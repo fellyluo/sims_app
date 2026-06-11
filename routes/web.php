@@ -5,6 +5,7 @@ use App\Http\Controllers\GuruController;
 use App\Http\Controllers\KelasController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\PelajaranController;
+use App\Http\Controllers\JadwalController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SiswaController;
@@ -59,6 +60,15 @@ Route::middleware('auth')->group(function () {
         Route::get('/guru/{uuid}/pelajaran', [GuruController::class, 'pelajaran'])->name('guru.pelajaran');
         Route::post('/guru/{uuid}/pelajaran', [GuruController::class, 'ngajar'])->name('guru.ngajar');
         Route::delete('/guru/pelajaran/{uuid}/hapus', [GuruController::class, 'hapusNgajar'])->name('guru.hapusNgajar');
+        Route::get('/guru/{uuid}/ketersediaan', [GuruController::class, 'ketersediaan'])->name('guru.ketersediaan');
+        Route::post('/guru/{uuid}/ketersediaan', [GuruController::class, 'simpanKetersediaan'])->name('guru.ketersediaan.simpan');
+
+        // Jadwal
+        Route::post('/jadwal/generate', [\App\Http\Controllers\JadwalController::class, 'generate'])->name('jadwal.generate');
+        Route::get('/jadwal/print/{kelas?}', [\App\Http\Controllers\JadwalController::class, 'print'])->name('jadwal.print');
+        Route::get('/jadwal/export/{kelas?}', [\App\Http\Controllers\JadwalController::class, 'export'])->name('jadwal.export');
+        Route::post('/jadwal/import', [\App\Http\Controllers\JadwalController::class, 'import'])->name('jadwal.import');
+        Route::resource('/jadwal', \App\Http\Controllers\JadwalController::class)->except(['create', 'edit', 'show', 'update']);
 
         // Kelas
         Route::resource('/kelas', KelasController::class)->except('show');
@@ -81,6 +91,11 @@ Route::middleware('auth')->group(function () {
         Route::delete('/pelajaran/{uuid}', [PelajaranController::class, 'destroy'])->name('pelajaran.destroy');
         Route::post('/pelajaran/sorting', [PelajaranController::class, 'sorting'])->name('pelajaran.sorting');
 
+        // Jadwal Pelajaran
+        Route::get('/jadwal', [JadwalController::class, 'index'])->name('jadwal.index');
+        Route::post('/jadwal', [JadwalController::class, 'store'])->name('jadwal.store');
+        Route::delete('/jadwal/{uuid}', [JadwalController::class, 'destroy'])->name('jadwal.destroy');
+
         // Import Siswa
         Route::get('/siswa/import', [SiswaController::class, 'importForm'])->name('siswa.importForm');
         Route::post('/siswa/import', [SiswaController::class, 'import'])->name('siswa.import');
@@ -98,6 +113,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/tanggal-rapor', 'setTanggalRapor')->name('setting.tanggalRapor');
             Route::post('/cara-absensi', 'setCaraAbsensi')->name('setting.caraAbsensi');
             Route::post('/rumus-rapor', 'setRumusRapor')->name('setting.rumusRapor');
+            Route::post('/waktu-jadwal', 'setWaktuJadwal')->name('setting.waktuJadwal');
         });
     });
 });

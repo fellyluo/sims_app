@@ -90,6 +90,14 @@
                     @endforelse
                 </div>
             </div>
+            {{-- Ketersediaan Waktu --}}
+            <div class="card p-6 mt-5">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2"><i data-lucide="clock" class="w-[18px] h-[18px] text-primary"></i> Ketersediaan Waktu</h3>
+                    <a href="{{ route('guru.ketersediaan', $guru->uuid) }}" class="text-xs font-semibold text-primary hover:underline flex items-center gap-1">Atur <i data-lucide="arrow-right" class="w-3 h-3"></i></a>
+                </div>
+                <p class="text-sm text-slate-500">Atur jadwal kapan guru tidak bisa mengajar (misal libur hari tertentu).</p>
+            </div>
         </div>
     </div>
 </div>

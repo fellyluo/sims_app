@@ -81,22 +81,25 @@ class SettingController extends Controller
 
     public function setCaraAbsensi(Request $request)
     {
-        $request->validate(['cara_absensi' => 'required|in:barcode,manual']);
-        Setting::set('cara_absensi_guru', $request->cara_absensi);
-        return back()->with('success', 'Cara absensi disimpan.');
+        $request->validate(['cara_absensi' => 'required|in:1,2']);
+        Setting::set('cara_absensi', $request->cara_absensi);
+        return back()->with('success', 'Cara absensi berhasil diperbarui');
     }
 
     public function setRumusRapor(Request $request)
     {
-        $request->validate([
-            'bobot_harian' => 'required|integer|min:0|max:100',
-            'bobot_pts'    => 'required|integer|min:0|max:100',
-            'bobot_pas'    => 'required|integer|min:0|max:100',
-        ]);
-        Setting::set('bobot_harian', $request->bobot_harian);
-        Setting::set('bobot_pts', $request->bobot_pts);
-        Setting::set('bobot_pas', $request->bobot_pas);
-        return back()->with('success', 'Rumus rapor disimpan.');
+        $request->validate(['rumus_rapor' => 'required|in:1,2']);
+        Setting::set('rumus_rapor', $request->rumus_rapor);
+        return back()->with('success', 'Rumus perhitungan rapor berhasil diperbarui');
+    }
+
+    public function setWaktuJadwal(Request $request)
+    {
+        $data = $request->input('waktu');
+        if (is_array($data)) {
+            Setting::set('jadwal_waktu', json_encode($data));
+        }
+        return back()->with('success', 'Master waktu pelajaran berhasil disimpan');
     }
 
     public function setBarcodeAbsensi()

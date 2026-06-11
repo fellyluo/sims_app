@@ -9,8 +9,8 @@
     </div>
 
     {{-- Tabs --}}
-    <div class="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-2xl p-1.5 mb-6 flex-wrap">
-        @foreach(['sekolah'=>['Identitas','building-2'],'semester'=>['Semester','calendar-days'],'penilaian'=>['Penilaian','calculator'],'absensi'=>['Absensi','clock']] as $key => [$label,$icon])
+    <div class="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-2xl p-1.5 mb-6 flex-wrap overflow-x-auto">
+        @foreach(['sekolah'=>['Identitas','building-2'],'semester'=>['Semester','calendar-days'],'penilaian'=>['Penilaian','calculator'],'absensi'=>['Absensi','clock'],'jadwal'=>['Waktu Jadwal','clock-4']] as $key => [$label,$icon])
         <button @click="tab='{{ $key }}'"
                 :class="tab==='{{ $key }}' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'"
                 class="seg flex-1 min-w-fit flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition">
@@ -143,6 +143,41 @@
                 </div>
             </form>
         </div>
+    </div>
+
+    {{-- Waktu Jadwal --}}
+    <div x-show="tab==='jadwal'" x-transition>
+        <form method="POST" action="{{ route('setting.waktuJadwal') }}" class="card p-6 space-y-4">
+            @csrf
+            <div>
+                <h2 class="font-bold text-slate-800 dark:text-slate-100">Master Waktu Pelajaran</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Atur jam mulai dan selesai untuk masing-masing slot "Jam Ke-". Kosongkan jika tidak dipakai.</p>
+            </div>
+            
+            @php
+                $waktuJadwal = json_decode($settings['jadwal_waktu'] ?? '{}', true);
+            @endphp
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+                @for($i = 1; $i <= 10; $i++)
+                <div class="border rounded-xl p-3 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                    <p class="font-bold text-sm text-slate-700 dark:text-slate-300 mb-2">Jam Ke-{{ $i }}</p>
+                    <div class="flex gap-2">
+                        <div class="flex-1">
+                            <label class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Mulai</label>
+                            <input type="time" name="waktu[{{ $i }}][mulai]" value="{{ $waktuJadwal[$i]['mulai'] ?? '' }}" class="form-input !py-1.5 !px-2 text-sm">
+                        </div>
+                        <div class="flex-1">
+                            <label class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Selesai</label>
+                            <input type="time" name="waktu[{{ $i }}][selesai]" value="{{ $waktuJadwal[$i]['selesai'] ?? '' }}" class="form-input !py-1.5 !px-2 text-sm">
+                        </div>
+                    </div>
+                </div>
+                @endfor
+            </div>
+
+            <button type="submit" class="btn-primary px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 mt-4"><i data-lucide="save" class="w-4 h-4"></i> Simpan Waktu Jadwal</button>
+        </form>
     </div>
 </div>
 @endsection

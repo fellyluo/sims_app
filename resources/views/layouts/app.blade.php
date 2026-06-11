@@ -224,13 +224,27 @@
                 ['guru.index','guru.*','users','Data Guru'],
                 ['kelas.index','kelas.*','door-open','Data Kelas'],
                 ['siswa.index','siswa.*','graduation-cap','Data Siswa'],
-                ['pelajaran.index','pelajaran.*','book-open-text','Mata Pelajaran'],
             ] as [$route, $pattern, $icon, $label])
             <a href="{{ route($route) }}" class="nav-link flex items-center gap-3 px-3 py-2.5 {{ request()->routeIs($pattern) ? 'active' : '' }}">
                 <i data-lucide="{{ $icon }}" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
                 <span x-show="!collapsed" class="text-sm truncate">{{ $label }}</span>
             </a>
             @endforeach
+
+            {{-- Dropdown Akademik --}}
+            <div x-data="{ open: {{ request()->routeIs('pelajaran.*', 'jadwal.*') ? 'true' : 'false' }} }">
+                <button @click="open = !open" class="nav-link flex items-center justify-between w-full px-3 py-2.5 {{ request()->routeIs('pelajaran.*', 'jadwal.*') ? 'active' : '' }}">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="book-open-text" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
+                        <span x-show="!collapsed" class="text-sm truncate">Akademik</span>
+                    </div>
+                    <i data-lucide="chevron-down" x-show="!collapsed" class="w-4 h-4 transition-transform" :class="open ? 'rotate-180' : ''"></i>
+                </button>
+                <div x-show="open && !collapsed" class="pl-9 pr-3 py-1 space-y-1">
+                    <a href="{{ route('pelajaran.index') }}" class="block px-3 py-2 text-sm rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition {{ request()->routeIs('pelajaran.*') ? 'text-primary font-bold bg-black/5 dark:bg-white/5' : '' }}">Mata Pelajaran</a>
+                    <a href="{{ route('jadwal.index') }}" class="block px-3 py-2 text-sm rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition {{ request()->routeIs('jadwal.*') ? 'text-primary font-bold bg-black/5 dark:bg-white/5' : '' }}">Jadwal Pelajaran</a>
+                </div>
+            </div>
 
             <p x-show="!collapsed" class="nav-section px-3 pt-5 pb-2 text-[11px] font-bold uppercase tracking-[.1em]">Sistem</p>
             <a href="{{ route('setting.index') }}" class="nav-link flex items-center gap-3 px-3 py-2.5 {{ request()->routeIs('setting.*') ? 'active' : '' }}">

@@ -152,15 +152,21 @@ class GuruController extends Controller
         $request->validate([
             'id_pelajaran' => 'required|exists:pelajarans,uuid',
             'id_kelas'     => 'nullable|exists:kelas,uuid',
+            'jumlah_jam'   => 'required|integer|min:1|max:40'
         ]);
 
         Guru::findOrFail($uuid);
 
-        Ngajar::firstOrCreate([
-            'id_guru'      => $uuid,
-            'id_pelajaran' => $request->id_pelajaran,
-            'id_kelas'     => $request->id_kelas,
-        ]);
+        Ngajar::updateOrCreate(
+            [
+                'id_guru'      => $uuid,
+                'id_pelajaran' => $request->id_pelajaran,
+                'id_kelas'     => $request->id_kelas,
+            ],
+            [
+                'jumlah_jam'   => $request->jumlah_jam
+            ]
+        );
 
         return back()->with('success', 'Pelajaran berhasil ditambahkan.');
     }
@@ -169,5 +175,34 @@ class GuruController extends Controller
     {
         Ngajar::findOrFail($ngajarUuid)->delete();
         return back()->with('success', 'Pelajaran dihapus.');
+    }
+
+    public function ketersediaan(string $uuid)
+    {
+        $guru = Guru::findOrFail($uuid);
+        $ketersediaans = \App\Models\GuruKetersediaan::where('id_guru', $uuid)->get();
+        return view('guru.ketersediaan', compact('guru', 'ketersediaans'));
+    }
+
+    public function simpanKetersediaan(Request $request, string $uuid)
+    {
+        $guru = Guru::findOrFail($uuid);
+        \App\Models\GuruKetersediaan::where('id_guru', $uuid)->delete();
+        
+        if ($request->has('unavailable') && is_array($request->unavailable)) {
+            foreach ($request->unavailable as $item) {
+                // $item is like "1_1" for Hari 1 Jam 1
+                $parts = explode('_', $item);
+                if (count($parts) === 2) {
+                    \App\Models\GuruKetersediaan::create([
+                        'id_guru' => $uuid,
+                        'hari' => (int)$parts[0],
+                        'jam_ke' => (int)$parts[1],
+                    ]);
+                }
+            }
+        }
+        
+        return back()->with('success', 'Ketersediaan waktu berhasil disimpan.');
     }
 }

@@ -6,16 +6,22 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Ngajar extends Model
+class Jadwal extends Model
 {
     use HasFactory, HasUuids;
 
     protected $primaryKey = 'uuid';
-    protected $fillable = ['id_guru', 'id_pelajaran', 'id_kelas', 'jumlah_jam'];
+    protected $fillable = [
+        'id_kelas',
+        'id_pelajaran',
+        'id_guru',
+        'hari',
+        'jam_ke'
+    ];
 
-    public function guru()
+    public function kelas()
     {
-        return $this->belongsTo(Guru::class, 'id_guru', 'uuid');
+        return $this->belongsTo(Kelas::class, 'id_kelas', 'uuid');
     }
 
     public function pelajaran()
@@ -23,8 +29,8 @@ class Ngajar extends Model
         return $this->belongsTo(Pelajaran::class, 'id_pelajaran', 'uuid');
     }
 
-    public function kelas()
+    public function guru()
     {
-        return $this->belongsTo(Kelas::class, 'id_kelas', 'uuid');
+        return $this->belongsTo(Guru::class, 'id_guru', 'uuid');
     }
 }

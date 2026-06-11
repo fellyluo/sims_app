@@ -36,6 +36,9 @@
                     @endforeach
                 </select>
             </div>
+            <div class="w-24">
+                <input type="number" name="jumlah_jam" min="1" max="40" value="2" required class="form-input" title="Jumlah Jam per Minggu">
+            </div>
             <button type="submit" class="btn-primary px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2">
                 <i data-lucide="plus" class="w-4 h-4"></i> Tambah
             </button>
@@ -50,6 +53,7 @@
                     <tr>
                         <th>Pelajaran</th>
                         <th>Kelas</th>
+                        <th>Jam/Mgg</th>
                         <th class="text-right">Aksi</th>
                     </tr>
                 </thead>
@@ -60,6 +64,7 @@
                         <td>
                             <span class="badge bg-primary-50 text-primary">{{ $ngajar->kelas ? 'Kelas '.$ngajar->kelas->tingkat.$ngajar->kelas->kelas : 'Semua Kelas' }}</span>
                         </td>
+                        <td class="font-bold text-slate-700 dark:text-slate-300">{{ $ngajar->jumlah_jam }}</td>
                         <td class="text-right">
                             <form method="POST" action="{{ route('guru.hapusNgajar', $ngajar->uuid) }}" onsubmit="return confirmDelete(this)">
                                 @csrf @method('DELETE')
