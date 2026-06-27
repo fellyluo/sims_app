@@ -19,6 +19,8 @@
 /storage/*.key
 /storage/pail
 /vendor
+# Database SQLite lokal — jangan ikut ter-commit (berisi data siswa asli).
+/database/database.sqlite
 # Backup database lokal — jangan ikut ter-commit.
 /database/*.backup-*.sqlite
 /database/*.sqlite-journal
