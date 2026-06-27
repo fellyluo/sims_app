@@ -31,7 +31,6 @@ use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SiswaController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Middleware\EnsureFaceRegistered;
-use App\Http\Middleware\IsAdmin;
 use Illuminate\Support\Facades\Route;
 use Laragear\WebAuthn\Http\Routes as WebAuthnRoutes;
 
@@ -228,7 +227,7 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
     });
 
     // ─── Admin ─────────────────────────────────────────────────────────────
-    Route::middleware(IsAdmin::class)->group(function () {
+    Route::middleware('role:admin')->group(function () {
 
         // Guru
         Route::resource('/guru', GuruController::class);
@@ -339,7 +338,7 @@ Route::middleware(['auth', 'chatbot.user'])->group(function () {
 });
 
 // Inbox admin (hanya admin/superadmin).
-Route::middleware(['auth', 'isAdmin'])->prefix('chatbot/admin')->name('chatbot.admin.')->group(function () {
+Route::middleware(['auth', 'role:admin'])->prefix('chatbot/admin')->name('chatbot.admin.')->group(function () {
     Route::get('/inbox', [ChatbotAdminController::class, 'inbox'])->name('inbox');
     Route::get('/queue', [ChatbotAdminController::class, 'queue'])->name('queue');
     Route::get('/history', [ChatbotAdminController::class, 'history'])->name('history');
