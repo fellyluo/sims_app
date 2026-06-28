@@ -30,6 +30,8 @@ use App\Http\Controllers\RekapController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SiswaController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\Keuangan\KeuanganController;
+use App\Http\Controllers\Keuangan\TagihanController;
 use App\Http\Middleware\EnsureFaceRegistered;
 use Illuminate\Support\Facades\Route;
 use Laragear\WebAuthn\Http\Routes as WebAuthnRoutes;
@@ -317,6 +319,29 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
             Route::get('/kop-rapor', 'kopRapor')->name('setting.kopRapor');
             Route::post('/kop-rapor', 'kopRaporSave')->name('setting.kopRapor.save');
         });
+    });
+
+    // ─── Keuangan: Bendahara (juga admin/superadmin) ───────────────────────
+    Route::middleware('role:admin,bendahara')->prefix('keuangan')->name('keuangan.')->group(function () {
+        Route::get('/', [KeuanganController::class, 'index'])->name('index');
+        Route::get('/verifikasi', [KeuanganController::class, 'verifikasi'])->name('verifikasi');
+        Route::post('/verifikasi/verify', [KeuanganController::class, 'verifyBatch'])->name('verify-batch');
+        Route::post('/verifikasi/validate', [KeuanganController::class, 'validateBatch'])->name('validate-batch');
+        Route::post('/verifikasi/revise', [KeuanganController::class, 'reviseBatch'])->name('revise-batch');
+        Route::post('/verifikasi/reject', [KeuanganController::class, 'rejectBatch'])->name('reject-batch');
+        Route::get('/bank', [KeuanganController::class, 'bank'])->name('bank');
+        Route::post('/bank', [KeuanganController::class, 'bankUpdate'])->name('bank.update');
+        Route::get('/kelas/{kelas}', [KeuanganController::class, 'kelas'])->name('kelas');
+        Route::get('/kelas/{kelas}/pengaturan', [KeuanganController::class, 'pengaturanKelas'])->name('kelas.pengaturan');
+        Route::post('/kelas/{kelas}/pengaturan', [KeuanganController::class, 'simpanPengaturanKelas'])->name('kelas.pengaturan.simpan');
+        Route::post('/pembayaran/{pembayaran}/cell', [KeuanganController::class, 'cell'])->name('cell');
+    });
+
+    // ─── Keuangan: Tagihan SPP siswa & orang tua ───────────────────────────
+    Route::prefix('tagihan-spp')->name('keuangan.tagihan.')->group(function () {
+        Route::get('/', [TagihanController::class, 'index'])->name('index');
+        Route::get('/{pembayaran}', [TagihanController::class, 'show'])->name('show');
+        Route::post('/{pembayaran}/bukti', [TagihanController::class, 'upload'])->name('upload');
     });
 });
 
