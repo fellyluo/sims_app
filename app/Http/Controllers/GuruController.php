@@ -158,6 +158,7 @@ class GuruController extends Controller
         'kurikulum' => 'Kurikulum',
         'kesiswaan' => 'Kesiswaan',
         'sapras'    => 'Sarana & Prasarana',
+        'bendahara' => 'Bendahara',
         'kepala'    => 'Kepala Sekolah',
         'admin'     => 'Admin',
     ];

@@ -1,0 +1,122 @@
+<?php
+
+namespace App\Services\Keuangan;
+
+use App\Models\Kelas;
+use App\Models\Siswa;
+use App\Models\SppPembayaran;
+use App\Support\TahunAjaran;
+use Illuminate\Support\Collection;
+
+/**
+ * Logika inti pembayaran SPP: memastikan baris 12 bulan ada, menyusun grid
+ * per kelas untuk bendahara, dan rekap tagihan per siswa untuk ortu/siswa.
+ */
+class SppService
+{
+    /**
+     * Pastikan 12 baris bulan (Juli..Juni) ada untuk satu siswa pada tahun
+     * ajaran tertentu. Nominal default diambil dari kolom siswa.spp.
+     */
+    public function ensureRows(Siswa $siswa, string $ta): void
+    {
+        $existing = SppPembayaran::where('id_siswa', $siswa->uuid)
+            ->where('tahun_ajaran', $ta)
+            ->pluck('bulan')
+            ->all();
+
+        $nominal = (int) preg_replace('/\D/', '', (string) ($siswa->spp ?? '')) ?: 0;
+
+        $missing = [];
+        foreach (array_keys(TahunAjaran::BULAN) as $idx) {
+            if (!in_array($idx, $existing, true)) {
+                $missing[] = [
+                    'uuid'         => (string) \Illuminate\Support\Str::uuid(),
+                    'id_siswa'     => $siswa->uuid,
+                    'tahun_ajaran' => $ta,
+                    'bulan'        => $idx,
+                    'nominal'      => $nominal,
+                    'status'       => SppPembayaran::STATUS_BELUM,
+                    'created_at'   => now(),
+                    'updated_at'   => now(),
+                ];
+            }
+        }
+        if ($missing) {
+            SppPembayaran::insert($missing);
+        }
+    }
+
+    /**
+     * Pastikan baris ada untuk seluruh siswa di satu kelas.
+     */
+    public function ensureRowsForKelas(Kelas $kelas, string $ta): void
+    {
+        foreach ($kelas->siswa as $siswa) {
+            $this->ensureRows($siswa, $ta);
+        }
+    }
+
+    /**
+     * Pembayaran satu siswa untuk satu tahun ajaran, terurut bulan 1..12
+     * dan ter-index berdasarkan bulan.
+     *
+     * @return Collection<int, SppPembayaran>
+     */
+    public function forSiswa(Siswa $siswa, string $ta): Collection
+    {
+        $this->ensureRows($siswa, $ta);
+
+        return SppPembayaran::where('id_siswa', $siswa->uuid)
+            ->where('tahun_ajaran', $ta)
+            ->orderBy('bulan')
+            ->get()
+            ->keyBy('bulan');
+    }
+
+    /**
+     * Grid kelas: tiap siswa beserta pembayaran ter-index bulan + ringkasan.
+     *
+     * @return array{siswa: Siswa, bayar: Collection<int,SppPembayaran>, lunas:int, nominal:int}[]
+     */
+    public function gridForKelas(Kelas $kelas, string $ta): array
+    {
+        $this->ensureRowsForKelas($kelas, $ta);
+
+        $siswaList = $kelas->siswa()->get();
+        $all = SppPembayaran::whereIn('id_siswa', $siswaList->pluck('uuid'))
+            ->where('tahun_ajaran', $ta)
+            ->get()
+            ->groupBy('id_siswa');
+
+        $rows = [];
+        foreach ($siswaList as $siswa) {
+            $bayar = ($all[$siswa->uuid] ?? collect())->keyBy('bulan');
+            $rows[] = [
+                'siswa'   => $siswa,
+                'bayar'   => $bayar,
+                'lunas'   => $bayar->where('status', SppPembayaran::STATUS_LUNAS)->count(),
+                'nominal' => (int) $bayar->where('status', SppPembayaran::STATUS_LUNAS)->sum('nominal'),
+            ];
+        }
+        return $rows;
+    }
+
+    /**
+     * Ringkasan tagihan satu siswa: total bulan, lunas, menunggu, tunggakan.
+     *
+     * @param Collection<int,SppPembayaran> $bayar
+     * @return array{total:int, lunas:int, menunggu:int, belum:int, tunggakan:int}
+     */
+    public function ringkasan(Collection $bayar): array
+    {
+        return [
+            'total'         => $bayar->count(),
+            'lunas'         => $bayar->where('status', SppPembayaran::STATUS_LUNAS)->count(),
+            'terverifikasi' => $bayar->where('status', SppPembayaran::STATUS_TERVERIFIKASI)->count(),
+            'menunggu'      => $bayar->where('status', SppPembayaran::STATUS_MENUNGGU)->count(),
+            'belum'         => $bayar->whereIn('status', [SppPembayaran::STATUS_BELUM, SppPembayaran::STATUS_DITOLAK])->count(),
+            'tunggakan'     => (int) $bayar->whereIn('status', [SppPembayaran::STATUS_BELUM, SppPembayaran::STATUS_DITOLAK])->sum('nominal'),
+        ];
+    }
+}

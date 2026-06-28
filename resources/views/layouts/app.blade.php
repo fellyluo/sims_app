@@ -343,6 +343,15 @@
                     ]];
                 }
 
+                // Grup Keuangan (Bendahara + admin/superadmin)
+                if (in_array($access, ['superadmin','admin','bendahara'])) {
+                    $groups['keuangan'] = ['Keuangan', 'wallet', [
+                        ['keuangan.index',      ['keuangan.index','keuangan.kelas'], 'layout-dashboard', 'Pembayaran SPP'],
+                        ['keuangan.verifikasi', ['keuangan.verifikasi'],             'badge-check',      'Verifikasi'],
+                        ['keuangan.bank',       ['keuangan.bank'],                   'landmark',         'Bank & Metode'],
+                    ]];
+                }
+
                 if ($isAdmin) {
                     $groups['sistem'] = ['Sistem', 'sliders-horizontal', [
                         ['setting.index', ['setting.*'], 'settings-2', 'Pengaturan'],
@@ -385,6 +394,14 @@
             <a href="{{ route('chatbot.admin.inbox') }}" class="nav-link flex items-center gap-3 px-3 py-2.5 {{ request()->routeIs('chatbot.admin.*') ? 'active' : '' }}">
                 <i data-lucide="message-circle" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
                 <span x-show="!collapsed" class="text-sm truncate">Chat / Inbox</span>
+            </a>
+            @endif
+
+            {{-- Tagihan SPP: siswa & orang tua --}}
+            @if(auth()->user()?->siswa || auth()->user()?->access === 'orangtua')
+            <a href="{{ route('keuangan.tagihan.index') }}" class="nav-link flex items-center gap-3 px-3 py-2.5 {{ request()->routeIs('keuangan.tagihan.*') ? 'active' : '' }}">
+                <i data-lucide="wallet" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
+                <span x-show="!collapsed" class="text-sm truncate">Tagihan SPP</span>
             </a>
             @endif
 

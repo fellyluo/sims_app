@@ -1,0 +1,216 @@
+@extends('layouts.app')
+@section('title', 'SPP — ' . $kelas->nama_lengkap)
+
+@push('styles')
+<style>
+    .spp-cell { transition: all .12s; }
+    .spp-cell:hover { transform: scale(1.06); z-index: 1; }
+    .spp-belum    { background:#f1f5f9; color:#64748b; }
+    .dark .spp-belum   { background:#334155; color:#94a3b8; }
+    .spp-menunggu { background:#fef3c7; color:#b45309; }
+    .dark .spp-menunggu{ background:#78350f; color:#fde68a; }
+    .spp-terverifikasi { background:#e0f2fe; color:#0369a1; }
+    .dark .spp-terverifikasi { background:#0c4a6e; color:#bae6fd; }
+    .spp-lunas    { background:#d1fae5; color:#047857; }
+    .dark .spp-lunas   { background:#064e3b; color:#6ee7b7; }
+    .spp-ditolak  { background:#fee2e2; color:#b91c1c; }
+    .dark .spp-ditolak { background:#7f1d1d; color:#fecaca; }
+    .spp-grid th, .spp-grid td { white-space: nowrap; }
+    .spp-sticky { position: sticky; left: 0; z-index: 2; }
+</style>
+@endpush
+
+@section('content')
+<div x-data="sppGrid()" class="space-y-5">
+
+    {{-- Header --}}
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+            <nav class="text-xs text-slate-400 mb-1"><a href="{{ route('keuangan.index', ['ta'=>$ta]) }}" class="hover:underline">Keuangan</a> / {{ $kelas->nama_lengkap }}</nav>
+            <h1 class="page-title">{{ $kelas->nama_lengkap }}</h1>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Tahun Ajaran {{ $ta }} · {{ count($rows) }} siswa · klik sel untuk ubah status / nominal / tanggal</p>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+            <a href="{{ route('keuangan.kelas.pengaturan', ['kelas'=>$kelas->uuid,'ta'=>$ta]) }}"
+               class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-primary/40 text-primary hover:bg-primary/5">
+                <i data-lucide="wallet-cards" class="w-4 h-4"></i> <span class="hidden sm:inline">Atur VA &amp; Nominal</span>
+            </a>
+            <form method="GET" class="flex items-center gap-2">
+                <select name="ta" onchange="this.form.submit()" class="form-input !w-auto text-sm">
+                    @foreach($taOptions as $opt)
+                        <option value="{{ $opt }}" @selected($opt===$ta)>T.A. {{ $opt }}</option>
+                    @endforeach
+                </select>
+            </form>
+        </div>
+    </div>
+
+    {{-- Legenda --}}
+    <div class="flex flex-wrap gap-3 text-xs">
+        <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded spp-lunas inline-block"></span> Lunas</span>
+        <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded spp-terverifikasi inline-block"></span> Terverifikasi</span>
+        <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded spp-menunggu inline-block"></span> Menunggu verifikasi</span>
+        <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded spp-ditolak inline-block"></span> Ditolak</span>
+        <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded spp-belum inline-block"></span> Belum bayar</span>
+    </div>
+
+    {{-- Grid --}}
+    <div class="card p-0 overflow-x-auto">
+        <table class="spp-grid w-full text-sm border-collapse">
+            <thead>
+                <tr class="text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                    <th class="spp-sticky bg-white dark:bg-slate-800 text-left font-semibold px-4 py-3">Siswa</th>
+                    @foreach($bulanList as $b)
+                        <th class="px-2 py-3 text-center font-semibold text-[11px]">{{ \Illuminate\Support\Str::substr($b['label'],0,3) }}<br><span class="text-slate-300 dark:text-slate-500 font-normal">'{{ substr($b['year'],2) }}</span></th>
+                    @endforeach
+                    <th class="px-3 py-3 text-center font-semibold">Lunas</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($rows as $row)
+                @php $s = $row['siswa']; @endphp
+                <tr class="border-b border-slate-100 dark:border-slate-700/60 hover:bg-slate-50/60 dark:hover:bg-slate-700/30">
+                    <td class="spp-sticky bg-white dark:bg-slate-800 px-4 py-2">
+                        <p class="font-medium text-slate-700 dark:text-slate-200">{{ $s->nama }}</p>
+                        <p class="text-[11px] text-slate-400">NIS {{ $s->nis }}</p>
+                    </td>
+                    @foreach($bulanList as $b)
+                        @php
+                            $p = $row['bayar'][$b['idx']] ?? null;
+                            $cellData = $p ? [
+                                'uuid'          => $p->uuid,
+                                'siswa'         => $s->nama,
+                                'bulan'         => $b['label'] . ' ' . $b['year'],
+                                'status'        => $p->status,
+                                'nominal'       => (int) $p->nominal,
+                                'tanggal_bayar' => optional($p->tanggal_bayar)->format('Y-m-d'),
+                                'jatuh_tempo'   => optional($p->jatuh_tempo)->format('Y-m-d'),
+                                'catatan'       => $p->catatan,
+                                'bukti'         => $p->bukti_url,
+                                'bank'          => $p->bank,
+                            ] : null;
+                        @endphp
+                        <td class="px-1 py-1 text-center">
+                            @if($p)
+                            <button type="button"
+                                    class="spp-cell w-9 h-9 rounded-lg grid place-items-center mx-auto spp-{{ $p->status }}"
+                                    title="{{ $b['label'] }} {{ $b['year'] }} — {{ ucfirst($p->status) }}"
+                                    @click="openCell({{ \Illuminate\Support\Js::from($cellData) }})">
+                                @switch($p->status)
+                                    @case('lunas')<i data-lucide="check" class="w-4 h-4"></i>@break
+                                    @case('terverifikasi')<i data-lucide="badge-check" class="w-4 h-4"></i>@break
+                                    @case('menunggu')<i data-lucide="clock" class="w-4 h-4"></i>@break
+                                    @case('ditolak')<i data-lucide="x" class="w-4 h-4"></i>@break
+                                    @default<span class="text-[11px]">—</span>
+                                @endswitch
+                            </button>
+                            @endif
+                        </td>
+                    @endforeach
+                    <td class="px-3 py-2 text-center">
+                        <span class="badge {{ $row['lunas']===12 ? 'bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300' }}">{{ $row['lunas'] }}/12</span>
+                    </td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+
+    {{-- Modal editor sel --}}
+    <div x-show="open" x-transition.opacity style="display:none" class="fixed inset-0 z-[9990] grid place-items-center p-4 bg-slate-900/50 backdrop-blur-sm" @click.self="open=false">
+        <div class="card !rounded-2xl w-full max-w-md p-5 space-y-4" @click.stop>
+            <div class="flex items-start justify-between">
+                <div>
+                    <h3 class="font-bold text-slate-800 dark:text-slate-100" x-text="cell.siswa"></h3>
+                    <p class="text-sm text-slate-500 dark:text-slate-400" x-text="cell.bulan"></p>
+                </div>
+                <button @click="open=false" class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            {{-- Bukti --}}
+            <template x-if="cell.bukti">
+                <a :href="cell.bukti" target="_blank" class="block rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 hover:opacity-90">
+                    <img :src="cell.bukti" alt="Bukti" class="w-full max-h-48 object-contain bg-slate-50 dark:bg-slate-900">
+                    <p class="text-center text-xs text-slate-500 dark:text-slate-400 py-1.5 flex items-center justify-center gap-1"><i data-lucide="external-link" class="w-3 h-3"></i> Lihat bukti <span x-show="cell.bank" x-text="'· '+cell.bank"></span></p>
+                </a>
+            </template>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div class="col-span-2">
+                    <label class="form-label">Status</label>
+                    <select x-model="cell.status" class="form-input text-sm">
+                        <option value="belum">Belum bayar</option>
+                        <option value="menunggu">Menunggu verifikasi</option>
+                        <option value="terverifikasi">Sudah terverifikasi</option>
+                        <option value="lunas">Lunas</option>
+                        <option value="ditolak">Ditolak</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">Nominal (Rp)</label>
+                    <input type="number" min="0" x-model.number="cell.nominal" class="form-input text-sm">
+                </div>
+                <div>
+                    <label class="form-label">Tgl Bayar</label>
+                    <input type="date" x-model="cell.tanggal_bayar" class="form-input text-sm">
+                </div>
+                <div class="col-span-2">
+                    <label class="form-label">Jatuh Tempo</label>
+                    <input type="date" x-model="cell.jatuh_tempo" class="form-input text-sm">
+                </div>
+                <div class="col-span-2" x-show="cell.status==='ditolak'">
+                    <label class="form-label">Catatan / alasan tolak</label>
+                    <input type="text" x-model="cell.catatan" maxlength="500" class="form-input text-sm" placeholder="mis. Nominal kurang / bukti buram">
+                </div>
+            </div>
+
+            <div class="flex gap-2 pt-1">
+                <button @click="open=false" class="flex-1 py-2.5 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700">Batal</button>
+                <button @click="save()" :disabled="saving" class="btn-primary flex-1 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2">
+                    <i data-lucide="loader-2" class="w-4 h-4 animate-spin" x-show="saving"></i>
+                    <span x-text="saving ? 'Menyimpan...' : 'Simpan'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+@push('scripts')
+<script>
+function sppGrid() {
+    return {
+        open: false,
+        saving: false,
+        cell: {},
+        openCell(data) {
+            this.cell = { ...data };
+            this.open = true;
+            this.$nextTick(() => lucide.createIcons());
+        },
+        async save() {
+            this.saving = true;
+            try {
+                const res = await fetch(`{{ url('keuangan/pembayaran') }}/${this.cell.uuid}/cell`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': $('meta[name=csrf-token]').attr('content'), 'Accept': 'application/json' },
+                    body: JSON.stringify({
+                        status: this.cell.status,
+                        nominal: this.cell.nominal,
+                        tanggal_bayar: this.cell.tanggal_bayar || null,
+                        jatuh_tempo: this.cell.jatuh_tempo || null,
+                        catatan: this.cell.catatan || null,
+                    }),
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                showToast('Pembayaran diperbarui');
+                setTimeout(() => window.location.reload(), 400);
+            } catch (e) {
+                $.alert({ title: 'Gagal', content: 'Gagal menyimpan perubahan, coba lagi.', type: 'red' });
+                this.saving = false;
+            }
+        },
+    }
+}
+</script>
+@endpush
