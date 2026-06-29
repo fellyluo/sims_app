@@ -7,6 +7,7 @@ use App\Models\Kelas;
 use App\Models\Semester;
 use App\Models\Siswa;
 use App\Models\UserPreference;
+use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
@@ -29,5 +30,24 @@ class DashboardController extends Controller
         }
 
         return view('dashboard', compact('user', 'semester', 'pref', 'stats'));
+    }
+
+    /** Simpan urutan blok dashboard hasil drag & drop. */
+    public function saveLayout(Request $request)
+    {
+        $data = $request->validate([
+            'layout'   => ['required', 'array'],
+            'layout.*' => ['string', 'in:' . implode(',', UserPreference::DASHBOARD_BLOCKS)],
+        ]);
+
+        // Saring duplikat & jaga hanya blok yang dikenal, urutannya sesuai kiriman.
+        $layout = array_values(array_unique($data['layout']));
+
+        auth()->user()->preference()->updateOrCreate(
+            ['user_uuid' => auth()->id()],
+            ['dashboard_layout' => $layout]
+        );
+
+        return response()->json(['success' => true, 'layout' => $layout]);
     }
 }

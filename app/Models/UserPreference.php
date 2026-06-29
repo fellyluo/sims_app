@@ -13,13 +13,18 @@ class UserPreference extends Model
         'user_uuid', 'primary_color', 'secondary_color', 'accent_color',
         'sidebar_style', 'sidebar_bg', 'sidebar_text',
         'theme_mode', 'motif', 'ui_style', 'font_size', 'compact_mode', 'dashboard_widgets',
+        'dashboard_layout',
     ];
+
+    /** Urutan kanonik blok dashboard (default sebelum di-drag). */
+    public const DASHBOARD_BLOCKS = ['stats', 'ringkasan', 'sarpras', 'recent'];
 
     protected function casts(): array
     {
         return [
             'compact_mode'       => 'boolean',
             'dashboard_widgets'  => 'array',
+            'dashboard_layout'   => 'array',
         ];
     }
 

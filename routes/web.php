@@ -60,6 +60,7 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
 
     Route::get('/home', [LoginController::class, 'home'])->name('auth.home');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::post('/dashboard/tata-letak', [DashboardController::class, 'saveLayout'])->name('dashboard.layout');
 
     // Wajib daftar wajah sendiri (dipakai gate di atas)
     Route::get('/wajah-saya', [FaceController::class, 'self'])->name('face.self');
