@@ -111,14 +111,24 @@
         .nav-link { position:relative; color: color-mix(in srgb, var(--stx) 72%, transparent); border-radius:14px; transition:all .16s; }
         .nav-link:hover { background: color-mix(in srgb, var(--cp) 12%, transparent); color: {{ $isSidebarDark ? '#ffffff' : 'color-mix(in srgb, var(--stx) 95%, black)' }}; }
         .nav-link.active {
-            background: {{ $isSidebarDark ? 'rgba(255, 255, 255, 0.12)' : 'color-mix(in srgb, var(--cp) 16%, transparent)' }};
-            color: {{ $isSidebarDark ? '#ffffff' : 'color-mix(in srgb, var(--cp) 78%, black)' }};
+            background: {{ $isSidebarDark ? 'rgba(255, 255, 255, 0.18)' : 'color-mix(in srgb, var(--cp) 26%, transparent)' }};
+            color: {{ $isSidebarDark ? '#ffffff' : 'color-mix(in srgb, var(--cp) 88%, black)' }};
             font-weight:700;
+            box-shadow: inset 0 0 0 1px {{ $isSidebarDark ? 'rgba(255,255,255,0.12)' : 'color-mix(in srgb, var(--cp) 30%, transparent)' }};
         }
-        .nav-link.active .nav-icon { color: var(--sia); }
+        .nav-link.active .nav-icon { color: var(--sia); stroke-width:2.5; }
         .dark .nav-link.active { color:#e2e8f0; }
         .nav-section { color: color-mix(in srgb, var(--stx) 45%, transparent); }
         .dark .nav-section { color:#64748b; }
+        /* Tooltip melayang utk sidebar mode ikon (mini) — fixed agar tak terpotong scroll */
+        .sb-tip { position:fixed; transform:translateY(-50%); background:#1e293b; color:#fff; font-size:12px;
+            font-weight:600; line-height:1; padding:7px 11px; border-radius:9px; box-shadow:0 8px 22px rgba(15,23,42,.28);
+            white-space:nowrap; z-index:9999; opacity:0; pointer-events:none; transition:opacity .12s ease; }
+        .sb-tip.show { opacity:1; }
+        .sb-tip::before { content:""; position:absolute; right:100%; top:50%; transform:translateY(-50%);
+            border:5px solid transparent; border-right-color:#1e293b; }
+        .dark .sb-tip { background:#334155; }
+        .dark .sb-tip::before { border-right-color:#334155; }
         /* Tombol grup (kategori) + submenu */
         .nav-group { color: color-mix(in srgb, var(--stx) 78%, transparent); border-radius:14px; transition:all .16s; cursor:pointer; }
         .nav-group:hover { background: color-mix(in srgb, var(--cp) 10%, transparent); color: {{ $isSidebarDark ? '#ffffff' : 'color-mix(in srgb, var(--stx) 95%, black)' }}; }
@@ -268,14 +278,14 @@
 
     {{-- ============ SIDEBAR ============ --}}
     <aside class="sidebar flex flex-col flex-shrink-0 z-50 fixed inset-y-0 left-0 lg:relative -translate-x-full lg:translate-x-0"
-           :class="collapsed ? 'w-[78px]' : 'w-[258px]'">
+           :class="mini ? 'w-[78px]' : 'w-[258px]'">
 
         <div class="flex items-center gap-3 h-16 px-5 pt-2 flex-shrink-0">
             <div class="flex items-center gap-2.5 min-w-0">
                 <div class="w-9 h-9 rounded-xl grid place-items-center flex-shrink-0 shadow" style="background:linear-gradient(135deg,var(--cp),var(--cps))">
                     <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5 text-white" stroke="currentColor" stroke-width="2.2"><path d="M12 3L1 9l11 6 9-4.91V17M1 9v7" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </div>
-                <span x-show="!collapsed" class="font-extrabold text-[15px] truncate" style="color:var(--stx)">{{ $namaSekolah ?? 'Edu Nusantara' }}</span>
+                <span x-show="!mini" class="font-extrabold text-[15px] truncate" style="color:var(--stx)">{{ $namaSekolah ?? 'Edu Nusantara' }}</span>
             </div>
         </div>
 
@@ -293,45 +303,63 @@
                         ['siswa.index',     ['siswa.*'],           'graduation-cap', 'Data Siswa'],
                         ['pelajaran.index', ['pelajaran.*'],       'book-open-text', 'Mata Pelajaran'],
                     ]];
-                    $groups['presensi'] = ['Absensi & Presensi', 'clipboard-check', [
-                        ['absensi.index',       ['absensi.*'],                           'clipboard-check', 'Absensi Siswa'],
-                        ['presensi-guru.index', ['presensi-guru.*'],                     'user-check',      'Presensi Guru'],
-                        ['wajah.galeri',        ['wajah.*'],                             'scan-face',       'Validasi Wajah'],
-                        ['qr.absensi',          ['qr.*'],                                'qr-code',         'QR Absensi'],
-                    ]];
                 }
 
-                // Grup Penilaian & Rapor (bisa diakses Admin, Guru, & Siswa)
-                $penilaianItems = [];
-                $penilaianItems[] = ['classroom.index', ['classroom.*'], 'graduation-cap', 'Ruang Kelas'];
-                
-                if ($isAdmin) {
-                    $penilaianItems[] = ['jadwal.index', ['jadwal.*'], 'calendar-clock', 'Jadwal Pelajaran'];
+                // ── Absensi & Presensi (admin penuh; kurikulum hanya Kalender) ──
+                $presensiItems = [];
+                if ($isAdmin || $access === 'kurikulum') {
+                    $presensiItems[] = ['kalender.index', ['kalender.*'], 'calendar-days', 'Kalender Absensi'];
                 }
-                
-                if (auth()->user()?->guru) {
-                    $penilaianItems[] = ['agenda.index', ['agenda.index','agenda.create','agenda.edit'], 'clipboard-pen-line', 'Agenda Guru'];
+                if ($isAdmin) {
+                    $presensiItems[] = ['absensi.index',       ['absensi.*'],       'clipboard-check', 'Absensi Siswa'];
+                    $presensiItems[] = ['presensi-guru.index', ['presensi-guru.*'], 'user-check',      'Presensi Guru'];
+                    $presensiItems[] = ['wajah.galeri',        ['wajah.*'],         'scan-face',       'Validasi Wajah'];
+                    $presensiItems[] = ['qr.absensi',          ['qr.*'],            'qr-code',         'QR Absensi'];
+                }
+                if (!empty($presensiItems)) {
+                    $groups['presensi'] = ['Absensi & Presensi', 'clipboard-check', $presensiItems];
+                }
+
+                // ── Akademik (Ruang Kelas, Jadwal, Penilaian, Ekskul) ──
+                $akademik = [];
+                $akademik[] = ['classroom.index', ['classroom.*'], 'graduation-cap', 'Ruang Kelas'];
+                if ($isAdmin) {
+                    $akademik[] = ['jadwal.index', ['jadwal.*'], 'calendar-clock', 'Jadwal Pelajaran'];
                 }
                 if (auth()->user()?->guru || $isAdmin) {
-                    $penilaianItems[] = ['nilai.index', ['nilai.*'], 'pencil-line', $isAdmin ? 'Penilaian' : 'Buku Guru'];
-                    $penilaianItems[] = ['ekskul.index', ['ekskul.*'], 'volleyball', 'Ekstrakurikuler'];
+                    $akademik[] = ['nilai.index', ['nilai.*'], 'pencil-line', $isAdmin ? 'Penilaian' : 'Buku Guru'];
+                    $akademik[] = ['ekskul.index', ['ekskul.*'], 'volleyball', 'Ekstrakurikuler'];
                 }
-                if ($isAdmin || in_array(auth()->user()?->access, ['kurikulum','kepala']) || auth()->user()?->guru?->walikelas) {
-                    $penilaianItems[] = ['rekap.nilai', ['rekap.*'], 'table-2', 'Rekap Nilai'];
-                    $penilaianItems[] = ['cetak.rapor.index', ['cetak.*'], 'printer', 'Cetak Rapor'];
-                }
-                if ($isAdmin || in_array(auth()->user()?->access, ['kurikulum','kepala'])) {
-                    $penilaianItems[] = ['agenda.rekap', ['agenda.rekap','agenda.validasi'], 'calendar-check-2', 'Rekap Agenda'];
+                if (!empty($akademik)) {
+                    $groups['akademik'] = ['Akademik', 'book-open-check', $akademik];
                 }
 
-                if (!empty($penilaianItems)) {
-                    $groups['penilaian'] = ['Penilaian & Rapor', 'notebook-pen', $penilaianItems];
+                // ── Agenda (menu terpisah) ──
+                $agendaItems = [];
+                if (auth()->user()?->guru) {
+                    $agendaItems[] = ['agenda.index', ['agenda.index','agenda.create','agenda.edit'], 'clipboard-pen-line', 'Agenda Guru'];
+                }
+                if ($isAdmin || in_array($access, ['kurikulum','kepala'])) {
+                    $agendaItems[] = ['agenda.rekap', ['agenda.rekap','agenda.validasi'], 'calendar-check-2', 'Rekap Agenda'];
+                }
+                if (!empty($agendaItems)) {
+                    $groups['agenda'] = ['Agenda', 'notebook-pen', $agendaItems];
+                }
+
+                // ── Rapor (Rekap Nilai & Cetak Rapor) ──
+                $raporItems = [];
+                if ($isAdmin || in_array($access, ['kurikulum','kepala']) || auth()->user()?->guru?->walikelas) {
+                    $raporItems[] = ['rekap.nilai', ['rekap.*'], 'table-2', 'Rekap Nilai'];
+                    $raporItems[] = ['cetak.rapor.index', ['cetak.*'], 'printer', 'Cetak Rapor'];
+                }
+                if (!empty($raporItems)) {
+                    $groups['rapor'] = ['Rapor', 'file-text', $raporItems];
                 }
 
                 // Grup Sarana & Prasarana (staf sekolah; kelola penuh utk superadmin/admin/sapras)
                 if (in_array($access, ['superadmin','admin','sapras','kepala','kurikulum','kesiswaan','sekretaris','walikelas','guru'])) {
-                    $groups['sarpras'] = ['Sarana & Prasarana', 'building-2', [
-                        ['sarpras.dashboard',        ['sarpras.dashboard'],                          'gauge',           'Dashboard'],
+                    $sarprasFull = [
+                        ['sarpras.dashboard',        ['sarpras.dashboard'],                          'gauge',           'Dashboard Sapras'],
                         ['sarpras.aset.index',       ['sarpras.aset.*'],                             'package',         'Katalog Aset'],
                         ['sarpras.denah.index',      ['sarpras.denah.*','sarpras.ruangan.*'],        'map',             'Denah Gedung'],
                         ['sarpras.kerusakan.index',  ['sarpras.kerusakan.*'],                        'triangle-alert',  'Kerusakan'],
@@ -340,7 +368,16 @@
                         ['sarpras.pengadaan.index',  ['sarpras.pengadaan.*','sarpras.supplier.*'],   'shopping-cart',   'Pengadaan'],
                         ['sarpras.penghapusan.index',['sarpras.penghapusan.*','sarpras.mutasi.*'],   'trash-2',         'Penghapusan & Mutasi'],
                         ['sarpras.laporan.index',    ['sarpras.laporan.*','sarpras.kategori.*'],     'file-bar-chart',  'Laporan'],
-                    ]];
+                    ];
+                    // Penuh hanya utk admin & sapras. Role lain: cukup Denah Gedung,
+                    // Kerusakan, dan Peminjaman & Booking. (Siswa & orang tua sudah tak masuk grup.)
+                    if (in_array($access, ['superadmin', 'admin', 'sapras'])) {
+                        $sarprasItems = $sarprasFull;
+                    } else {
+                        $bolehTerbatas = ['sarpras.denah.index', 'sarpras.kerusakan.index', 'sarpras.peminjaman.index'];
+                        $sarprasItems = array_values(array_filter($sarprasFull, fn ($it) => in_array($it[0], $bolehTerbatas)));
+                    }
+                    $groups['sarpras'] = ['Sarana & Prasarana', 'building-2', $sarprasItems];
                 }
 
                 // Grup Keuangan (Bendahara + admin/superadmin)
@@ -369,39 +406,40 @@
             @endphp
 
             {{-- Menu utama (selalu tampil) --}}
-            <p x-show="!collapsed" class="nav-section px-3 pt-2 pb-2 text-[11px] font-bold uppercase tracking-[.1em]">Navigasi</p>
-            <a href="{{ route('dashboard') }}" class="nav-link flex items-center gap-3 px-3 py-2.5 {{ request()->routeIs('dashboard') ? 'active' : '' }}">
+            <p x-show="!mini" class="nav-section px-3 pt-2 pb-2 text-[11px] font-bold uppercase tracking-[.1em]">Navigasi</p>
+            <a href="{{ route('dashboard') }}" data-tip="Dashboard" class="nav-link flex items-center px-3 py-2.5 {{ request()->routeIs('dashboard') ? 'active' : '' }}" :class="mini ? 'justify-center' : 'gap-3'">
                 <i data-lucide="layout-dashboard" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
-                <span x-show="!collapsed" class="text-sm truncate">Dashboard</span>
+                <span x-show="!mini" class="text-sm truncate">Dashboard</span>
             </a>
             @if(auth()->user()?->siswa || auth()->user()?->guru)
-            <a href="{{ route('absen.qr') }}" class="nav-link flex items-center gap-3 px-3 py-2.5 {{ request()->routeIs('absen.qr') ? 'active' : '' }}">
+            <a href="{{ route('absen.qr') }}" data-tip="Absen QR" class="nav-link flex items-center px-3 py-2.5 {{ request()->routeIs('absen.qr') ? 'active' : '' }}" :class="mini ? 'justify-center' : 'gap-3'">
                 <i data-lucide="qr-code" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
-                <span x-show="!collapsed" class="text-sm truncate">Absen QR</span>
+                <span x-show="!mini" class="text-sm truncate">Absen QR</span>
             </a>
             @endif
 
             @can('viewAny', App\Models\ForumTopic::class)
-            <a href="{{ route('forum.index') }}" class="nav-link flex items-center gap-3 px-3 py-2.5 {{ request()->routeIs('forum.*') ? 'active' : '' }}">
+            <a href="{{ route('forum.index') }}" data-tip="Forum Diskusi" class="nav-link flex items-center px-3 py-2.5 {{ request()->routeIs('forum.*') ? 'active' : '' }}" :class="mini ? 'justify-center' : 'gap-3'">
                 <i data-lucide="messages-square" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
-                <span x-show="!collapsed" class="text-sm truncate">Forum Diskusi</span>
+                <span x-show="!mini" class="text-sm truncate">Forum Diskusi</span>
             </a>
             @endcan
+
 
             {{-- Asisten Sekolah: untuk pengguna non-admin dipakai lewat floating ball
                  (lihat akhir layout). Admin tetap punya menu Inbox di sidebar. --}}
             @if($isAdmin)
-            <a href="{{ route('chatbot.admin.inbox') }}" class="nav-link flex items-center gap-3 px-3 py-2.5 {{ request()->routeIs('chatbot.admin.*') ? 'active' : '' }}">
+            <a href="{{ route('chatbot.admin.inbox') }}" data-tip="Chat / Inbox" class="nav-link flex items-center px-3 py-2.5 {{ request()->routeIs('chatbot.admin.*') ? 'active' : '' }}" :class="mini ? 'justify-center' : 'gap-3'">
                 <i data-lucide="message-circle" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
-                <span x-show="!collapsed" class="text-sm truncate">Chat / Inbox</span>
+                <span x-show="!mini" class="text-sm truncate">Chat / Inbox</span>
             </a>
             @endif
 
             {{-- Tagihan SPP: siswa & orang tua --}}
             @if(auth()->user()?->siswa || auth()->user()?->access === 'orangtua')
-            <a href="{{ route('keuangan.tagihan.index') }}" class="nav-link flex items-center gap-3 px-3 py-2.5 {{ request()->routeIs('keuangan.tagihan.*') ? 'active' : '' }}">
+            <a href="{{ route('keuangan.tagihan.index') }}" data-tip="Tagihan SPP" class="nav-link flex items-center px-3 py-2.5 {{ request()->routeIs('keuangan.tagihan.*') ? 'active' : '' }}" :class="mini ? 'justify-center' : 'gap-3'">
                 <i data-lucide="wallet" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
-                <span x-show="!collapsed" class="text-sm truncate">Tagihan SPP</span>
+                <span x-show="!mini" class="text-sm truncate">Tagihan SPP</span>
             </a>
             @endif
 
@@ -410,7 +448,7 @@
             @php [$glabel, $gicon, $gitems] = $g; @endphp
 
             {{-- Mode lebar: tombol grup + submenu collapsible --}}
-            <div x-show="!collapsed" class="pt-1">
+            <div x-show="!mini" class="pt-1">
                 <button type="button" @click="toggleGroup('{{ $gk }}')"
                         class="nav-group w-full flex items-center gap-3 px-3 py-2.5 {{ $activeGroup===$gk ? 'has-active' : '' }}">
                     <i data-lucide="{{ $gicon }}" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
@@ -430,9 +468,9 @@
             </div>
 
             {{-- Mode ringkas (icon-only): anak grup jadi ikon datar langsung --}}
-            <div x-show="collapsed" class="space-y-0.5 pt-1">
+            <div x-show="mini" x-cloak class="space-y-0.5 pt-1">
                 @foreach($gitems as [$iroute, $ipatterns, $iicon, $ilabel])
-                <a href="{{ route($iroute) }}" title="{{ $ilabel }}" class="nav-link flex items-center justify-center px-3 py-2.5 {{ request()->routeIs(...$ipatterns) ? 'active' : '' }}">
+                <a href="{{ route($iroute) }}" data-tip="{{ $ilabel }}" class="nav-link flex items-center justify-center px-3 py-2.5 {{ request()->routeIs(...$ipatterns) ? 'active' : '' }}">
                     <i data-lucide="{{ $iicon }}" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
                 </a>
                 @endforeach
@@ -445,7 +483,7 @@
                 <div class="w-9 h-9 rounded-xl text-white grid place-items-center text-sm font-bold flex-shrink-0 shadow overflow-hidden {{ $myFace ? 'cursor-zoom-in' : '' }}" style="background:linear-gradient(135deg,var(--ca),var(--cp))" @if($myFace) @click="avatarZoom=true" title="Lihat foto profil" @endif>
                     @if($myFace)<img src="{{ $myFace }}" class="w-full h-full object-cover" alt="profil">@else{{ strtoupper(substr(auth()->user()?->guru?->nama ?? auth()->user()?->siswa?->nama ?? auth()->user()?->username ?? 'U', 0, 1)) }}@endif
                 </div>
-                <div x-show="!collapsed" class="min-w-0 flex-1">
+                <div x-show="!mini" class="min-w-0 flex-1">
                     <p class="text-[13px] font-bold truncate leading-tight" style="color:var(--stx)">{{ auth()->user()?->guru?->nama ?? auth()->user()?->siswa?->nama ?? auth()->user()?->username }}</p>
                     <p class="text-[10px] capitalize opacity-50" style="color:var(--stx)">{{ auth()->user()?->access }}</p>
                 </div>
@@ -504,11 +542,14 @@
                                      :class="!n.read_at ? 'bg-slate-50/40 dark:bg-slate-700/20' : ''"
                                      @click="clickNotification(n)">
                                     <div class="w-8 h-8 rounded-full flex-shrink-0 grid place-items-center text-white"
-                                         :style="{ background: n.data.type === 'forum_reply' ? 'var(--cp)' : 'var(--ca)' }">
-                                        <i :data-lucide="n.data.type === 'forum_reply' ? 'messages-square' : 'graduation-cap'" class="w-4 h-4"></i>
+                                         :style="{ background: notifColor(n) }">
+                                        <i :data-lucide="notifIcon(n)" class="w-4 h-4"></i>
                                     </div>
                                     <div class="min-w-0 flex-1">
-                                        <p class="text-xs text-slate-700 dark:text-slate-200 font-medium leading-normal" x-text="n.data.message"></p>
+                                        <template x-if="n.data.judul">
+                                            <p class="text-xs font-bold text-slate-800 dark:text-slate-100 leading-normal" x-text="n.data.judul"></p>
+                                        </template>
+                                        <p class="text-xs text-slate-700 dark:text-slate-200 leading-normal" x-text="notifText(n)"></p>
                                         <p class="text-[10px] text-slate-400 mt-1" x-text="n.time_ago"></p>
                                     </div>
                                 </div>
@@ -655,9 +696,10 @@
             :class="open ? 'hidden sm:grid' : 'grid'"
             class="relative h-14 w-14 rounded-full bg-gradient-to-br from-primary to-primary-700 text-white shadow-lg shadow-primary/30 place-items-center hover:scale-105 active:scale-95 transition focus:outline-none focus:ring-4 focus:ring-primary/40"
             title="Asisten Sekolah">
-        {{-- Ikon chat (saat tertutup) --}}
-        <svg x-show="!open" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12a8 8 0 01-11.3 7.3L3 21l1.7-6.7A8 8 0 1121 12z"/>
+        {{-- Ikon chat (saat tertutup) — Lucide message-circle-more, seimbang & ter-center --}}
+        <svg x-show="!open" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>
+            <path d="M8 12h.01"/><path d="M12 12h.01"/><path d="M16 12h.01"/>
         </svg>
         {{-- Ikon tutup (saat terbuka) --}}
         <svg x-show="open" x-cloak class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -710,6 +752,9 @@
         return {
             collapsed: localStorage.getItem('sb_collapsed') === '1',
             mobileOpen: false,
+            isMobile: window.matchMedia('(max-width: 1023px)').matches,
+            // "mini" = sidebar ikon-only. Hanya berlaku di desktop; di mobile selalu full.
+            get mini(){ return this.collapsed && !this.isMobile; },
             avatarZoom: false,
             openGroup: ('{{ $activeGroup ?? '' }}' || localStorage.getItem('sb_group') || ''),
             toggleGroup(g){ this.openGroup = (this.openGroup === g ? '' : g); localStorage.setItem('sb_group', this.openGroup); this.$nextTick(()=>lucide.createIcons()); },
@@ -724,7 +769,32 @@
                     .then(()=> showToast('Gaya: ' + (this.uiStyle==='soft'?'Soft':'Analyzer')));
                 this.$nextTick(()=>lucide.createIcons());
             },
-            init(){ this.$nextTick(()=>lucide.createIcons()); }
+            init(){
+                const mq = window.matchMedia('(max-width: 1023px)');
+                const sync = () => { this.isMobile = mq.matches; if (this.isMobile) this.mobileOpen = false; };
+                mq.addEventListener ? mq.addEventListener('change', sync) : mq.addListener(sync);
+                this.initNavTips();
+                this.$nextTick(()=>lucide.createIcons());
+            },
+            // Tooltip melayang utk ikon sidebar saat mode mini (anti-terpotong overflow).
+            initNavTips(){
+                let tip;
+                const sel = '.sidebar a[data-tip], .sidebar button[data-tip]';
+                const hide = () => { if (tip) tip.classList.remove('show'); };
+                const show = (el) => {
+                    const aside = el.closest('aside');
+                    if (!aside || aside.offsetWidth > 120) { hide(); return; }   // hanya saat sidebar ikon
+                    if (!tip) { tip = document.createElement('div'); tip.className = 'sb-tip'; document.body.appendChild(tip); }
+                    tip.textContent = el.getAttribute('data-tip');
+                    const r = el.getBoundingClientRect();
+                    tip.style.top  = (r.top + r.height / 2) + 'px';
+                    tip.style.left = (r.right + 12) + 'px';
+                    tip.classList.add('show');
+                };
+                document.addEventListener('mouseover', (e) => { const el = e.target.closest(sel); if (el) show(el); });
+                document.addEventListener('mouseout',  (e) => { if (e.target.closest(sel)) hide(); });
+                document.addEventListener('click',     (e) => { if (e.target.closest(sel)) hide(); });
+            }
         }
     }
     function notificationDropdown() {
@@ -776,7 +846,23 @@
                         url += `?class=${n.data.classroom_id}`;
                     }
                     window.location.href = `${url}#c-${n.data.comment_id}`;
+                } else if (n.data.url) {
+                    window.location.href = n.data.url;   // notifikasi umum (mis. Sarpras)
                 }
+            },
+            // Teks/ikon/warna toleran ke berbagai bentuk notifikasi
+            notifText(n) {
+                const d = n.data || {};
+                return d.message || d.pesan || (d.judul ? '' : 'Notifikasi baru');
+            },
+            notifIcon(n) {
+                const t = (n.data || {}).type;
+                if (t === 'forum_reply') return 'messages-square';
+                if (t === 'classroom_comment') return 'graduation-cap';
+                return (n.data && (n.data.url || n.data.laporan_id)) ? 'bell' : 'bell';
+            },
+            notifColor(n) {
+                return (n.data || {}).type === 'forum_reply' ? 'var(--cp)' : 'var(--ca)';
             },
             async markAllAsRead() {
                 try {

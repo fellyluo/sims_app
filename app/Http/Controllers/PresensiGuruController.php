@@ -98,6 +98,29 @@ class PresensiGuruController extends Controller
         ]);
         $mode = $data['mode'] ?? 'masuk';
 
+        // Metode absensi guru aktif harus "Scan Wajah".
+        if (!\App\Support\AbsensiGuru::bolehWajah()) {
+            return response()->json([
+                'success' => false,
+                'blocked' => true,
+                'message' => \App\Support\AbsensiGuru::pesanKunci('Scan Wajah'),
+            ]);
+        }
+
+        // Guru wajib melengkapi agenda hari ini sebelum boleh absen pulang.
+        if ($mode === 'pulang') {
+            $guru = Guru::find($data['id_guru']);
+            $belum = $guru ? \App\Support\AgendaGuru::belumDiisi($guru, $data['tanggal']) : [];
+            if (!empty($belum) && \App\Support\AgendaGuru::wajibSebelumPulang()) {
+                return response()->json([
+                    'success' => false,
+                    'blocked' => true,
+                    'message' => \App\Support\AgendaGuru::pesanTolak($belum),
+                    'belum'   => $belum,
+                ]);
+            }
+        }
+
         $row = PresensiGuru::firstOrNew([
             'id_guru' => $data['id_guru'],
             'tanggal' => $data['tanggal'],

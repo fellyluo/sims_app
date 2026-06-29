@@ -186,6 +186,59 @@ class KeuanganSppTest extends TestCase
         $this->assertSame(180000, $p->nominal);
     }
 
+    public function test_bendahara_update_beberapa_sel_pembayaran_sekaligus(): void
+    {
+        $bendahara = $this->makeUser('bendahara', 'bendahara_bulk_cell');
+        $kelas = $this->makeKelas();
+        $siswa = $this->makeSiswa($kelas);
+        $ta = TahunAjaran::current();
+
+        $p1 = SppPembayaran::create([
+            'id_siswa' => $siswa->uuid,
+            'tahun_ajaran' => $ta,
+            'bulan' => 1,
+            'nominal' => 150000,
+            'status' => 'belum',
+        ]);
+        $p2 = SppPembayaran::create([
+            'id_siswa' => $siswa->uuid,
+            'tahun_ajaran' => $ta,
+            'bulan' => 2,
+            'nominal' => 150000,
+            'status' => 'belum',
+        ]);
+        $p3 = SppPembayaran::create([
+            'id_siswa' => $siswa->uuid,
+            'tahun_ajaran' => $ta,
+            'bulan' => 3,
+            'nominal' => 150000,
+            'status' => 'belum',
+        ]);
+
+        $this->actingAs($bendahara)->postJson('/keuangan/pembayaran/' . $p1->uuid . '/cell', [
+            'status'           => 'lunas',
+            'nominal'          => 200000,
+            'tanggal_bayar'    => '2026-06-28',
+            'selected_bulans'  => [1, 2, 3],
+        ])->assertOk()->assertJsonPath('ok', true);
+
+        $p1->refresh();
+        $p2->refresh();
+        $p3->refresh();
+
+        $this->assertSame('lunas', $p1->status);
+        $this->assertSame(200000, $p1->nominal);
+        $this->assertSame('2026-06-28', $p1->tanggal_bayar->toDateString());
+
+        $this->assertSame('lunas', $p2->status);
+        $this->assertSame(200000, $p2->nominal);
+        $this->assertSame('2026-06-28', $p2->tanggal_bayar->toDateString());
+
+        $this->assertSame('lunas', $p3->status);
+        $this->assertSame(200000, $p3->nominal);
+        $this->assertSame('2026-06-28', $p3->tanggal_bayar->toDateString());
+    }
+
     public function test_upload_sekaligus_beberapa_bulan(): void
     {
         Storage::fake('public');

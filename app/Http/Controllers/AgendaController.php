@@ -97,7 +97,7 @@ class AgendaController extends Controller
         } else {
             $daftar = $guru ? $this->riwayatJadwal($guru, $hari) : [];
         }
-        $belum = collect($daftar)->filter(fn ($d) => !$d['agenda'])->count();
+        $belum = collect($daftar)->filter(fn ($d) => !$d['agenda'] && $d['wajib'])->count();
         $mengajar = $guru ? Jadwal::where('id_guru', $guru->uuid)->whereNotNull('id_pelajaran')->exists() : false;
 
         return view('agenda.index', compact('guru', 'daftar', 'belum', 'mengajar', 'hari', 'tanggal'));
@@ -119,6 +119,7 @@ class AgendaController extends Controller
                 'jam_selesai'   => $s['jam_selesai'],
                 'hari_ini'      => $tanggal === now()->toDateString(),
                 'agenda'        => $s['agenda'],
+                'wajib'         => \App\Support\KalenderAbsensi::agendaWajib($tanggal),
             ];
         }
         usort($list, fn ($a, $b) => strcmp($a['jam_mulai'], $b['jam_mulai']));
@@ -146,6 +147,7 @@ class AgendaController extends Controller
                     'jam_selesai'   => $s['jam_selesai'],
                     'hari_ini'      => $tgl === now()->toDateString(),
                     'agenda'        => $s['agenda'],   // model Agenda atau null
+                    'wajib'         => \App\Support\KalenderAbsensi::agendaWajib($tgl),
                 ];
             }
         }
@@ -356,19 +358,38 @@ class AgendaController extends Controller
         $sampai = $request->sampai ?: now()->toDateString();
         if ($dari > $sampai) [$dari, $sampai] = [$sampai, $dari];
 
-        $agendas = collect();
-        if ($selectedGuru) {
-            $agendas = Agenda::with(['absensi.siswa', 'kelas', 'pelajaran', 'jadwal.jam'])
-                ->where('id_guru', $selectedGuru)
-                ->whereDate('tanggal', '>=', $dari)
-                ->whereDate('tanggal', '<=', $sampai)
-                ->orderBy('tanggal')
-                ->get()
-                ->sortBy(fn ($a) => $a->tanggal->toDateString() . ' ' . ($a->jadwal?->jam_mulai ?? ''))
-                ->values();
+        // Daftar SEMUA slot terjadwal pada rentang (sudah & belum diisi), per guru terpilih.
+        $daftar = collect();
+        $sudah = 0; $belum = 0;
+        if ($selectedGuru && ($guru = Guru::find($selectedGuru))) {
+            $start = \Carbon\Carbon::parse($dari);
+            $end   = \Carbon\Carbon::parse($sampai);
+            $i = 0;
+            for ($d = $start->copy(); $d <= $end && $i < 92; $d->addDay(), $i++) {
+                $tgl = $d->toDateString();
+                $wajib = \App\Support\KalenderAbsensi::agendaWajib($tgl);
+                foreach ($this->slotHari($guru, $tgl) as $s) {
+                    $daftar->push([
+                        'tanggal'       => $tgl,
+                        'tanggal_label' => $d->locale('id')->isoFormat('dddd, D MMMM Y'),
+                        'kelas'         => $s['kelas'],
+                        'pelajaran'     => $s['pelajaran'],
+                        'jam_mulai'     => $s['jam_mulai'],
+                        'jam_selesai'   => $s['jam_selesai'],
+                        'agenda'        => $s['agenda'],
+                        'wajib'         => $wajib,
+                    ]);
+                    if ($s['agenda']) $sudah++;
+                    elseif ($wajib)   $belum++;
+                }
+            }
+            // eager-load relasi agenda terisi (hindari N+1 di view)
+            $terisi = $daftar->pluck('agenda')->filter()->values();
+            \Illuminate\Database\Eloquent\Collection::make($terisi)->load(['absensi.siswa', 'kelas', 'pelajaran', 'jadwal.jam']);
+            $daftar = $daftar->sortByDesc(fn ($x) => $x['tanggal'] . ' ' . $x['jam_mulai'])->values();
         }
 
-        return view('agenda.rekap', compact('guruList', 'selectedGuru', 'dari', 'sampai', 'agendas'));
+        return view('agenda.rekap', compact('guruList', 'selectedGuru', 'dari', 'sampai', 'daftar', 'sudah', 'belum'));
     }
 
     /** Validasi/catatan kepala sekolah pada satu agenda. */

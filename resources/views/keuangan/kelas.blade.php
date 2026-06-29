@@ -63,7 +63,7 @@
                     @foreach($bulanList as $b)
                         <th class="px-2 py-3 text-center font-semibold text-[11px]">{{ \Illuminate\Support\Str::substr($b['label'],0,3) }}<br><span class="text-slate-300 dark:text-slate-500 font-normal">'{{ substr($b['year'],2) }}</span></th>
                     @endforeach
-                    <th class="px-3 py-3 text-center font-semibold">Lunas</th>
+                    <th class="px-3 py-3 text-center font-semibold">Belum Bayar</th>
                 </tr>
             </thead>
             <tbody>
@@ -74,17 +74,28 @@
                         <p class="font-medium text-slate-700 dark:text-slate-200">{{ $s->nama }}</p>
                         <p class="text-[11px] text-slate-400">NIS {{ $s->nis }}</p>
                     </td>
+                    @php
+                        $unpaidTotal = 0;
+                        $nowStart = \Illuminate\Support\Carbon::now()->startOfMonth();
+                    @endphp
                     @foreach($bulanList as $b)
                         @php
                             $p = $row['bayar'][$b['idx']] ?? null;
+                            if ($p && in_array($p->status, ['belum', 'ditolak'])) {
+                                $tglBulan = \App\Support\TahunAjaran::tanggal($ta, $b['idx'])->startOfMonth();
+                                if ($tglBulan <= $nowStart) {
+                                    $unpaidTotal += $p->nominal;
+                                }
+                            }
                             $cellData = $p ? [
                                 'uuid'          => $p->uuid,
+                                'id_siswa'      => $s->uuid,
                                 'siswa'         => $s->nama,
-                                'bulan'         => $b['label'] . ' ' . $b['year'],
+                                'bulan'         => $p->bulan,
+                                'bulan_label'   => $b['label'] . ' ' . $b['year'],
                                 'status'        => $p->status,
                                 'nominal'       => (int) $p->nominal,
                                 'tanggal_bayar' => optional($p->tanggal_bayar)->format('Y-m-d'),
-                                'jatuh_tempo'   => optional($p->jatuh_tempo)->format('Y-m-d'),
                                 'catatan'       => $p->catatan,
                                 'bukti'         => $p->bukti_url,
                                 'bank'          => $p->bank,
@@ -108,7 +119,11 @@
                         </td>
                     @endforeach
                     <td class="px-3 py-2 text-center">
-                        <span class="badge {{ $row['lunas']===12 ? 'bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300' }}">{{ $row['lunas'] }}/12</span>
+                        @if($unpaidTotal === 0)
+                            <span class="badge bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 font-semibold">Rp 0</span>
+                        @else
+                            <span class="badge bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 font-semibold">Rp {{ number_format($unpaidTotal, 0, ',', '.') }}</span>
+                        @endif
                     </td>
                 </tr>
                 @endforeach
@@ -122,7 +137,7 @@
             <div class="flex items-start justify-between">
                 <div>
                     <h3 class="font-bold text-slate-800 dark:text-slate-100" x-text="cell.siswa"></h3>
-                    <p class="text-sm text-slate-500 dark:text-slate-400" x-text="cell.bulan"></p>
+                    <p class="text-sm text-slate-500 dark:text-slate-400" x-text="cell.bulan_label"></p>
                 </div>
                 <button @click="open=false" class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
@@ -154,13 +169,30 @@
                     <label class="form-label">Tgl Bayar</label>
                     <input type="date" x-model="cell.tanggal_bayar" class="form-input text-sm">
                 </div>
-                <div class="col-span-2">
-                    <label class="form-label">Jatuh Tempo</label>
-                    <input type="date" x-model="cell.jatuh_tempo" class="form-input text-sm">
-                </div>
                 <div class="col-span-2" x-show="cell.status==='ditolak'">
                     <label class="form-label">Catatan / alasan tolak</label>
                     <input type="text" x-model="cell.catatan" maxlength="500" class="form-input text-sm" placeholder="mis. Nominal kurang / bukti buram">
+                </div>
+                
+                {{-- Pilihan Bulan Pembayaran (Bulk) --}}
+                <div class="col-span-2 border-t border-slate-100 dark:border-slate-700/60 pt-3">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="form-label !mb-0 font-semibold text-slate-700 dark:text-slate-300">Terapkan untuk Bulan:</label>
+                        <div class="flex gap-2 text-[11px]">
+                            <button type="button" @click="selectAll()" class="text-primary hover:underline font-medium">Pilih Semua</button>
+                            <span class="text-slate-300 dark:text-slate-600">|</span>
+                            <button type="button" @click="resetSelection()" class="text-slate-500 hover:underline font-medium">Reset</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-4 gap-1.5">
+                        <template x-for="b in bulanList" :key="b.idx">
+                            <label class="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400 cursor-pointer p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                                   :class="selectedBulans.includes(b.idx) ? 'bg-primary/5 border-primary text-primary font-semibold' : ''">
+                                <input type="checkbox" :value="b.idx" x-model="selectedBulans" class="rounded text-primary focus:ring-primary border-slate-300 dark:border-slate-600">
+                                <span x-text="b.label.substring(0,3)"></span>
+                            </label>
+                        </template>
+                    </div>
                 </div>
             </div>
 
@@ -183,10 +215,19 @@ function sppGrid() {
         open: false,
         saving: false,
         cell: {},
+        selectedBulans: [],
+        bulanList: @json($bulanList),
         openCell(data) {
             this.cell = { ...data };
+            this.selectedBulans = [data.bulan];
             this.open = true;
             this.$nextTick(() => lucide.createIcons());
+        },
+        selectAll() {
+            this.selectedBulans = this.bulanList.map(b => b.idx);
+        },
+        resetSelection() {
+            this.selectedBulans = [this.cell.bulan];
         },
         async save() {
             this.saving = true;
@@ -198,8 +239,8 @@ function sppGrid() {
                         status: this.cell.status,
                         nominal: this.cell.nominal,
                         tanggal_bayar: this.cell.tanggal_bayar || null,
-                        jatuh_tempo: this.cell.jatuh_tempo || null,
                         catatan: this.cell.catatan || null,
+                        selected_bulans: this.selectedBulans.map(x => parseInt(x)),
                     }),
                 });
                 if (!res.ok) throw new Error('HTTP ' + res.status);

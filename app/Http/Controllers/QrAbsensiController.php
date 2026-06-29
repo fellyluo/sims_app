@@ -97,6 +97,14 @@ class QrAbsensiController extends Controller
         $label = 'Hadir';
 
         if ($user->siswa) {
+            // Metode absensi aktif harus "Barcode / QR".
+            if (!\App\Support\AbsensiGuru::bolehQr()) {
+                return response()->json(['ok' => false, 'message' => \App\Support\AbsensiGuru::pesanKunci('QR')], 422);
+            }
+            // Hormati kalender: absensi siswa harus dibuka untuk hari ini.
+            if (!\App\Support\KalenderAbsensi::absenSiswaDibuka($today)) {
+                return response()->json(['ok' => false, 'message' => 'Absensi siswa tidak dibuka untuk hari ini.'], 422);
+            }
             // Siswa: hanya absen masuk, SEKALI per hari
             $row = Absensi::firstOrNew(['id_siswa' => $user->siswa->uuid, 'tanggal' => $today]);
             if (!empty($row->jam_masuk)) {
@@ -110,11 +118,20 @@ class QrAbsensiController extends Controller
             $row->save();
             $jamDipakai = $row->jam_masuk;
         } elseif ($user->guru) {
+            // Metode absensi guru aktif harus "Barcode / QR".
+            if (!\App\Support\AbsensiGuru::bolehQr()) {
+                return response()->json(['ok' => false, 'message' => \App\Support\AbsensiGuru::pesanKunci('QR')], 422);
+            }
             // Guru: MASUK sekali & PULANG sekali per hari
             $row = PresensiGuru::firstOrNew(['id_guru' => $user->guru->uuid, 'tanggal' => $today]);
             if ($mode === 'pulang') {
                 if (!empty($row->jam_pulang)) {
                     return response()->json(['ok' => false, 'message' => 'Anda sudah absen pulang hari ini pukul ' . substr($row->jam_pulang, 0, 5) . '.'], 422);
+                }
+                // Wajib melengkapi agenda hari ini sebelum boleh absen pulang.
+                $belum = \App\Support\AgendaGuru::belumDiisi($user->guru, $today);
+                if (!empty($belum) && \App\Support\AgendaGuru::wajibSebelumPulang()) {
+                    return response()->json(['ok' => false, 'message' => \App\Support\AgendaGuru::pesanTolak($belum)], 422);
                 }
                 $row->jam_pulang = $jam;
                 $jamDipakai = $row->jam_pulang;

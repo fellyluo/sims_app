@@ -81,7 +81,8 @@
         @foreach(collect($daftar)->groupBy('tanggal') as $tgl => $items)
         @php
             $first = $items->first();
-            $belumHari = $items->filter(fn($x) => !$x['agenda'])->count();
+            $belumHari = $items->filter(fn($x) => !$x['agenda'] && $x['wajib'])->count();
+            $adaWajib = $items->contains(fn($x) => $x['wajib']);
             $c = \Carbon\Carbon::parse($tgl)->locale('id');
         @endphp
         <div class="flex flex-col sm:flex-row gap-4 pt-6 border-t border-slate-100 dark:border-slate-700/60 first:pt-0 first:border-0">
@@ -98,8 +99,10 @@
                     @endif
                     @if($belumHari > 0)
                     <span class="badge bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-semibold">{{ $belumHari }} belum diisi</span>
-                    @else
+                    @elseif($adaWajib)
                     <span class="badge bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-semibold">Lengkap</span>
+                    @else
+                    <span class="badge bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 font-semibold">Tidak wajib</span>
                     @endif
                 </div>
             </div>
@@ -108,7 +111,8 @@
             <div class="flex-1 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                 @foreach($items->sortBy('jam_mulai') as $d)
                 @php $ag = $d['agenda']; @endphp
-                <div class="card p-4 flex flex-col gap-2.5 {{ $ag ? '' : 'border-amber-200 dark:border-amber-800 bg-amber-50/30 dark:bg-amber-900/10' }}">
+                @php $cardWarn = !$ag && $d['wajib']; @endphp
+                <div class="card p-4 flex flex-col gap-2.5 {{ $cardWarn ? 'border-amber-200 dark:border-amber-800 bg-amber-50/30 dark:bg-amber-900/10' : '' }}">
                     <div class="flex items-start justify-between gap-2">
                         <div class="min-w-0">
                             <p class="font-bold text-slate-800 dark:text-slate-100 truncate">{{ $d['pelajaran'] }}</p>
@@ -119,8 +123,10 @@
                         </div>
                         @if($ag)
                         <span class="badge bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-semibold flex items-center gap-1 flex-shrink-0"><i data-lucide="check" class="w-3 h-3"></i> Sudah diisi</span>
-                        @else
+                        @elseif($d['wajib'])
                         <span class="badge bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-semibold flex-shrink-0">Belum</span>
+                        @else
+                        <span class="badge bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 font-semibold flex-shrink-0">Tidak wajib</span>
                         @endif
                     </div>
 

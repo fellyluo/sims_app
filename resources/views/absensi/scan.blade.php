@@ -309,12 +309,40 @@ function faceScan(data){
             } catch(e){}
         },
 
+        // bunyi "error" penolakan absen — nada turun & kasar, beda dari sukses
+        playError(){
+            try {
+                const ctx=this.audioCtx; if(!ctx) return;
+                if(ctx.state==='suspended') ctx.resume();
+                const now=ctx.currentTime;
+                [ [392,0], [261.6,0.17] ].forEach(([freq,at])=>{   // G4 → C4 (turun = ditolak)
+                    const osc=ctx.createOscillator(), gain=ctx.createGain();
+                    osc.type='square'; osc.frequency.value=freq;
+                    gain.gain.setValueAtTime(0.0001, now+at);
+                    gain.gain.exponentialRampToValueAtTime(0.16, now+at+0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now+at+0.26);
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.start(now+at); osc.stop(now+at+0.28);
+                });
+            } catch(e){}
+        },
+
+        // Umpan balik penolakan (siswa & guru): suara error + toast + suara bicara
+        rejectFeedback(nama, msg){
+            this.playError();
+            showToast((nama ? nama.split(' ')[0]+': ' : '') + (msg || 'Absen tidak dapat diproses'), 'error');
+            this.speak('tolak', nama);
+        },
+
         // Suara sapaan: masuk → "Selamat datang, nama", pulang → "Terima kasih, nama"
         speak(label, nama){
             try {
                 if(!('speechSynthesis' in window)) return;
                 const panggil = (nama||'').split(',')[0].trim();
-                const teks = (label === 'pulang' ? 'Terima kasih, ' : 'Selamat datang, ') + panggil;
+                let teks;
+                if(label === 'pulang') teks = 'Terima kasih, ' + panggil;
+                else if(label === 'tolak') teks = 'Maaf ' + panggil + ', absen tidak dapat diproses';
+                else teks = 'Selamat datang, ' + panggil;
                 const u = new SpeechSynthesisUtterance(teks);
                 u.lang='id-ID'; u.rate=0.97; u.pitch=1;
                 const id = speechSynthesis.getVoices().find(v => v.lang && v.lang.toLowerCase().startsWith('id'));
@@ -391,63 +419,99 @@ function faceScan(data){
 
             // ===== Mode PULANG (khusus guru) =====
             if(this.scanMode==='pulang'){
-                if(s.type!=='guru') return;        // pulang hanya dilacak untuk guru
+                if(s.type!=='guru') return;          // pulang hanya dilacak untuk guru
                 if(s.pulangMarked) return;
-                s.pulangMarked=true; s.justMarked=true;
-                this.playDing();
-                this.speak('pulang', s.nama);
-                const k=++this._seq;
-                const jamK=this.nowHM();
-                this.lastMatch={ key:k, nama:s.nama, type:s.type, kelas:'Guru', mode:'pulang', jam:jamK };
-                this.recent.unshift({ key:k, nama:s.nama.split(' ')[0], type:s.type, kelas:'Pulang', mode:'pulang', jam:jamK });
-                if(this.recent.length>5) this.recent.pop();
-                setTimeout(()=> window.lucide && lucide.createIcons(), 40);
-                setTimeout(()=>{ if(this.lastMatch && this.lastMatch.key===k) this.lastMatch=null; }, 1700);
-                setTimeout(()=>{ s.justMarked=false; }, 1600);
-                setTimeout(()=>{ this.recent = this.recent.filter(x=>x.key!==k); }, 6000); // auto-hilang
+                if(s._pulangBusy) return;            // cegah fetch ganda saat wajah masih di kamera
+                if(s._pulangBlockedAt && (Date.now()-s._pulangBlockedAt) < 8000) return; // jeda setelah ditolak
+                s._pulangBusy=true;
+                // Cek server DULU (agenda wajib lengkap) — baru tampilkan konfirmasi bila lolos.
                 fetch('{{ route('presensi-guru.mark') }}', {
                     method:'POST', headers:{'Content-Type':'application/json','X-CSRF-TOKEN':$('meta[name=csrf-token]').attr('content'),Accept:'application/json'},
                     body: JSON.stringify({ id_guru: uuid, tanggal: '{{ $tanggal }}', mode:'pulang' })
                 }).then(r=>r.json()).then(d=>{
-                    if(d&&d.jam){ const it=this.recent.find(x=>x.key===k); if(it) it.jam=d.jam; if(this.lastMatch&&this.lastMatch.key===k) this.lastMatch.jam=d.jam; }
-                }).catch(()=>{});
+                    s._pulangBusy=false;
+                    if(!d || d.success===false){
+                        s._pulangBlockedAt = Date.now();
+                        this.rejectFeedback(s.nama, (d&&d.message) ? d.message : 'Tidak bisa absen pulang.');
+                        return;
+                    }
+                    // Lolos → tampilkan konfirmasi pulang
+                    s.pulangMarked=true; s.justMarked=true;
+                    this.playDing();
+                    this.speak('pulang', s.nama);
+                    const k=++this._seq;
+                    const jamK=d.jam || this.nowHM();
+                    this.lastMatch={ key:k, nama:s.nama, type:s.type, kelas:'Guru', mode:'pulang', jam:jamK };
+                    this.recent.unshift({ key:k, nama:s.nama.split(' ')[0], type:s.type, kelas:'Pulang', mode:'pulang', jam:jamK });
+                    if(this.recent.length>5) this.recent.pop();
+                    setTimeout(()=> window.lucide && lucide.createIcons(), 40);
+                    setTimeout(()=>{ if(this.lastMatch && this.lastMatch.key===k) this.lastMatch=null; }, 1700);
+                    setTimeout(()=>{ s.justMarked=false; }, 1600);
+                    setTimeout(()=>{ this.recent = this.recent.filter(x=>x.key!==k); }, 6000); // auto-hilang
+                }).catch(()=>{ s._pulangBusy=false; });
                 return;
             }
 
             // ===== Mode MASUK =====
             if(s.marked) return;
-            s.marked=true; s.justMarked=true;
-            this.playDing();   // bunyi sukses
-            this.speak('masuk', s.nama);
 
-            // feedback visual (langsung tampil dengan jam lokal, dikoreksi jam server)
-            const key = ++this._seq;
-            const jamNow = this.nowHM();
-            const subKelas = s.type === 'siswa' ? s.kelas : 'Guru';
-            this.lastMatch = { key, nama: s.nama, type: s.type, kelas: subKelas, mode:'masuk', jam: jamNow };
-            this.recent.unshift({ key, nama: s.nama.split(' ')[0], type: s.type, kelas: subKelas, mode:'masuk', jam: jamNow });
-            if(this.recent.length>5) this.recent.pop();
-            setTimeout(()=> window.lucide && lucide.createIcons(), 40);
-            setTimeout(()=>{ if(this.lastMatch && this.lastMatch.key===key) this.lastMatch=null; }, 1700);
-            setTimeout(()=>{ s.justMarked=false; }, 1600);
-            setTimeout(()=>{ this.recent = this.recent.filter(x=>x.key!==key); }, 6000); // auto-hilang
-
-            // payload based on type
-            let url, bodyData;
-            if (s.type === 'siswa') {
-                url = '{{ route('absensi.mark') }}';
-                bodyData = { id_siswa: uuid, id_kelas: s.id_kelas, tanggal: '{{ $tanggal }}', status: 'hadir' };
-            } else {
-                url = '{{ route('presensi-guru.mark') }}';
-                bodyData = { id_guru: uuid, tanggal: '{{ $tanggal }}', status: 'hadir', mode:'masuk' };
+            // GURU: cek server dulu (metode wajah harus aktif) — baru konfirmasi.
+            if(s.type==='guru'){
+                if(s._masukBusy) return;
+                if(s._masukBlockedAt && (Date.now()-s._masukBlockedAt) < 8000) return; // jeda setelah ditolak
+                s._masukBusy=true;
+                fetch('{{ route('presensi-guru.mark') }}', {
+                    method:'POST', headers:{'Content-Type':'application/json','X-CSRF-TOKEN':$('meta[name=csrf-token]').attr('content'),Accept:'application/json'},
+                    body: JSON.stringify({ id_guru: uuid, tanggal: '{{ $tanggal }}', status:'hadir', mode:'masuk' })
+                }).then(r=>r.json()).then(d=>{
+                    s._masukBusy=false;
+                    if(!d || d.success===false){
+                        s._masukBlockedAt = Date.now();
+                        this.rejectFeedback(s.nama, (d&&d.message) || 'Tidak bisa absen');
+                        return;
+                    }
+                    s.marked=true; s.justMarked=true;
+                    this.playDing(); this.speak('masuk', s.nama);
+                    const key=++this._seq; const jam=d.jam || this.nowHM();
+                    this.lastMatch={ key, nama:s.nama, type:'guru', kelas:'Guru', mode:'masuk', jam };
+                    this.recent.unshift({ key, nama:s.nama.split(' ')[0], type:'guru', kelas:'Guru', mode:'masuk', jam });
+                    if(this.recent.length>5) this.recent.pop();
+                    setTimeout(()=> window.lucide && lucide.createIcons(), 40);
+                    setTimeout(()=>{ if(this.lastMatch && this.lastMatch.key===key) this.lastMatch=null; }, 1700);
+                    setTimeout(()=>{ s.justMarked=false; }, 1600);
+                    setTimeout(()=>{ this.recent = this.recent.filter(x=>x.key!==key); }, 6000);
+                    if(d.terlambat){ showToast(s.nama+' Terlambat (' + jam + ')', 'info'); }
+                }).catch(()=>{ s._masukBusy=false; });
+                return;
             }
-            fetch(url, {
+
+            // SISWA: cek server dulu (metode & kalender) — baru tampilkan konfirmasi.
+            if(s._masukBusy) return;
+            if(s._masukBlockedAt && (Date.now()-s._masukBlockedAt) < 8000) return; // jeda setelah ditolak
+            s._masukBusy=true;
+            fetch('{{ route('absensi.mark') }}', {
                 method:'POST', headers:{'Content-Type':'application/json','X-CSRF-TOKEN':$('meta[name=csrf-token]').attr('content'),Accept:'application/json'},
-                body: JSON.stringify(bodyData)
+                body: JSON.stringify({ id_siswa: uuid, id_kelas: s.id_kelas, tanggal: '{{ $tanggal }}', status: 'hadir' })
             }).then(r=>r.json()).then(d=>{
-                if(d && d.jam){ const it=this.recent.find(x=>x.key===key); if(it) it.jam=d.jam; if(this.lastMatch && this.lastMatch.key===key) this.lastMatch.jam=d.jam; }
-                if(d && d.terlambat){ showToast(s.nama+' Terlambat (' + d.jam + ')', 'info'); }
-            }).catch(()=>{});
+                s._masukBusy=false;
+                if(!d || d.success===false){
+                    // ditolak (mis. metode dikunci / tanggal absensi tidak dibuka)
+                    s._masukBlockedAt = Date.now();
+                    this.rejectFeedback(s.nama, (d&&d.message) || 'Absensi tidak dibuka');
+                    return;
+                }
+                s.marked=true; s.justMarked=true;
+                this.playDing(); this.speak('masuk', s.nama);
+                const key=++this._seq; const jam=d.jam || this.nowHM();
+                this.lastMatch={ key, nama:s.nama, type:'siswa', kelas:s.kelas, mode:'masuk', jam };
+                this.recent.unshift({ key, nama:s.nama.split(' ')[0], type:'siswa', kelas:s.kelas, mode:'masuk', jam });
+                if(this.recent.length>5) this.recent.pop();
+                setTimeout(()=> window.lucide && lucide.createIcons(), 40);
+                setTimeout(()=>{ if(this.lastMatch && this.lastMatch.key===key) this.lastMatch=null; }, 1700);
+                setTimeout(()=>{ s.justMarked=false; }, 1600);
+                setTimeout(()=>{ this.recent = this.recent.filter(x=>x.key!==key); }, 6000); // auto-hilang
+                if(d.terlambat){ showToast(s.nama+' Terlambat (' + jam + ')', 'info'); }
+            }).catch(()=>{ s._masukBusy=false; });
         },
 
         stop(){

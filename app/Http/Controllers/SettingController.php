@@ -103,9 +103,15 @@ class SettingController extends Controller
 
     public function setCaraAbsensi(Request $request)
     {
-        $request->validate(['cara_absensi' => 'required|in:barcode,manual']);
+        $request->validate(['cara_absensi' => 'required|in:wajah,barcode']);
         Setting::set('cara_absensi_guru', $request->cara_absensi);
         return back()->with('success', 'Cara absensi disimpan.');
+    }
+
+    public function setAgendaWajibPulang(Request $request)
+    {
+        Setting::set('agenda_wajib_pulang', $request->boolean('agenda_wajib_pulang') ? '1' : '0');
+        return back()->with('success', 'Pengaturan agenda sebelum pulang disimpan.');
     }
 
     public function setRumusRapor(Request $request)

@@ -115,34 +115,45 @@ class KeuanganController extends Controller
             ->with('success', 'VA & nominal SPP tersimpan.');
     }
 
-    /** Update satu sel pembayaran (status/nominal/tanggal/jatuh tempo). */
+    /** Update satu atau beberapa sel pembayaran sekaligus (status/nominal/tanggal/jatuh tempo). */
     public function cell(Request $request, SppPembayaran $pembayaran)
     {
         $data = $request->validate([
-            'status'        => 'nullable|in:belum,menunggu,terverifikasi,lunas,ditolak',
-            'nominal'       => 'nullable|integer|min:0',
-            'tanggal_bayar' => 'nullable|date',
-            'jatuh_tempo'   => 'nullable|date',
-            'catatan'       => 'nullable|string|max:500',
+            'status'           => 'nullable|in:belum,menunggu,terverifikasi,lunas,ditolak',
+            'nominal'          => 'nullable|integer|min:0',
+            'tanggal_bayar'    => 'nullable|date',
+            'jatuh_tempo'      => 'nullable|date',
+            'catatan'          => 'nullable|string|max:500',
+            'selected_bulans'  => 'nullable|array',
+            'selected_bulans.*'=> 'integer|between:1,12',
         ]);
 
-        if (array_key_exists('nominal', $data) && $data['nominal'] !== null) {
-            $pembayaran->nominal = $data['nominal'];
-        }
-        if (array_key_exists('jatuh_tempo', $data)) {
-            $pembayaran->jatuh_tempo = $data['jatuh_tempo'];
-        }
-        if (array_key_exists('catatan', $data)) {
-            $pembayaran->catatan = $data['catatan'];
-        }
+        $selectedBulans = $data['selected_bulans'] ?? [$pembayaran->bulan];
 
-        if (!empty($data['status'])) {
-            $this->applyStatus($pembayaran, $data['status'], $data['tanggal_bayar'] ?? null);
-        } elseif (array_key_exists('tanggal_bayar', $data)) {
-            $pembayaran->tanggal_bayar = $data['tanggal_bayar'];
-        }
+        $payments = SppPembayaran::where('id_siswa', $pembayaran->id_siswa)
+            ->where('tahun_ajaran', $pembayaran->tahun_ajaran)
+            ->whereIn('bulan', $selectedBulans)
+            ->get();
 
-        $pembayaran->save();
+        foreach ($payments as $p) {
+            if (array_key_exists('nominal', $data) && $data['nominal'] !== null) {
+                $p->nominal = $data['nominal'];
+            }
+            if (array_key_exists('jatuh_tempo', $data)) {
+                $p->jatuh_tempo = $data['jatuh_tempo'];
+            }
+            if (array_key_exists('catatan', $data)) {
+                $p->catatan = $data['catatan'];
+            }
+
+            if (!empty($data['status'])) {
+                $this->applyStatus($p, $data['status'], $data['tanggal_bayar'] ?? null);
+            } elseif (array_key_exists('tanggal_bayar', $data)) {
+                $p->tanggal_bayar = $data['tanggal_bayar'];
+            }
+
+            $p->save();
+        }
 
         if ($request->wantsJson()) {
             return response()->json([

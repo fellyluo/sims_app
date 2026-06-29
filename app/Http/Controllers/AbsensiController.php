@@ -196,6 +196,22 @@ class AbsensiController extends Controller
             'status'   => 'nullable|in:hadir,izin,sakit,alpa',
         ]);
 
+        // Metode absensi aktif harus "Scan Wajah".
+        if (!\App\Support\AbsensiGuru::bolehWajah()) {
+            return response()->json([
+                'success' => false,
+                'message' => \App\Support\AbsensiGuru::pesanKunci('Scan Wajah'),
+            ]);
+        }
+
+        // Hormati kalender: absensi siswa harus dibuka untuk tanggal ini.
+        if (!\App\Support\KalenderAbsensi::absenSiswaDibuka($data['tanggal'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Absensi siswa tidak dibuka untuk tanggal ini.',
+            ]);
+        }
+
         $row = Absensi::firstOrNew([
             'id_siswa' => $data['id_siswa'],
             'tanggal'  => $data['tanggal'],

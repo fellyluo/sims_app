@@ -140,12 +140,15 @@
     <div x-show="tab==='absensi'" x-transition class="space-y-4">
         <form method="POST" action="{{ route('setting.caraAbsensi') }}" class="card p-6 space-y-4">
             @csrf
-            <h2 class="font-bold text-slate-800 dark:text-slate-100">Cara Absensi Guru</h2>
-            <div class="grid grid-cols-2 gap-3">
-                @foreach(['manual'=>['Manual','Admin input kehadiran'],'barcode'=>['Barcode / QR','Scan QR Code']] as $val => [$lbl,$desc])
+            <h2 class="font-bold text-slate-800 dark:text-slate-100">Cara Absensi (Guru &amp; Siswa)</h2>
+            <p class="text-xs text-slate-400 -mt-1">Pilih metode absen mandiri. Metode yang tidak dipilih <span class="font-semibold">dikunci</span> untuk guru &amp; siswa. Admin tetap bisa <span class="font-semibold">mengoreksi manual</span> kapan saja.</p>
+            @php $caraNow = in_array($settings['cara_absensi_guru'] ?? 'wajah', ['wajah','barcode']) ? ($settings['cara_absensi_guru'] ?? 'wajah') : 'wajah'; @endphp
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                @foreach(['wajah'=>['Scan Wajah','Pengenalan wajah (kiosk)','scan-face'],'barcode'=>['Barcode / QR','Scan QR Code','qr-code']] as $val => [$lbl,$desc,$icon])
                 <label class="cursor-pointer">
-                    <input type="radio" name="cara_absensi" value="{{ $val }}" @checked(($settings['cara_absensi_guru'] ?? 'manual')===$val) class="sr-only peer">
-                    <div class="border-2 rounded-xl p-4 transition peer-checked:border-primary peer-checked:bg-primary-50 border-slate-200 dark:border-slate-600">
+                    <input type="radio" name="cara_absensi" value="{{ $val }}" @checked($caraNow===$val) class="sr-only peer">
+                    <div class="border-2 rounded-xl p-4 transition peer-checked:border-primary peer-checked:bg-primary-50 border-slate-200 dark:border-slate-600 h-full">
+                        <i data-lucide="{{ $icon }}" class="w-5 h-5 text-slate-400 peer-checked:text-primary mb-1.5"></i>
                         <p class="font-bold text-sm text-slate-700 dark:text-slate-200">{{ $lbl }}</p>
                         <p class="text-xs text-slate-400 mt-0.5">{{ $desc }}</p>
                     </div>
@@ -153,6 +156,23 @@
                 @endforeach
             </div>
             <button type="submit" class="btn-primary px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> Simpan</button>
+        </form>
+
+        {{-- Wajib isi agenda sebelum absen pulang --}}
+        <form method="POST" action="{{ route('setting.agendaWajibPulang') }}" class="card p-6"
+              x-data="{ on: {{ ($settings['agenda_wajib_pulang'] ?? '1')=='1' ? 'true' : 'false' }} }">
+            @csrf
+            <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                    <h2 class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2"><i data-lucide="clipboard-pen-line" class="w-4 h-4 text-amber-500"></i> Wajib Isi Agenda Sebelum Pulang</h2>
+                    <p class="text-xs text-slate-400 mt-1 leading-relaxed">Jika aktif, guru tidak dapat absen pulang (scan wajah maupun QR) sebelum seluruh agenda mengajar hari itu diisi.</p>
+                    <p class="text-xs mt-2 font-semibold" :class="on ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'" x-text="on ? '● Aktif' : '○ Nonaktif'"></p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-1">
+                    <input type="checkbox" name="agenda_wajib_pulang" value="1" class="sr-only peer" x-model="on" @change="$el.form.submit()">
+                    <div class="relative w-11 h-6 bg-slate-200 dark:bg-slate-600 rounded-full peer-checked:bg-[color:var(--cp)] transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition peer-checked:after:translate-x-5"></div>
+                </label>
+            </div>
         </form>
 
         <div class="grid sm:grid-cols-2 gap-4">

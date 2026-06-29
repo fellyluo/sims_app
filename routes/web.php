@@ -3,6 +3,7 @@
 use App\Http\Controllers\AbsensiController;
 use App\Http\Controllers\Admin\ChatbotAdminController;
 use App\Http\Controllers\AgendaController;
+use App\Http\Controllers\KalenderController;
 use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EkskulController;
@@ -214,6 +215,14 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
         Route::post('/ekskul/{uuid}/nilai/sel', 'nilaiCell')->name('ekskul.nilai.cell');
     });
 
+    // ─── Kalender Absensi & Agenda (admin & kurikulum; guard di controller) ───
+    Route::prefix('kalender-absensi')->name('kalender.')->controller(KalenderController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/toggle', 'toggle')->name('toggle');
+        Route::post('/bulk', 'bulk')->name('bulk');
+        Route::post('/mode', 'mode')->name('mode');
+    });
+
     // ─── Agenda Guru (guru mengisi; rekap utk admin/kepala/kurikulum) ───
     Route::prefix('agenda')->name('agenda.')->controller(AgendaController::class)->group(function () {
         Route::get('/', 'index')->name('index');
@@ -311,6 +320,7 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
             Route::post('/mapel-rapor', 'setMapelRapor')->name('setting.mapelRapor');
             Route::post('/tanggal-rapor', 'setTanggalRapor')->name('setting.tanggalRapor');
             Route::post('/cara-absensi', 'setCaraAbsensi')->name('setting.caraAbsensi');
+            Route::post('/agenda-wajib-pulang', 'setAgendaWajibPulang')->name('setting.agendaWajibPulang');
             Route::post('/lokasi-qr', 'setLokasiQr')->name('setting.lokasiQr');
             Route::post('/rumus-rapor', 'setRumusRapor')->name('setting.rumusRapor');
             Route::get('/penjabaran', 'penjabaran')->name('setting.penjabaran');

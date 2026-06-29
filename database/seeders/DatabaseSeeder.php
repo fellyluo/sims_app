@@ -61,7 +61,7 @@ class DatabaseSeeder extends Seeder
             'npsn'              => '00000000',
             'alamat_sekolah'    => 'Jl. Pendidikan No. 1',
             'kepala_sekolah'    => 'Nama Kepala Sekolah',
-            'cara_absensi_guru' => 'manual',
+            'cara_absensi_guru' => 'wajah',
             'poin_terlambat'    => '5',
             'waktu_terlambat'   => '07:30',
             'bobot_harian'      => '60',
