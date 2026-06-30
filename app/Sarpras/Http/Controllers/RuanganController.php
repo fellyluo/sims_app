@@ -33,6 +33,8 @@ class RuanganController extends Controller
         $data = $request->safe()->only(['kode', 'nama', 'pos_x', 'pos_y', 'lebar', 'tinggi', 'warna', 'kapasitas', 'deskripsi', 'gedung', 'lantai', 'status']);
         $data['fasilitas'] = $this->parseFasilitas($request->input('fasilitas'));
         $data['denah_id'] = $denah->id;
+        $data['gedung'] = $data['gedung'] ?? $denah->gedung;
+        $data['lantai'] = $data['lantai'] ?? $denah->lantai;
 
         try {
             if ($request->hasFile('gambar_denah')) {

@@ -30,17 +30,17 @@
     </h2>
     <div class="flex items-center gap-2 flex-wrap">
         @can('sarpras.aset.kelola')
-            <button type="button" id="toggle-import" class="inline-flex items-center gap-1.5 border border-emerald-600 text-emerald-700 dark:text-emerald-400 px-3 py-2 rounded-lg text-sm hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
+            <button type="button" id="toggle-import" class="inline-flex items-center gap-2 bg-[#eafaf1] text-[#065f46] border border-[#a7f3d0] dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30 px-5 py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all duration-200 shadow-sm hover:bg-[#d1fae5]">
                 <i data-lucide="upload" class="w-4 h-4"></i> Import
             </button>
         @endcan
         @if(Route::has('sarpras.laporan.aset.excel'))
-            <a href="{{ route('sarpras.laporan.aset.excel') }}" class="inline-flex items-center gap-1.5 border border-emerald-600 text-emerald-700 dark:text-emerald-400 px-3 py-2 rounded-lg text-sm hover:bg-emerald-50 dark:hover:bg-emerald-900/20">
+            <a href="{{ route('sarpras.laporan.aset.excel') }}" class="inline-flex items-center gap-2 bg-[#eafaf1] text-[#065f46] border border-[#a7f3d0] dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30 px-5 py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all duration-200 shadow-sm hover:bg-[#d1fae5]">
                 <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Export Excel
             </a>
         @endif
         @can('sarpras.aset.kelola')
-            <a href="{{ route('sarpras.aset.create') }}" class="inline-flex items-center gap-1.5 bg-slate-900 dark:bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold">
+            <a href="{{ route('sarpras.aset.create') }}" class="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 dark:bg-primary dark:hover:bg-primary-hover text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-bold shadow-sm hover:shadow transition-all duration-200">
                 <i data-lucide="plus" class="w-4 h-4"></i> Tambah Aset
             </a>
         @endcan
@@ -62,7 +62,9 @@
         <form method="POST" action="{{ route('sarpras.aset.import') }}" enctype="multipart/form-data" class="flex flex-wrap items-center gap-2 text-sm">
             @csrf
             <input type="file" name="file" accept=".xlsx,.xls,.csv" required class="border rounded px-3 py-2 file:mr-3 file:border-0 file:bg-slate-100 file:px-3 file:py-1 file:rounded file:text-sm">
-            <button class="bg-emerald-600 text-white rounded px-4 py-2 hover:bg-emerald-700">Proses Import</button>
+            <button class="inline-flex items-center gap-1.5 bg-[#eafaf1] text-[#065f46] border border-[#a7f3d0] px-5 py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all duration-200 shadow-sm hover:bg-[#d1fae5]">
+                <i data-lucide="upload" class="w-4 h-4"></i> Proses Import
+            </button>
         </form>
         <p class="text-xs text-gray-400 mt-2">Kolom: <code>kode, nama, kategori, ruangan, merk, kondisi, status, tgl_perolehan, nilai_perolehan, sumber_dana</code>.</p>
     </div>

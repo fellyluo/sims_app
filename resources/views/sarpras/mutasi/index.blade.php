@@ -5,8 +5,14 @@
 <div class="flex justify-between items-center mb-4">
     <h2 class="text-lg font-semibold text-gray-800">Mutasi & Perpindahan Aset</h2>
     <div class="flex gap-2">
-        <a href="{{ route('sarpras.laporan.mutasi.excel') }}" class="border px-4 py-2 rounded text-sm">⬇ Excel</a>
-        <a href="{{ route('sarpras.mutasi.create') }}" class="bg-slate-900 text-white px-4 py-2 rounded text-sm">+ Mutasi</a>
+        <a href="{{ route('sarpras.laporan.mutasi.excel') }}" 
+           class="inline-flex items-center gap-2 bg-[#eafaf1] text-[#065f46] border border-[#a7f3d0] dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/30 px-5 py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all duration-200 shadow-sm hover:bg-[#d1fae5]">
+            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Ekspor Excel
+        </a>
+        <a href="{{ route('sarpras.mutasi.create') }}" 
+           class="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-bold shadow-sm hover:shadow transition-all duration-200">
+            <i data-lucide="plus" class="w-4 h-4"></i> Mutasi
+        </a>
     </div>
 </div>
 <div class="bg-white rounded-lg shadow overflow-x-auto">

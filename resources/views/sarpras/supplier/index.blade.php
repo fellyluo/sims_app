@@ -5,7 +5,8 @@
 
 @section('sarpras_actions')
     @can('sarpras.supplier.kelola')
-        <a href="{{ route('sarpras.supplier.create') }}" class="inline-flex items-center gap-2 bg-slate-900 dark:bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold">
+        <a href="{{ route('sarpras.supplier.create') }}" 
+           class="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 dark:bg-primary dark:hover:bg-primary-hover text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-bold shadow-sm hover:shadow transition-all duration-200">
             <i data-lucide="plus" class="w-4 h-4"></i> Tambah Supplier
         </a>
     @endcan

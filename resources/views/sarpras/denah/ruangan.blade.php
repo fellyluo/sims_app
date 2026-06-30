@@ -12,7 +12,9 @@
     </div>
     @can('sarpras.kerusakan.lapor')
         <a href="{{ route('sarpras.kerusakan.create', ['ruangan_id' => $ruangan->id]) }}"
-           class="bg-red-600 text-white px-4 py-2 rounded text-sm">🛠️ Lapor Kerusakan</a>
+           class="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-bold shadow-sm hover:shadow transition-all duration-200">
+            <i data-lucide="plus" class="w-4 h-4"></i> Lapor Kerusakan
+        </a>
     @endcan
 </div>
 

@@ -296,9 +296,9 @@
 
 @php $myFace = auth()->user()?->siswa?->face_photo_url ?? auth()->user()?->guru?->face_photo_url; @endphp
 
-<div class="h-screen flex relative z-10" :class="{ 'mob-open': mobileOpen }">
-
-    <div class="sidebar-overlay lg:hidden" @click="mobileOpen=false"></div>
+<div class="h-screen flex flex-col relative z-10" :class="{ 'mob-open': mobileOpen }">
+    <div class="flex-1 flex relative overflow-hidden">
+        <div class="sidebar-overlay lg:hidden" @click="mobileOpen=false"></div>
 
     {{-- ============ SIDEBAR ============ --}}
     <aside class="sidebar flex flex-col flex-shrink-0 z-50 fixed inset-y-0 left-0 lg:relative -translate-x-full lg:translate-x-0"
@@ -313,7 +313,7 @@
             </div>
         </div>
 
-        <nav class="flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
+        <nav class="flex-1 overflow-y-auto px-3 py-2 pb-6 space-y-0.5">
             @php
                 $access  = auth()->user()?->access;
                 $isAdmin = in_array($access, ['superadmin','admin']);
@@ -383,18 +383,18 @@
                 // Grup Sarana & Prasarana (staf sekolah; kelola penuh utk superadmin/admin/sapras)
                 if (in_array($access, ['superadmin','admin','sapras','kepala','kurikulum','kesiswaan','sekretaris','walikelas','guru'])) {
                     $sarprasFull = [
-                        ['sarpras.dashboard',        ['sarpras.dashboard'],                          'gauge',           'Dashboard Sapras'],
-                        ['sarpras.aset.index',       ['sarpras.aset.*'],                             'package',         'Katalog Aset'],
-                        ['sarpras.denah.index',      ['sarpras.denah.*','sarpras.ruangan.*'],        'map',             'Denah Gedung'],
-                        ['sarpras.kerusakan.index',  ['sarpras.kerusakan.*'],                        'triangle-alert',  'Kerusakan'],
-                        ['sarpras.peminjaman.index', ['sarpras.peminjaman.*'],                          'handshake',       'Peminjaman & Booking'],
-                        ['sarpras.perbaikan.index',  ['sarpras.perbaikan.*','sarpras.teknisi.*','sarpras.jadwal.*'], 'wrench', 'Perbaikan'],
-                        ['sarpras.pengadaan.index',  ['sarpras.pengadaan.*','sarpras.supplier.*'],   'shopping-cart',   'Pengadaan'],
-                        ['sarpras.penghapusan.index',['sarpras.penghapusan.*','sarpras.mutasi.*'],   'trash-2',         'Penghapusan & Mutasi'],
-                        ['sarpras.laporan.index',    ['sarpras.laporan.*','sarpras.kategori.*'],     'file-bar-chart',  'Laporan'],
+                        ['sarpras.dashboard',        ['sarpras.dashboard'],                          'layout-dashboard', 'Dashboard Sarpras'],
+                        ['sarpras.denah.index',      ['sarpras.denah.*','sarpras.ruangan.*'],        'map',              'Denah Interaktif'],
+                        ['sarpras.kerusakan.index',  ['sarpras.kerusakan.*'],                        'triangle-alert',   'Maintenance Lapor'],
+                        ['sarpras.aset.index',       ['sarpras.aset.*','sarpras.kategori.*'],        'package',          'Inventaris Barang'],
+                        ['sarpras.pengadaan.index',  ['sarpras.pengadaan.*'],                        'shopping-cart',    'Pengadaan Aset'],
+                        ['sarpras.peminjaman.index', ['sarpras.peminjaman.*'],                       'hand-helping',     'Peminjaman Aset'],
+                        ['sarpras.perbaikan.index',  ['sarpras.perbaikan.*','sarpras.teknisi.*','sarpras.jadwal.*'], 'wrench', 'Perbaikan & Teknisi'],
+                        ['sarpras.mutasi.index',     ['sarpras.mutasi.*','sarpras.penghapusan.*'],   'trash-2',          'Mutasi & Hapus'],
+                        ['sarpras.supplier.index',   ['sarpras.supplier.*'],                         'truck',            'Supplier'],
+                        ['sarpras.laporan.index',    ['sarpras.laporan.*'],                          'file-bar-chart',   'Laporan'],
                     ];
-                    // Penuh hanya utk admin & sapras. Role lain: cukup Denah Gedung,
-                    // Kerusakan, dan Peminjaman & Booking. (Siswa & orang tua sudah tak masuk grup.)
+                    // Penuh hanya utk admin & sapras. Role lain: cukup Denah Interaktif, Maintenance Lapor, dan Peminjaman Aset.
                     if (in_array($access, ['superadmin', 'admin', 'sapras'])) {
                         $sarprasItems = $sarprasFull;
                     } else {
@@ -502,17 +502,6 @@
             @endforeach
         </nav>
 
-        <div class="p-3 flex-shrink-0">
-            <div class="flex items-center gap-2.5 p-2.5 rounded-2xl bg-white/50 dark:bg-white/5">
-                <div class="w-9 h-9 rounded-xl text-white grid place-items-center text-sm font-bold flex-shrink-0 shadow overflow-hidden {{ $myFace ? 'cursor-zoom-in' : '' }}" style="background:linear-gradient(135deg,var(--ca),var(--cp))" @if($myFace) @click="avatarZoom=true" title="Lihat foto profil" @endif>
-                    @if($myFace)<img src="{{ $myFace }}" class="w-full h-full object-cover" alt="profil">@else{{ strtoupper(substr(auth()->user()?->guru?->nama ?? auth()->user()?->siswa?->nama ?? auth()->user()?->username ?? 'U', 0, 1)) }}@endif
-                </div>
-                <div x-show="!mini" class="min-w-0 flex-1">
-                    <p class="text-[13px] font-bold truncate leading-tight" style="color:var(--stx)">{{ auth()->user()?->guru?->nama ?? auth()->user()?->siswa?->nama ?? auth()->user()?->username }}</p>
-                    <p class="text-[10px] capitalize opacity-50" style="color:var(--stx)">{{ auth()->user()?->access }}</p>
-                </div>
-            </div>
-        </div>
     </aside>
 
     {{-- ============ MAIN ============ --}}
@@ -654,6 +643,8 @@
                 &copy; {{ date('Y') }} <span class="font-semibold text-slate-500 dark:text-slate-400">{{ $namaSekolah ?? 'Edu Nusantara' }}</span>. Seluruh hak cipta dilindungi.
             </footer>
         </main>
+    </div>
+</div>
 
         {{-- SIMS-NET System Ticker Bar (Integrated for all roles, displaying real dashboard statistics) --}}
         @php
@@ -833,7 +824,6 @@
                 </div>
             </div>
         </div>
-    </div>
 </div>
 
 @if($myFace)

@@ -63,43 +63,163 @@
             <h1 class="text-2xl font-extrabold text-slate-800 dark:text-slate-100">@yield('sarpras_title', 'Sarana & Prasarana')</h1>
             <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">@yield('sarpras_subtitle', 'Manajemen aset, gedung interaktif, pengadaan barang, peminjaman, perbaikan, dan mutasi barang.')</p>
         </div>
-        @hasSection('sarpras_actions')
-            <div class="flex items-center gap-2 flex-wrap">@yield('sarpras_actions')</div>
-        @endif
+        <div class="flex items-center gap-2 flex-wrap">
+            @can('sarpras.denah.kelola')
+                @if (request()->routeIs('sarpras.dashboard') || request()->routeIs('sarpras.denah.index') || request()->routeIs('sarpras.denah.show'))
+                    <button type="button" id="btn-toggle-tata-letak" onclick="toggleTataLetakMode()"
+                       class="btn-accent inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition shadow-sm">
+                        <i data-lucide="layout-dashboard" class="w-4 h-4"></i> <span>Tata Letak</span>
+                    </button>
+                @endif
+            @endcan
+            @hasSection('sarpras_actions')
+                @yield('sarpras_actions')
+            @endif
+        </div>
     </div>
 
-    {{-- Tab navigasi modul Sarpras --}}
-    @php
-        $sarprasTabs = [
-            ['Dashboard Sarpras', 'layout-dashboard', 'sarpras.dashboard',     ['sarpras.dashboard']],
-            ['Denah Interaktif',  'map',              'sarpras.denah.index',   ['sarpras.denah.*','sarpras.ruangan.*']],
-            ['Ruangan & Booking', 'building-2',       'sarpras.booking.index', ['sarpras.booking.*']],
-            ['Maintenance Lapor', 'triangle-alert',   'sarpras.kerusakan.index',  ['sarpras.kerusakan.*']],
-            ['Inventaris Barang', 'package',          'sarpras.aset.index',       ['sarpras.aset.*','sarpras.kategori.*']],
-            ['Pengadaan Aset',    'shopping-cart',    'sarpras.pengadaan.index',  ['sarpras.pengadaan.*']],
-            ['Peminjaman Aset',   'hand-helping',     'sarpras.peminjaman.index', ['sarpras.peminjaman.*']],
-            ['Perbaikan & Teknisi','wrench',          'sarpras.perbaikan.index',  ['sarpras.perbaikan.*','sarpras.teknisi.*','sarpras.jadwal.*']],
-            ['Mutasi & Hapus',    'trash-2',          'sarpras.mutasi.index',     ['sarpras.mutasi.*','sarpras.penghapusan.*']],
-            ['Supplier',          'truck',            'sarpras.supplier.index',   ['sarpras.supplier.*']],
-        ];
-    @endphp
-    <div class="border-b border-slate-200 dark:border-slate-700">
-        <nav class="sarpras-tabs flex gap-1 overflow-x-auto">
-            @foreach($sarprasTabs as [$label, $icon, $route, $patterns])
-                @php $active = request()->routeIs(...$patterns); @endphp
-                <a href="{{ route($route) }}"
-                   class="flex items-center gap-2 px-4 py-3 text-sm font-semibold whitespace-nowrap border-b-2 transition
-                          {{ $active
-                                ? 'border-amber-500 text-amber-600 dark:text-amber-400'
-                                : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200' }}">
-                    <i data-lucide="{{ $icon }}" class="w-[18px] h-[18px]"></i>
-                    {{ $label }}
-                </a>
-            @endforeach
-        </nav>
-    </div>
+
 
     {{-- Konten halaman modul --}}
     @yield('sarpras_body')
 </div>
+
+<script>
+// === DRAG & DROP LAYOUT ARRANGEMENT (LocalStorage-backed) ===
+let isLayoutEditMode = false;
+
+function applySavedLayouts() {
+    document.querySelectorAll('[data-drag-container]').forEach(container => {
+        const key = 'sarpras_layout_' + container.getAttribute('data-drag-container');
+        const savedOrder = localStorage.getItem(key);
+        if (savedOrder) {
+            const orderIds = JSON.parse(savedOrder);
+            const elements = Array.from(container.children);
+            
+            // Map elements by a unique identifier (data-drag-id)
+            const elementsMap = {};
+            elements.forEach(el => {
+                const id = el.getAttribute('data-drag-id') || el.innerText.trim();
+                elementsMap[id] = el;
+            });
+            
+            // Re-append elements in the saved order
+            orderIds.forEach(id => {
+                if (elementsMap[id]) {
+                    container.appendChild(elementsMap[id]);
+                    delete elementsMap[id];
+                }
+            });
+            
+            // Append any remaining elements that weren't in the saved order
+            Object.values(elementsMap).forEach(el => {
+                container.appendChild(el);
+            });
+        }
+    });
+}
+
+function toggleTataLetakMode() {
+    isLayoutEditMode = !isLayoutEditMode;
+    const btn = document.getElementById('btn-toggle-tata-letak');
+    const containers = document.querySelectorAll('[data-drag-container]');
+    
+    if (isLayoutEditMode) {
+        if (btn) {
+            btn.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i> <span>Selesai</span>';
+            btn.className = "btn-accent inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition shadow-sm";
+            if (window.lucide) window.lucide.createIcons();
+        }
+        
+        containers.forEach(container => {
+            container.classList.add('ring-4', 'ring-emerald-300/40', 'p-2', 'rounded-xl', 'bg-emerald-50/10', 'transition-all');
+            Array.from(container.children).forEach(child => {
+                child.setAttribute('draggable', 'true');
+                child.classList.add('cursor-move', 'opacity-90', 'hover:border-emerald-400');
+                
+                // Add drag events
+                child.addEventListener('dragstart', handleDragStart);
+                child.addEventListener('dragover', handleDragOver);
+                child.addEventListener('drop', handleDrop);
+                child.addEventListener('dragend', handleDragEnd);
+            });
+        });
+    } else {
+        if (btn) {
+            btn.innerHTML = '<i data-lucide="layout-dashboard" class="w-4 h-4"></i> <span>Tata Letak</span>';
+            btn.className = "btn-accent inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition shadow-sm";
+            if (window.lucide) window.lucide.createIcons();
+        }
+        
+        containers.forEach(container => {
+            container.classList.remove('ring-4', 'ring-emerald-300/40', 'p-2', 'rounded-xl', 'bg-emerald-50/10');
+            
+            // Save new order to localStorage
+            const key = 'sarpras_layout_' + container.getAttribute('data-drag-container');
+            const orderIds = Array.from(container.children).map(child => {
+                return child.getAttribute('data-drag-id') || child.innerText.trim();
+            });
+            localStorage.setItem(key, JSON.stringify(orderIds));
+            
+            Array.from(container.children).forEach(child => {
+                child.removeAttribute('draggable');
+                child.classList.remove('cursor-move', 'opacity-90', 'hover:border-emerald-400');
+                
+                // Remove drag events
+                child.removeEventListener('dragstart', handleDragStart);
+                child.removeEventListener('dragover', handleDragOver);
+                child.removeEventListener('drop', handleDrop);
+                child.removeEventListener('dragend', handleDragEnd);
+            });
+        });
+    }
+}
+
+let dragSrcEl = null;
+
+function handleDragStart(e) {
+    this.style.opacity = '0.4';
+    dragSrcEl = this;
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragOver(e) {
+    if (e.preventDefault) {
+        e.preventDefault();
+    }
+    e.dataTransfer.dropEffect = 'move';
+    return false;
+}
+
+function handleDrop(e) {
+    if (e.stopPropagation) {
+        e.stopPropagation();
+    }
+    
+    if (dragSrcEl !== this) {
+        const container = this.parentNode;
+        const children = Array.from(container.children);
+        const fromIndex = children.indexOf(dragSrcEl);
+        const toIndex = children.indexOf(this);
+        
+        if (fromIndex < toIndex) {
+            container.insertBefore(dragSrcEl, this.nextSibling);
+        } else {
+            container.insertBefore(dragSrcEl, this);
+        }
+    }
+    return false;
+}
+
+function handleDragEnd(e) {
+    this.style.opacity = '1';
+}
+
+// Run applySavedLayouts on DOMContentLoaded or immediately if DOM is loaded
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applySavedLayouts);
+} else {
+    applySavedLayouts();
+}
+</script>
 @endsection

@@ -16,7 +16,7 @@
     ];
 @endphp
 
-<div x-data="{ open: {{ $errors->any() ? 'true' : 'false' }}, form: { ruangan_id: '{{ old('ruangan_id') }}' } }" class="space-y-5">
+<div x-data="{ open: {{ ($errors->has('ruangan_id') || $errors->has('keperluan') || $errors->has('tanggal') || $errors->has('jam_mulai') || $errors->has('jam_selesai')) ? 'true' : 'false' }}, openTambah: {{ ($errors->has('kode') || $errors->has('nama') || $errors->has('warna')) ? 'true' : 'false' }}, openEdit: false, form: { ruangan_id: '{{ old('ruangan_id') }}' }, editForm: { action: '', kode: '', nama: '', kapasitas: '', warna: '#3b82f6', pos_x: '', pos_y: '', lebar: '', tinggi: '' } }" class="space-y-5">
 
     {{-- Judul sub-modul + aksi --}}
     <div class="flex items-center justify-between gap-3 flex-wrap">
@@ -24,13 +24,65 @@
             <span class="grid place-items-center w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-500"><i data-lucide="building-2" class="w-4 h-4"></i></span>
             Ruangan &amp; Peminjaman
         </h2>
-        @can('sarpras.peminjaman.ajukan')
-        <button type="button" @click="form.ruangan_id=''; open=true"
-                class="inline-flex items-center gap-2 bg-slate-900 dark:bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold">
-            <i data-lucide="plus" class="w-4 h-4"></i> Ajukan Penggunaan Ruang
-        </button>
-        @endcan
+        <div class="flex items-center gap-2 flex-wrap">
+            @can('sarpras.denah.kelola')
+            <button type="button" @click="openTambah = !openTambah"
+                    class="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 dark:bg-primary dark:hover:bg-primary-hover text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-bold shadow-sm hover:shadow transition-all duration-200">
+                <i data-lucide="plus" class="w-4 h-4"></i> Tambah Ruangan
+            </button>
+            @endcan
+            @can('sarpras.peminjaman.ajukan')
+            <button type="button" @click="form.ruangan_id=''; open=true"
+                    class="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 dark:bg-primary dark:hover:bg-primary-hover text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-bold shadow-sm hover:shadow transition-all duration-200">
+                <i data-lucide="plus" class="w-4 h-4"></i> Ajukan Penggunaan Ruang
+            </button>
+            @endcan
+        </div>
     </div>
+
+    @can('sarpras.denah.kelola')
+        {{-- Panel tambah ruangan secara manual --}}
+        <div x-show="openTambah" x-transition class="mb-4 rounded-lg border border-slate-200 bg-slate-50/50 p-4" style="display: none;">
+            <h4 class="font-semibold text-gray-800 dark:text-slate-100 text-sm mb-3">Tambah Ruangan Baru</h4>
+            @php $allDenahs = \App\Sarpras\Models\Denah::orderBy('nama')->get(); @endphp
+            <form method="POST" action="{{ route('sarpras.ruangan.store', ':denah') }}" enctype="multipart/form-data"
+                  onsubmit="this.action = this.action.replace(':denah', document.getElementById('select-denah').value); return true;"
+                  class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                @csrf
+                <input type="hidden" name="pos_x" value="50">
+                <input type="hidden" name="pos_y" value="50">
+                <input type="hidden" name="lebar" value="14">
+                <input type="hidden" name="tinggi" value="9">
+                <input type="hidden" name="status" value="tersedia">
+
+                <div>
+                    <label class="block text-gray-600 dark:text-slate-300 text-xs font-semibold mb-1">Denah / Layout <span class="text-red-500">*</span></label>
+                    <select id="select-denah" required class="w-full border rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100">
+                        <option value="" disabled selected>Pilih Denah/Lantai</option>
+                        @foreach($allDenahs as $d)
+                            <option value="{{ $d->id }}">{{ $d->nama }} (Gedung: {{ $d->gedung ?? '—' }}, Lantai: {{ $d->lantai ?? '—' }})</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-gray-600 dark:text-slate-300 text-xs font-semibold mb-1">Kode Ruangan (mis. 7A) <span class="text-red-500">*</span></label>
+                    <input name="kode" required placeholder="mis. 7A" class="w-full border rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100">
+                </div>
+                <div>
+                    <label class="block text-gray-600 dark:text-slate-300 text-xs font-semibold mb-1">Nama Ruangan <span class="text-red-500">*</span></label>
+                    <input name="nama" required placeholder="mis. Kelas 7A" class="w-full border rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100">
+                </div>
+                <div>
+                    <label class="block text-gray-600 dark:text-slate-300 text-xs font-semibold mb-1">Kapasitas Orang / Warna</label>
+                    <div class="flex gap-1.5">
+                        <input name="kapasitas" type="number" min="0" placeholder="Kapasitas" class="w-full border rounded px-3 py-2 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 min-w-0">
+                        <input name="warna" type="color" value="#3b82f6" class="h-[38px] w-12 border rounded px-1 py-1 cursor-pointer bg-white shrink-0">
+                        <button type="submit" class="bg-slate-900 hover:bg-slate-800 dark:bg-primary dark:hover:bg-primary-hover text-white rounded px-4 font-bold transition">Simpan</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    @endcan
 
     {{-- Kartu status ruangan --}}
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -86,10 +138,10 @@
     </form>
 
     {{-- Kartu ruangan --}}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" data-drag-container="booking_rooms">
         @forelse($rooms as $room)
         @php [$slabel, $scolor, $schip] = $statusMeta[$room->status] ?? $statusMeta['tersedia']; @endphp
-        <div class="card p-5 flex flex-col gap-3">
+        <div class="card p-5 flex flex-col gap-3 transition-all duration-200" data-drag-id="{{ $room->id }}">
             <div class="flex items-start justify-between gap-2">
                 <div>
                     <p class="font-bold text-slate-800 dark:text-slate-100">{{ $room->kode }}</p>
@@ -108,12 +160,39 @@
             </div>
             @endif
 
-            @can('sarpras.peminjaman.ajukan')
-            <button type="button" @click="form.ruangan_id='{{ $room->id }}'; open=true"
-                    class="mt-auto inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline">
-                <i data-lucide="plus" class="w-4 h-4"></i> Ajukan penggunaan ruangan ini
-            </button>
-            @endcan
+            <div class="mt-auto pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                @can('sarpras.peminjaman.ajukan')
+                <button type="button" @click="form.ruangan_id='{{ $room->id }}'; open=true"
+                        class="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline">
+                    <i data-lucide="plus" class="w-4 h-4"></i> Ajukan penggunaan
+                </button>
+                @else
+                <div></div>
+                @endcan
+
+                @can('sarpras.denah.kelola')
+                <div class="flex items-center gap-1">
+                    @if($room->denah)
+                    <a href="{{ route('sarpras.denah.hotspot', $room->denah) }}"
+                       class="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition"
+                       title="Atur Tata Letak / Posisi (Drag & Drop)">
+                        <i data-lucide="move" class="w-4 h-4"></i>
+                    </a>
+                    @endif
+                    <button type="button" @click="editForm.action='{{ route('sarpras.ruangan.update', $room) }}'; editForm.kode='{{ $room->kode }}'; editForm.nama='{{ $room->nama }}'; editForm.kapasitas='{{ $room->kapasitas }}'; editForm.warna='{{ $room->warna_hex }}'; editForm.pos_x='{{ $room->pos_x }}'; editForm.pos_y='{{ $room->pos_y }}'; editForm.lebar='{{ $room->lebar }}'; editForm.tinggi='{{ $room->tinggi }}'; openEdit=true"
+                            class="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition" title="Edit Ruangan">
+                        <i data-lucide="edit-2" class="w-4 h-4"></i>
+                    </button>
+                    <form method="POST" action="{{ route('sarpras.ruangan.destroy', $room) }}"
+                          onsubmit="return confirmAction(this, 'Hapus ruangan &ldquo;{{ $room->kode }}&rdquo;? Semua aset di dalamnya akan terputus dari ruangan ini.', 'red')">
+                        @csrf @method('DELETE')
+                        <button type="submit" class="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 transition" title="Hapus Ruangan">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </form>
+                </div>
+                @endcan
+            </div>
         </div>
         @empty
         <div class="card p-10 text-center text-slate-400 col-span-full">
@@ -204,5 +283,47 @@
             </form>
         </div>
     </div>
+
+    @can('sarpras.denah.kelola')
+    {{-- Modal edit ruangan --}}
+    <div x-show="openEdit" x-cloak x-transition.opacity class="fixed inset-0 z-[9990] grid place-items-center p-4 bg-slate-900/50 backdrop-blur-sm" @click.self="openEdit=false">
+        <div class="card !rounded-2xl w-full max-w-md p-5 space-y-4" @click.stop>
+            <div class="flex items-center justify-between">
+                <h3 class="font-bold text-slate-800 dark:text-slate-100">Edit Ruangan</h3>
+                <button @click="openEdit=false" class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <form method="POST" :action="editForm.action" class="space-y-3">
+                @csrf @method('PUT')
+                <input type="hidden" name="pos_x" x-model="editForm.pos_x">
+                <input type="hidden" name="pos_y" x-model="editForm.pos_y">
+                <input type="hidden" name="lebar" x-model="editForm.lebar">
+                <input type="hidden" name="tinggi" x-model="editForm.tinggi">
+                <div>
+                    <label class="form-label">Kode Ruangan</label>
+                    <input type="text" name="kode" x-model="editForm.kode" required class="form-input text-sm">
+                </div>
+                <div>
+                    <label class="form-label">Nama Ruangan</label>
+                    <input type="text" name="nama" x-model="editForm.nama" required class="form-input text-sm">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="form-label">Kapasitas</label>
+                        <input type="number" name="kapasitas" x-model="editForm.kapasitas" class="form-input text-sm">
+                    </div>
+                    <div>
+                        <label class="form-label">Warna Blok</label>
+                        <input type="color" name="warna" x-model="editForm.warna" class="h-[38px] w-full border rounded px-1 py-1 cursor-pointer bg-white dark:bg-slate-800">
+                    </div>
+                </div>
+                <div class="flex gap-2 pt-1">
+                    <button type="button" @click="openEdit=false" class="flex-1 py-2.5 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700">Batal</button>
+                    <button type="submit" class="btn-primary flex-1 py-2.5 rounded-xl text-sm font-bold">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    @endcan
 </div>
 @endsection

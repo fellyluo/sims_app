@@ -35,7 +35,9 @@
             @endif
         @endcan
         <a href="{{ route('sarpras.penghapusan.berita', $penghapusan) }}" target="_blank"
-           class="block text-center bg-slate-900 text-white rounded py-2 text-sm">📄 Berita Acara (PDF)</a>
+           class="inline-flex items-center justify-center gap-2 w-full bg-[#fff1f2] text-[#9f1239] border border-[#fecdd3] px-5 py-2.5 rounded-full text-sm font-bold transition-all duration-200 shadow-sm hover:bg-[#ffe4e6]">
+            <i data-lucide="file-text" class="w-4 h-4"></i> Berita Acara (PDF)
+        </a>
     </div>
 </div>
 @endsection

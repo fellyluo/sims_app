@@ -17,8 +17,8 @@ class RuanganRequest extends FormRequest
             'kode' => ['required', 'string', 'max:50'],
             'nama' => ['nullable', 'string', 'max:150'],
             // KOORDINAT PERSEN wajib 0-100 (validasi anti out-of-range).
-            'pos_x' => ['required', 'numeric', 'between:0,100'],
-            'pos_y' => ['required', 'numeric', 'between:0,100'],
+            'pos_x' => ['sometimes', 'required', 'numeric', 'between:0,100'],
+            'pos_y' => ['sometimes', 'required', 'numeric', 'between:0,100'],
             'lebar' => ['nullable', 'numeric', 'between:1,100'],
             'tinggi' => ['nullable', 'numeric', 'between:1,100'],
             'kapasitas' => ['nullable', 'integer', 'min:0', 'max:100000'],
