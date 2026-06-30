@@ -33,6 +33,7 @@ class SmokeTest extends TestCase
             'dashboard'            => ['/dashboard'],
             'ticker-stats'         => ['/dashboard/ticker-stats'],
             'sarpras dashboard'    => ['/sarpras'],
+            'sarpras booking'      => ['/sarpras/booking'],
             'keuangan'             => ['/keuangan'],
             'keuangan verifikasi'  => ['/keuangan/verifikasi'],
             'keuangan bank'        => ['/keuangan/bank'],
@@ -58,6 +59,8 @@ class SmokeTest extends TestCase
             'sarpras pengadaan'    => ['/sarpras/pengadaan'],
             'sarpras perbaikan'    => ['/sarpras/perbaikan'],
             'sarpras laporan'      => ['/sarpras/laporan'],
+            'sarpras supplier'     => ['/sarpras/supplier'],
+            'sarpras teknisi'      => ['/sarpras/teknisi'],
         ];
     }
 

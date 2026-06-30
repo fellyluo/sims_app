@@ -30,7 +30,8 @@ class RuanganController extends Controller
 
     public function store(RuanganRequest $request, Denah $denah, FotoCompressor $compressor): RedirectResponse
     {
-        $data = $request->safe()->only(['kode', 'nama', 'pos_x', 'pos_y', 'lebar', 'tinggi', 'warna', 'kapasitas', 'deskripsi']);
+        $data = $request->safe()->only(['kode', 'nama', 'pos_x', 'pos_y', 'lebar', 'tinggi', 'warna', 'kapasitas', 'deskripsi', 'gedung', 'lantai', 'status']);
+        $data['fasilitas'] = $this->parseFasilitas($request->input('fasilitas'));
         $data['denah_id'] = $denah->id;
 
         try {
@@ -86,7 +87,10 @@ class RuanganController extends Controller
 
     public function update(RuanganRequest $request, DenahRuangan $ruangan, FotoCompressor $compressor): RedirectResponse
     {
-        $data = $request->safe()->only(['kode', 'nama', 'pos_x', 'pos_y', 'lebar', 'tinggi', 'warna', 'kapasitas', 'deskripsi']);
+        $data = $request->safe()->only(['kode', 'nama', 'pos_x', 'pos_y', 'lebar', 'tinggi', 'warna', 'kapasitas', 'deskripsi', 'gedung', 'lantai', 'status']);
+        if ($request->has('fasilitas')) {
+            $data['fasilitas'] = $this->parseFasilitas($request->input('fasilitas'));
+        }
 
         try {
             if ($request->hasFile('gambar_denah')) {
@@ -136,5 +140,16 @@ class RuanganController extends Controller
         $ruangan->delete();
 
         return back()->with('sukses', 'Ruangan dihapus.');
+    }
+
+    /** Ubah string fasilitas (dipisah koma) menjadi array; null bila kosong. */
+    private function parseFasilitas(?string $raw): ?array
+    {
+        if (! $raw || trim($raw) === '') {
+            return null;
+        }
+        $list = array_values(array_filter(array_map('trim', explode(',', $raw))));
+
+        return $list ?: null;
     }
 }

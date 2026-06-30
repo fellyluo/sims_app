@@ -23,6 +23,11 @@ class RuanganRequest extends FormRequest
             'tinggi' => ['nullable', 'numeric', 'between:1,100'],
             'kapasitas' => ['nullable', 'integer', 'min:0', 'max:100000'],
             'deskripsi' => ['nullable', 'string', 'max:1000'],
+            // Field booking ruangan.
+            'gedung' => ['nullable', 'string', 'max:80'],
+            'lantai' => ['nullable', 'string', 'max:40'],
+            'status' => ['nullable', 'in:tersedia,digunakan,maintenance'],
+            'fasilitas' => ['nullable', 'string', 'max:500'], // dipisah koma → array di controller
             // Warna blok dalam format hex #rrggbb.
             'warna' => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'gambar_denah' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],

@@ -1,6 +1,7 @@
 <?php
 
 use App\Sarpras\Http\Controllers\AsetController;
+use App\Sarpras\Http\Controllers\BookingController;
 use App\Sarpras\Http\Controllers\DashboardController;
 use App\Sarpras\Http\Controllers\DenahController;
 use App\Sarpras\Http\Controllers\JadwalController;
@@ -113,6 +114,16 @@ Route::middleware(['web', 'auth'])->prefix('sarpras')->name('sarpras.')->group(f
         Route::delete('aset/{aset}', [AsetController::class, 'destroy'])->name('aset.destroy');
     });
 
+    /* 5a. RUANGAN & BOOKING */
+    Route::get('booking', [BookingController::class, 'index'])
+        ->middleware('can:sarpras.peminjaman.lihat')->name('booking.index');
+    Route::post('booking', [BookingController::class, 'store'])
+        ->middleware('can:sarpras.peminjaman.ajukan')->name('booking.store');
+    Route::post('booking/{booking}/setujui', [BookingController::class, 'setujui'])
+        ->middleware('can:sarpras.booking.kelola')->name('booking.setujui');
+    Route::post('booking/{booking}/tolak', [BookingController::class, 'tolak'])
+        ->middleware('can:sarpras.booking.kelola')->name('booking.tolak');
+
     /* 5. PEMINJAMAN (terintegrasi dengan booking ruangan) */
     Route::middleware('can:sarpras.peminjaman.lihat')->group(function () {
         Route::get('peminjaman', [PeminjamanController::class, 'index'])->name('peminjaman.index');
@@ -138,6 +149,7 @@ Route::middleware(['web', 'auth'])->prefix('sarpras')->name('sarpras.')->group(f
         Route::get('perbaikan-baru', [PerbaikanController::class, 'create'])->name('perbaikan.create');
         Route::post('perbaikan', [PerbaikanController::class, 'store'])->name('perbaikan.store');
         Route::put('perbaikan/{perbaikan}', [PerbaikanController::class, 'update'])->name('perbaikan.update');
+        Route::post('perbaikan/{perbaikan}/selesai', [PerbaikanController::class, 'selesai'])->name('perbaikan.selesai');
     });
     Route::resource('teknisi', TeknisiController::class)
         ->middleware('can:sarpras.teknisi.kelola')->except(['show']);

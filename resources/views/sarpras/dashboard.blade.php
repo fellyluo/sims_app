@@ -1,43 +1,8 @@
-@extends('layouts.app')
+@extends('sarpras.layouts.app')
 @section('title', 'Dashboard Sarpras')
 
-@section('content')
+@section('sarpras_body')
 <div class="space-y-6">
-
-    {{-- Header --}}
-    <div>
-        <h1 class="text-2xl font-extrabold text-slate-800 dark:text-slate-100">Sarana &amp; Prasarana</h1>
-        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Manajemen aset, gedung interaktif, pengadaan barang, peminjaman, perbaikan, dan mutasi barang.</p>
-    </div>
-
-    {{-- Tab navigasi --}}
-    @php
-        $tabs = [
-            ['Dashboard Sarpras', 'layout-dashboard', 'sarpras.dashboard',     ['sarpras.dashboard']],
-            ['Denah Interaktif',  'map',              'sarpras.denah.index',   ['sarpras.denah.*','sarpras.ruangan.*']],
-            ['Ruangan & Booking', 'building-2',       'sarpras.peminjaman.index', ['sarpras.booking.*']],
-            ['Maintenance Lapor', 'triangle-alert',   'sarpras.kerusakan.index',  ['sarpras.kerusakan.*']],
-            ['Inventaris Barang', 'package',          'sarpras.aset.index',       ['sarpras.aset.*','sarpras.kategori.*']],
-            ['Pengadaan Aset',    'shopping-cart',    'sarpras.pengadaan.index',  ['sarpras.pengadaan.*','sarpras.supplier.*']],
-            ['Peminjaman Aset',   'hand-helping',     'sarpras.peminjaman.index', ['sarpras.peminjaman.*']],
-            ['Perbaikan & Teknis','wrench',           'sarpras.perbaikan.index',  ['sarpras.perbaikan.*','sarpras.teknisi.*']],
-        ];
-    @endphp
-    <div class="border-b border-slate-200 dark:border-slate-700 -mt-1">
-        <nav class="flex gap-1 overflow-x-auto no-scrollbar">
-            @foreach($tabs as [$label, $icon, $route, $patterns])
-                @php $active = request()->routeIs(...$patterns); @endphp
-                <a href="{{ route($route) }}"
-                   class="flex items-center gap-2 px-4 py-3 text-sm font-semibold whitespace-nowrap border-b-2 transition
-                          {{ $active
-                                ? 'border-amber-500 text-amber-600 dark:text-amber-400'
-                                : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200' }}">
-                    <i data-lucide="{{ $icon }}" class="w-[18px] h-[18px]"></i>
-                    {{ $label }}
-                </a>
-            @endforeach
-        </nav>
-    </div>
 
     {{-- Kartu statistik --}}
     @php
@@ -106,7 +71,7 @@
                 $maxKondisi = max(1, (int) $asetPerKondisi->max());
             @endphp
             <div class="space-y-3.5">
-                @forelse($kondisiMeta as $key => [$label, $color])
+                @foreach($kondisiMeta as $key => [$label, $color])
                     @php $jml = (int) ($asetPerKondisi[$key] ?? 0); @endphp
                     @if($jml > 0)
                     <div>
@@ -121,8 +86,7 @@
                         </div>
                     </div>
                     @endif
-                @empty
-                @endforelse
+                @endforeach
                 @if($asetPerKondisi->sum() === 0)
                     <p class="text-sm text-slate-400 py-6 text-center">Belum ada data kondisi.</p>
                 @endif
@@ -154,11 +118,3 @@
     </div>
 </div>
 @endsection
-
-@push('styles')
-<style>
-    .no-scrollbar::-webkit-scrollbar { height: 4px; }
-    .no-scrollbar::-webkit-scrollbar-thumb { background: rgb(203 213 225 / .6); border-radius: 9999px; }
-    .dark .no-scrollbar::-webkit-scrollbar-thumb { background: rgb(71 85 105 / .6); }
-</style>
-@endpush

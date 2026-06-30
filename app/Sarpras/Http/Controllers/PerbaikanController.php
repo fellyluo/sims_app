@@ -5,6 +5,7 @@ namespace App\Sarpras\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Sarpras\Http\Requests\PerbaikanRequest;
 use App\Sarpras\Models\Aset;
+use App\Sarpras\Models\JadwalPemeliharaan;
 use App\Sarpras\Models\LaporanKerusakan;
 use App\Sarpras\Models\Perbaikan;
 use App\Sarpras\Models\Teknisi;
@@ -22,7 +23,19 @@ class PerbaikanController extends Controller
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))
             ->latest()->paginate(15)->withQueryString();
 
-        return view('sarpras.perbaikan.index', compact('perbaikan'));
+        // Jadwal pemeliharaan rutin untuk panel di samping.
+        $jadwal = JadwalPemeliharaan::with('aset:id,kode,nama')
+            ->where('aktif', true)->orderBy('tgl_berikutnya')->limit(20)->get();
+
+        return view('sarpras.perbaikan.index', compact('perbaikan', 'jadwal'));
+    }
+
+    /** Tandai order perbaikan selesai. */
+    public function selesai(Perbaikan $perbaikan): RedirectResponse
+    {
+        $perbaikan->update(['status' => 'selesai', 'tgl_selesai' => now()]);
+
+        return back()->with('sukses', 'Perbaikan ditandai selesai.');
     }
 
     public function create(Request $request): View
