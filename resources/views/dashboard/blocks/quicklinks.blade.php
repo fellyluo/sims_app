@@ -16,11 +16,11 @@
         @foreach($shortcuts as [$label, $route, $icon])
         @if(\Illuminate\Support\Facades\Route::has($route))
         <a href="{{ route($route) }}"
-           class="card card-hover p-3 flex flex-col items-center justify-center gap-2 text-center group">
-            <span class="grid place-items-center w-11 h-11 rounded-2xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition">
+           class="card p-4 flex flex-col items-center justify-center gap-3 text-center group hover:border-primary/20 hover:-translate-y-0.5 hover:shadow-md transition-all duration-350">
+            <span class="grid place-items-center w-11 h-11 rounded-2xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-all duration-300">
                 <i data-lucide="{{ $icon }}" class="w-5 h-5"></i>
             </span>
-            <span class="text-[11px] font-semibold text-slate-600 dark:text-slate-300 leading-tight">{{ $label }}</span>
+            <span class="text-[11px] font-bold text-slate-600 dark:text-slate-300 leading-tight tracking-wide">{{ $label }}</span>
         </a>
         @endif
         @endforeach

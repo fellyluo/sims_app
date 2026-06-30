@@ -17,7 +17,12 @@ class UserPreference extends Model
     ];
 
     /** Urutan kanonik blok dashboard (default sebelum di-drag). */
-    public const DASHBOARD_BLOCKS = ['stats', 'ringkasan', 'insight', 'recent', 'sebaran', 'quicklinks', 'sarpras'];
+    public const DASHBOARD_BLOCKS = [
+        'ringkasan_siswa', 'ringkasan_guru', 'ringkasan_kelas', 'ringkasan_tahun',
+        'insight_rasio', 'insight_avg_kelas', 'insight_avg_tingkat', 'insight_terpadat',
+        'sarpras_aset', 'sarpras_kerusakan', 'sarpras_peminjaman', 'sarpras_pengadaan',
+        'recent_tingkat', 'recent_komposisi', 'sebaran', 'quicklinks'
+    ];
 
     protected function casts(): array
     {

@@ -29,6 +29,47 @@
     @keyframes motivIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     @media (prefers-reduced-motion: reduce) { .motiv-card { animation: none; } }
 
+    /* ===== Tampilan Khusus Ringkasan Baru ===== */
+    .card-siswa {
+        background: linear-gradient(160deg, color-mix(in srgb, var(--cp) 18%, white), color-mix(in srgb, var(--cp) 6%, white)) !important;
+        border-color: color-mix(in srgb, var(--cp) 12%, #e2e8f0) !important;
+    }
+    .dark .card-siswa {
+        background: linear-gradient(160deg, #1e293b, #0f172a) !important;
+        border-color: #334155 !important;
+    }
+    .card-siswa .text-title { color: color-mix(in srgb, var(--cp) 78%, black); }
+    .card-siswa .text-sub { color: color-mix(in srgb, var(--cp) 62%, black); }
+
+    .card-guru {
+        background: linear-gradient(160deg, color-mix(in srgb, var(--cps) 20%, white), color-mix(in srgb, var(--cps) 8%, white)) !important;
+        border-color: color-mix(in srgb, var(--cps) 12%, #e2e8f0) !important;
+    }
+    .dark .card-guru {
+        background: linear-gradient(160deg, #1e293b, #0f172a) !important;
+        border-color: #334155 !important;
+    }
+    .card-guru .text-title { color: color-mix(in srgb, var(--cps) 80%, black); }
+    .card-guru .text-sub { color: color-mix(in srgb, var(--cps) 64%, black); }
+
+    .card-kelas {
+        background: linear-gradient(160deg, color-mix(in srgb, var(--ca) 20%, white), color-mix(in srgb, var(--ca) 8%, white)) !important;
+        border-color: color-mix(in srgb, var(--ca) 12%, #e2e8f0) !important;
+    }
+    .dark .card-kelas {
+        background: linear-gradient(160deg, #1e293b, #0f172a) !important;
+        border-color: #334155 !important;
+    }
+    .card-kelas .text-title { color: color-mix(in srgb, var(--ca) 80%, black); }
+    .card-kelas .text-sub { color: color-mix(in srgb, var(--ca) 64%, black); }
+
+    .dark .card-siswa .text-title, .dark .card-guru .text-title, .dark .card-kelas .text-title {
+        color: #f1f5f9 !important;
+    }
+    .dark .card-siswa .text-sub, .dark .card-guru .text-sub, .dark .card-kelas .text-sub {
+        color: #94a3b8 !important;
+    }
+
     /* ===== Mode atur tata letak (drag & drop) ===== */
     .dash-block { position: relative; }
     .dash-handle { display: none; }
@@ -249,13 +290,40 @@
         ? array_values(array_intersect($pref->dashboard_hidden, $allBlocks))
         : [];
     $blockLabel = [
-        'stats'      => 'Statistik',
-        'ringkasan'  => 'Ringkasan & Tahun Ajaran',
-        'insight'    => 'Analitik Sekolah',
-        'recent'     => 'Distribusi & Komposisi Siswa',
-        'sebaran'    => 'Sebaran Siswa per Kelas',
-        'quicklinks' => 'Tautan Cepat',
-        'sarpras'    => 'Sarana & Prasarana',
+        'ringkasan_siswa' => 'Ringkasan Siswa',
+        'ringkasan_guru'  => 'Ringkasan Guru',
+        'ringkasan_kelas' => 'Ringkasan Kelas',
+        'ringkasan_tahun' => 'Tahun Ajaran',
+        'insight_rasio'   => 'Insight Rasio Guru',
+        'insight_avg_kelas' => 'Insight Rata Kelas',
+        'insight_avg_tingkat' => 'Insight Rata Tingkat',
+        'insight_terpadat' => 'Insight Kelas Terpadat',
+        'sarpras_aset'    => 'Sarpras Total Aset',
+        'sarpras_kerusakan' => 'Sarpras Laporan Kerusakan',
+        'sarpras_peminjaman' => 'Sarpras Peminjaman Aktif',
+        'sarpras_pengadaan' => 'Sarpras Pengadaan Pending',
+        'recent_tingkat'  => 'Sebaran Siswa per Tingkat',
+        'recent_komposisi' => 'Komposisi Jenis Kelamin',
+        'sebaran'         => 'Grafik Sebaran Kelas',
+        'quicklinks'      => 'Tautan Cepat',
+    ];
+    $spans = [
+        'ringkasan_siswa' => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'ringkasan_guru'  => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'ringkasan_kelas' => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'ringkasan_tahun' => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'insight_rasio'   => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'insight_avg_kelas' => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'insight_avg_tingkat' => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'insight_terpadat' => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'sarpras_aset'    => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'sarpras_kerusakan' => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'sarpras_peminjaman' => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'sarpras_pengadaan' => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'recent_tingkat'  => 'col-span-12 lg:col-span-5',
+        'recent_komposisi' => 'col-span-12 lg:col-span-7',
+        'sebaran'         => 'col-span-12',
+        'quicklinks'      => 'col-span-12',
     ];
 @endphp
 
@@ -301,12 +369,12 @@
     </div>
 
     {{-- Grid blok yang bisa di-drag --}}
-    <div id="dashGrid" class="space-y-6" x-ref="grid">
+    <div id="dashGrid" class="grid grid-cols-12 gap-5" x-ref="grid">
         @foreach($blockOrder as $block)
-            @if($block === 'sarpras' && ! auth()->user()->can('sarpras.dashboard.lihat'))
+            @if(str_starts_with($block, 'sarpras_') && ! auth()->user()->can('sarpras.dashboard.lihat'))
                 @continue
             @endif
-            <div class="dash-block {{ in_array($block, $hiddenBlocks) ? 'dash-hidden' : '' }}" data-block="{{ $block }}" :class="{ 'dash-hidden': hidden.includes('{{ $block }}') }">
+            <div class="dash-block {{ $spans[$block] ?? 'col-span-12' }} {{ in_array($block, $hiddenBlocks) ? 'dash-hidden' : '' }}" data-block="{{ $block }}" :class="{ 'dash-hidden': hidden.includes('{{ $block }}') }">
                 <span class="dash-handle"><i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i> {{ $blockLabel[$block] ?? $block }}</span>
                 <button type="button" class="dash-remove" @click.stop.prevent="toggleHide('{{ $block }}')"
                         :title="hidden.includes('{{ $block }}') ? 'Tampilkan blok' : 'Sembunyikan blok'">

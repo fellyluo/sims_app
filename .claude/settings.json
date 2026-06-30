@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(php artisan route:list --path=dashboard 2>&1)",
+      "Bash(git check-ignore *)",
+      "PowerShell(gh pr view 9 --repo dedyzhang/sims_app --json state,title,mergedAt 2>&1)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://127.0.0.1:8000/sarpras)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://127.0.0.1:8000/dashboard)",
+      "PowerShell(php artisan route:list 2>&1)",
+      "PowerShell(php artisan about --only=environment 2>&1)",
+      "PowerShell(Write-Output \"=== VIEW CACHE \\(isolated\\) ===\"; php artisan view:cache; Write-Output \"exit=$LASTEXITCODE\")",
+      "PowerShell(php artisan test 2>&1 | Select-Object -Last 18; Write-Output \"exit=$LASTEXITCODE\")",
+      "Bash(grep -iE \"route\\\\\\(|\\\\\\\\\\\\$|fetch\\\\\\(|@php|function|undefined|null|->|x-data\")",
+      "PowerShell(php artisan test --filter=SmokeTest 2>&1)",
+      "Bash(Select-Object -Last 3)",
+      "Bash(grep -n 'tickerSiswa\\\\|tickerOnlineText\\\\|$role = auth\\\\|ticker-val-siswa\\\\|fetch.*ticker-stats\\\\|ticker-stats' resources/views/layouts/app.blade.php)",
+      "PowerShell(php -l app/Support/TickerStats.php)",
+      "PowerShell(php -l routes/web.php)",
+      "Bash(cat)",
+      "Bash(cat C:/Users/felly/AppData/Local/Temp/claude/d--sims-app/543755da-f274-4163-af3e-b21ae4d96b02/scratchpad/ticker_proof.php)",
+      "PowerShell(php artisan test --filter=\"SmokeTest\" 2>&1)"
+    ]
+  }
+}
