@@ -60,6 +60,7 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
 
     Route::get('/home', [LoginController::class, 'home'])->name('auth.home');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::post('/dashboard/tata-letak', [DashboardController::class, 'saveLayout'])->name('dashboard.layout');
 
     // Wajib daftar wajah sendiri (dipakai gate di atas)
     Route::get('/wajah-saya', [FaceController::class, 'self'])->name('face.self');
@@ -91,6 +92,13 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
     Route::get('/notifications-json', [NotificationController::class, 'getNotifications'])->name('notifications.json');
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.readAll');
+
+    // Statistik real-time untuk ticker SIMS-NET (angka dari cache TickerStats).
+    Route::get('/dashboard/ticker-stats', function () {
+        return response()->json(
+            \App\Support\TickerStats::forRole(auth()->user()->access ?? '')
+        );
+    })->name('dashboard.ticker-stats');
 
     // ─── Penilaian (guru menilai penugasan mengajarnya; admin akses semua) ───
     Route::controller(NilaiController::class)->group(function () {
@@ -315,6 +323,7 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
             Route::post('/semester', 'updateSemester')->name('setting.semester');
             Route::post('/semester/store', 'storeSemester')->name('setting.semester.store');
             Route::post('/identitas', 'setIdentitasSekolah')->name('setting.identitas');
+            Route::post('/media-sosial', 'setMediaSosial')->name('setting.mediaSosial');
             Route::post('/poin-terlambat', 'setPoinTerlambat')->name('setting.poinTerlambat');
             Route::post('/waktu-terlambat', 'setWaktuTerlambat')->name('setting.waktuTerlambat');
             Route::post('/mapel-rapor', 'setMapelRapor')->name('setting.mapelRapor');

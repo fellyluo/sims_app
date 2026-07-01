@@ -4,6 +4,7 @@ namespace App\Sarpras\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Sarpras\Models\Aset;
+use App\Sarpras\Models\BookingRuangan;
 use App\Sarpras\Models\LaporanKerusakan;
 use App\Sarpras\Models\Peminjaman;
 use App\Sarpras\Models\Pengadaan;
@@ -39,8 +40,13 @@ class DashboardController extends Controller
             'kerusakanTerbuka' => LaporanKerusakan::whereIn('status', ['dilaporkan', 'diterima'])->count(),
             'peminjamanAktif' => Peminjaman::whereIn('status', ['disetujui', 'dipinjam', 'terlambat'])->count(),
             'pengadaanPending' => Pengadaan::where('status', 'diajukan')->count(),
-            'kerusakanTerbaru' => LaporanKerusakan::with('pelapor:uuid,username')
+            'kerusakanTerbaru' => LaporanKerusakan::with(['pelapor:uuid,username', 'aset:id,nama'])
                 ->latest()->limit(5)->get(),
+            'bookingHariIni' => BookingRuangan::with(['ruangan:id,nama,kode', 'pemohon'])
+                ->whereIn('status', ['diajukan', 'disetujui'])
+                ->whereDate('mulai', today())
+                ->orderBy('mulai')
+                ->get(),
         ];
 
         return view('sarpras.dashboard', $data);

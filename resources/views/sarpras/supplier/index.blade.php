@@ -1,33 +1,53 @@
 @extends('sarpras.layouts.app')
 @section('title', 'Supplier')
+@section('sarpras_title', 'Manajemen Supplier Aset')
+@section('sarpras_subtitle', 'Pencatatan data mitra / supplier penyedia barang sarana prasarana sekolah.')
+
+@section('sarpras_actions')
+    @can('sarpras.supplier.kelola')
+        <a href="{{ route('sarpras.supplier.create') }}" 
+           class="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 dark:bg-primary dark:hover:bg-primary-hover text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-bold shadow-sm hover:shadow transition-all duration-200">
+            <i data-lucide="plus" class="w-4 h-4"></i> Tambah Supplier
+        </a>
+    @endcan
+@endsection
 
 @section('sarpras_body')
-<div class="flex justify-between items-center mb-4">
-    <h2 class="text-lg font-semibold text-gray-800">Manajemen Supplier</h2>
-    <a href="{{ route('sarpras.supplier.create') }}" class="bg-slate-900 text-white px-4 py-2 rounded text-sm">+ Supplier</a>
+<div class="card p-5">
+    <h3 class="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-100 mb-4">
+        <span class="grid place-items-center w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-500"><i data-lucide="truck" class="w-4 h-4"></i></span>
+        Daftar Supplier Terdaftar
+    </h3>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead><tr class="text-left text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-700">
+                <th class="pb-2 font-semibold">Nama Supplier</th><th class="pb-2 font-semibold">Kontak</th><th class="pb-2 font-semibold">Alamat</th><th class="pb-2 font-semibold">NPWP</th><th class="pb-2 font-semibold text-right">Aksi</th>
+            </tr></thead>
+            <tbody>
+            @forelse ($supplier as $s)
+                <tr class="border-b border-slate-50 dark:border-slate-700/50">
+                    <td class="py-3 font-semibold text-slate-700 dark:text-slate-200">{{ $s->nama }}</td>
+                    <td class="py-3 text-slate-600 dark:text-slate-300">{{ $s->telepon ?: $s->kontak ?: '—' }}</td>
+                    <td class="py-3 text-slate-600 dark:text-slate-300">{{ $s->alamat ?: '—' }}</td>
+                    <td class="py-3 text-slate-500 dark:text-slate-400 font-mono text-xs">{{ $s->npwp ?: '—' }}</td>
+                    <td class="py-3">
+                        <div class="flex items-center justify-end gap-1.5">
+                            @can('sarpras.supplier.kelola')
+                            <a href="{{ route('sarpras.supplier.edit', $s) }}" class="p-2 rounded-lg text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20" title="Edit"><i data-lucide="pencil" class="w-4 h-4"></i></a>
+                            <form method="POST" action="{{ route('sarpras.supplier.destroy', $s) }}" onsubmit="return confirmDelete(this)">
+                                @csrf @method('DELETE')
+                                <button class="p-2 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20" title="Hapus"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            </form>
+                            @endcan
+                        </div>
+                    </td>
+                </tr>
+            @empty
+                <tr><td colspan="5" class="py-10 text-center text-slate-400">Belum ada supplier terdaftar.</td></tr>
+            @endforelse
+            </tbody>
+        </table>
+    </div>
+    @if($supplier->hasPages())<div class="mt-4">{{ $supplier->links() }}</div>@endif
 </div>
-<div class="bg-white rounded-lg shadow overflow-x-auto">
-    <table class="w-full text-sm">
-        <thead><tr class="text-left text-gray-500 border-b">
-            <th class="py-2 px-4">Nama</th><th>Kontak</th><th>Telepon</th><th>NPWP</th><th></th>
-        </tr></thead>
-        <tbody>
-        @forelse ($supplier as $s)
-            <tr class="border-b">
-                <td class="py-2 px-4 font-medium">{{ $s->nama }}</td>
-                <td>{{ $s->kontak }}</td><td>{{ $s->telepon }}</td><td>{{ $s->npwp }}</td>
-                <td class="px-4 flex gap-3">
-                    <a href="{{ route('sarpras.supplier.edit', $s) }}" class="text-blue-600 hover:underline">Edit</a>
-                    <form method="POST" action="{{ route('sarpras.supplier.destroy', $s) }}" onsubmit="return confirmDelete(this)">
-                        @csrf @method('DELETE')<button class="text-red-600 hover:underline">Hapus</button>
-                    </form>
-                </td>
-            </tr>
-        @empty
-            <tr><td colspan="5" class="py-4 px-4 text-gray-400">Belum ada supplier.</td></tr>
-        @endforelse
-        </tbody>
-    </table>
-</div>
-<div class="mt-4">{{ $supplier->links() }}</div>
 @endsection

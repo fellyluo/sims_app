@@ -12,13 +12,14 @@ class Aset extends SarprasModel
     protected $fillable = [
         'school_id', 'kode', 'nama', 'kategori_id', 'ruangan_id', 'merk',
         'spesifikasi', 'kondisi', 'status', 'tgl_perolehan',
-        'nilai_perolehan', 'sumber_dana', 'foto_path',
+        'nilai_perolehan', 'masa_manfaat_tahun', 'sumber_dana', 'foto_path',
     ];
 
     protected $casts = [
         'spesifikasi' => 'array',          // spec key-value JSON
         'tgl_perolehan' => 'date',
         'nilai_perolehan' => 'integer',    // UANG integer rupiah (BCMath)
+        'masa_manfaat_tahun' => 'integer',
     ];
 
     public function kategori(): BelongsTo
@@ -60,6 +61,45 @@ class Aset extends SarprasModel
     public function getNilaiPerolehanRpAttribute(): string
     {
         return $this->rupiah('nilai_perolehan');
+    }
+
+    // ─────────────── Penyusutan (garis lurus) & Nilai Buku ───────────────
+
+    /** Penyusutan per tahun (integer rupiah) = nilai perolehan / masa manfaat. */
+    public function penyusutanTahunan(): int
+    {
+        $tahun = (int) ($this->masa_manfaat_tahun ?: 0);
+        if ($tahun <= 0) {
+            return 0;
+        }
+        return intdiv((int) $this->nilai_perolehan, $tahun);
+    }
+
+    /**
+     * Akumulasi penyusutan s/d tanggal (default sekarang). Dibatasi masa manfaat
+     * & tidak melebihi nilai perolehan.
+     */
+    public function akumulasiPenyusutan(?\Carbon\Carbon $asOf = null): int
+    {
+        $asOf ??= now();
+        if (! $this->tgl_perolehan) {
+            return 0;
+        }
+        $tahunBerjalan = (int) floor($this->tgl_perolehan->floatDiffInYears($asOf));
+        $tahunBerjalan = max(0, min($tahunBerjalan, (int) ($this->masa_manfaat_tahun ?: 0)));
+
+        return min($this->penyusutanTahunan() * $tahunBerjalan, (int) $this->nilai_perolehan);
+    }
+
+    /** Nilai buku = nilai perolehan − akumulasi penyusutan (minimal 0). */
+    public function nilaiBuku(?\Carbon\Carbon $asOf = null): int
+    {
+        return max(0, (int) $this->nilai_perolehan - $this->akumulasiPenyusutan($asOf));
+    }
+
+    public function getNilaiBukuRpAttribute(): string
+    {
+        return \App\Sarpras\Support\Rupiah::format($this->nilaiBuku());
     }
 
     /** Label kondisi yang ramah dibaca. */

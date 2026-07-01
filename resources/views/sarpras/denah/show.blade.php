@@ -147,18 +147,60 @@
     </div>
 </div>
 
-<div class="mt-6 bg-white rounded-lg shadow p-5">
-    <div class="flex items-center justify-between gap-3 mb-3">
+<div class="mt-6 bg-white rounded-lg shadow p-5" x-data="{ openEdit: false, editForm: { action: '', kode: '', nama: '', kapasitas: '', warna: '#3b82f6', pos_x: '', pos_y: '', lebar: '', tinggi: '' } }">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
         <h3 class="font-semibold text-gray-800">Daftar Ruangan</h3>
         @can('sarpras.denah.kelola')
-            <button type="button" id="toggle-import-ruangan"
-                    class="inline-flex items-center gap-1.5 border border-emerald-600 text-emerald-700 px-3 py-1.5 rounded text-sm hover:bg-emerald-50">
-                <i data-lucide="upload" class="w-4 h-4"></i> Import Excel
-            </button>
+            <div class="flex items-center gap-2 flex-wrap">
+                <button type="button" id="toggle-tambah-ruangan"
+                        class="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-full text-xs sm:text-sm font-bold shadow-sm hover:shadow transition-all duration-200">
+                    <i data-lucide="plus" class="w-4 h-4"></i> Tambah Ruangan
+                </button>
+                <button type="button" id="toggle-import-ruangan"
+                        class="inline-flex items-center gap-2 bg-[#eafaf1] text-[#065f46] border border-[#a7f3d0] px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all duration-200 shadow-sm hover:bg-[#d1fae5]">
+                    <i data-lucide="upload" class="w-4 h-4"></i> Import Excel
+                </button>
+            </div>
         @endcan
     </div>
 
     @can('sarpras.denah.kelola')
+        {{-- Panel tambah ruangan secara manual --}}
+        <div id="panel-tambah-ruangan" class="hidden mb-4 rounded-lg border border-slate-200 bg-slate-50/50 p-4">
+            <h4 class="font-semibold text-gray-800 text-sm mb-3">Tambah Ruangan Baru</h4>
+            <form method="POST" action="{{ route('sarpras.ruangan.store', $denah) }}" enctype="multipart/form-data"
+                  class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                @csrf
+                <input type="hidden" name="pos_x" value="50">
+                <input type="hidden" name="pos_y" value="50">
+                <input type="hidden" name="lebar" value="14">
+                <input type="hidden" name="tinggi" value="9">
+                <input type="hidden" name="status" value="tersedia">
+                <input type="hidden" name="gedung" value="{{ $denah->gedung }}">
+                <input type="hidden" name="lantai" value="{{ $denah->lantai }}">
+
+                <div>
+                    <label class="block text-gray-600 text-xs font-semibold mb-1">Kode Ruangan (mis. 7A) <span class="text-red-500">*</span></label>
+                    <input name="kode" required placeholder="mis. 7A" class="w-full border rounded px-3 py-2 bg-white">
+                </div>
+                <div>
+                    <label class="block text-gray-600 text-xs font-semibold mb-1">Nama Ruangan <span class="text-red-500">*</span></label>
+                    <input name="nama" required placeholder="mis. Kelas 7A" class="w-full border rounded px-3 py-2 bg-white">
+                </div>
+                <div>
+                    <label class="block text-gray-600 text-xs font-semibold mb-1">Kapasitas Orang (opsional)</label>
+                    <input name="kapasitas" type="number" min="0" placeholder="mis. 36" class="w-full border rounded px-3 py-2 bg-white">
+                </div>
+                <div>
+                    <label class="block text-gray-600 text-xs font-semibold mb-1">Warna Blok</label>
+                    <div class="flex gap-1.5">
+                        <input name="warna" type="color" value="#3b82f6" class="h-[38px] w-12 border rounded px-1 py-1 cursor-pointer bg-white">
+                        <button type="submit" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white rounded font-bold transition">Simpan</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
         {{-- Panel import ruangan dari Excel/CSV (tersembunyi by default) --}}
         <div id="panel-import-ruangan" class="hidden mb-4 rounded-lg border border-emerald-100 bg-emerald-50/40 p-4">
             <div class="flex items-start justify-between gap-3 mb-3">
@@ -177,7 +219,9 @@
                 @csrf
                 <input type="file" name="file" accept=".xlsx,.xls,.csv" required
                        class="border rounded px-3 py-2 bg-white file:mr-3 file:border-0 file:bg-slate-100 file:px-3 file:py-1 file:rounded file:text-sm">
-                <button class="bg-emerald-600 text-white rounded px-4 py-2 hover:bg-emerald-700">Proses Import</button>
+                <button class="inline-flex items-center gap-1.5 bg-[#eafaf1] text-[#065f46] border border-[#a7f3d0] px-5 py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all duration-200 shadow-sm hover:bg-[#d1fae5]">
+                    <i data-lucide="upload" class="w-4 h-4"></i> Proses Import
+                </button>
             </form>
 
             <p class="text-xs text-gray-400 mt-2">
@@ -198,7 +242,7 @@
         @endif
     @endcan
 
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 text-sm">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
         @foreach ($denah->ruangan as $r)
             @php
                 $kr = (int) ($jmlKerusakan[$r->id] ?? 0);
@@ -206,20 +250,86 @@
                 $statusWarna = $kr > 0 ? '#dc2626' : ($dipinjam ? '#d97706' : '#059669');
                 $ja = (int) ($jmlAset[$r->id] ?? 0);
             @endphp
-            <a href="{{ route('sarpras.ruangan.show', $r) }}"
-               class="flex items-center gap-2 border rounded px-3 py-2 hover:bg-gray-50 hover:border-gray-300 transition">
-                <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background: {{ $statusWarna }}" title="Status"></span>
-                <span class="flex-1 min-w-0 truncate"><span class="font-semibold">{{ $r->kode }}</span> — {{ $r->nama }}</span>
-                @if ($kr > 0)
-                    <span class="shrink-0 text-[10px] font-bold text-red-700 bg-red-100 rounded px-1.5 py-0.5">{{ $kr }}⚠</span>
-                @elseif ($dipinjam)
-                    <span class="shrink-0 text-[10px] font-semibold text-amber-700 bg-amber-100 rounded px-1.5 py-0.5">dipinjam</span>
-                @elseif ($ja > 0)
-                    <span class="shrink-0 text-[10px] text-gray-400">{{ $ja }} aset</span>
-                @endif
-            </a>
+            <div class="group flex items-center justify-between border rounded-xl bg-white hover:bg-slate-50 hover:border-slate-300 transition-all duration-200">
+                <a href="{{ route('sarpras.ruangan.show', $r) }}"
+                   class="flex-1 flex items-center gap-2 px-3.5 py-2.5 min-w-0">
+                    <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background: {{ $statusWarna }}" title="Status"></span>
+                    <span class="flex-1 min-w-0 truncate text-slate-700 dark:text-slate-200">
+                        <span class="font-semibold text-slate-900 dark:text-white">{{ $r->kode }}</span> — {{ $r->nama }}
+                    </span>
+                    @if ($kr > 0)
+                        <span class="shrink-0 text-[10px] font-bold text-red-700 bg-red-100 rounded px-1.5 py-0.5">{{ $kr }}⚠</span>
+                    @elseif ($dipinjam)
+                        <span class="shrink-0 text-[10px] font-semibold text-amber-700 bg-amber-100 rounded px-1.5 py-0.5">dipinjam</span>
+                    @elseif ($ja > 0)
+                        <span class="shrink-0 text-[10px] text-gray-400 dark:text-gray-500">{{ $ja }} aset</span>
+                    @endif
+                </a>
+                @can('sarpras.denah.kelola')
+                    <div class="flex items-center gap-1 shrink-0 pr-2">
+                        <a href="{{ route('sarpras.denah.hotspot', $denah) }}"
+                           class="p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg hover:bg-emerald-50 transition"
+                           title="Atur Tata Letak / Posisi (Drag & Drop)">
+                            <i data-lucide="move" class="w-4 h-4"></i>
+                        </a>
+                        <button type="button" @click="editForm.action='{{ route('sarpras.ruangan.update', $r) }}'; editForm.kode='{{ $r->kode }}'; editForm.nama='{{ $r->nama }}'; editForm.kapasitas='{{ $r->kapasitas }}'; editForm.warna='{{ $r->warna_hex }}'; editForm.pos_x='{{ $r->pos_x }}'; editForm.pos_y='{{ $r->pos_y }}'; editForm.lebar='{{ $r->lebar }}'; editForm.tinggi='{{ $r->tinggi }}'; openEdit=true"
+                                class="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition" title="Edit Ruangan">
+                            <i data-lucide="edit-2" class="w-4 h-4"></i>
+                        </button>
+                        <form method="POST" action="{{ route('sarpras.ruangan.destroy', $r) }}"
+                              onsubmit="return confirmAction(this, 'Hapus ruangan &ldquo;{{ $r->kode }}&rdquo;? Semua aset di dalamnya akan terputus dari ruangan ini.', 'red')">
+                            @csrf @method('DELETE')
+                            <button type="submit" class="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition" title="Hapus Ruangan">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </form>
+                    </div>
+                @endcan
+            </div>
         @endforeach
     </div>
+
+    @can('sarpras.denah.kelola')
+    {{-- Modal edit ruangan --}}
+    <div x-show="openEdit" x-cloak x-transition.opacity class="fixed inset-0 z-[9990] grid place-items-center p-4 bg-slate-900/50 backdrop-blur-sm" @click.self="openEdit=false">
+        <div class="card !rounded-2xl w-full max-w-md p-5 space-y-4" @click.stop>
+            <div class="flex items-center justify-between">
+                <h3 class="font-bold text-slate-800 dark:text-slate-100">Edit Ruangan</h3>
+                <button @click="openEdit=false" class="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <form method="POST" :action="editForm.action" class="space-y-3">
+                @csrf @method('PUT')
+                <input type="hidden" name="pos_x" x-model="editForm.pos_x">
+                <input type="hidden" name="pos_y" x-model="editForm.pos_y">
+                <input type="hidden" name="lebar" x-model="editForm.lebar">
+                <input type="hidden" name="tinggi" x-model="editForm.tinggi">
+                <div>
+                    <label class="form-label">Kode Ruangan</label>
+                    <input type="text" name="kode" x-model="editForm.kode" required class="form-input text-sm">
+                </div>
+                <div>
+                    <label class="form-label">Nama Ruangan</label>
+                    <input type="text" name="nama" x-model="editForm.nama" required class="form-input text-sm">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="form-label">Kapasitas</label>
+                        <input type="number" name="kapasitas" x-model="editForm.kapasitas" class="form-input text-sm">
+                    </div>
+                    <div>
+                        <label class="form-label">Warna Blok</label>
+                        <input type="color" name="warna" x-model="editForm.warna" class="h-[38px] w-full border rounded px-1 py-1 cursor-pointer bg-white dark:bg-slate-800">
+                    </div>
+                </div>
+                <div class="flex gap-2 pt-1">
+                    <button type="button" @click="openEdit=false" class="flex-1 py-2.5 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700">Batal</button>
+                    <button type="submit" class="btn-primary flex-1 py-2.5 rounded-xl text-sm font-bold">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    @endcan
 </div>
 
 @push('scripts')
@@ -349,6 +459,15 @@
         const btn = e.target.closest('button[data-mode]');
         if (btn) terapkan(btn.dataset.mode);
     });
+})();
+
+// === Toggle panel Tambah Ruangan ===
+(function () {
+    const btn = document.getElementById('toggle-tambah-ruangan');
+    const panel = document.getElementById('panel-tambah-ruangan');
+    if (btn && panel) {
+        btn.addEventListener('click', () => panel.classList.toggle('hidden'));
+    }
 })();
 
 // === Toggle panel Import Ruangan ===

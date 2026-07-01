@@ -66,6 +66,11 @@
                 <label class="block text-gray-700 mb-1">Nilai Perolehan (Rp, angka bulat)</label>
                 <input name="nilai_perolehan" type="number" min="0" step="1" required value="{{ old('nilai_perolehan', $aset->nilai_perolehan) }}" class="w-full border rounded px-3 py-2">
             </div>
+            <div>
+                <label class="block text-gray-700 mb-1">Masa Manfaat (tahun)</label>
+                <input name="masa_manfaat_tahun" type="number" min="1" max="50" step="1" value="{{ old('masa_manfaat_tahun', $aset->masa_manfaat_tahun ?? 4) }}" class="w-full border rounded px-3 py-2">
+                <p class="text-xs text-gray-400 mt-1">Untuk hitung penyusutan &amp; Nilai Buku (garis lurus).</p>
+            </div>
         </div>
 
         {{-- Spesifikasi key-value dinamis --}}

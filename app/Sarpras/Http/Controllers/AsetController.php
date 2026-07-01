@@ -31,9 +31,28 @@ class AsetController extends Controller
             ->when($request->kondisi, fn ($q, $v) => $q->where('kondisi', $v))
             ->latest()->paginate(15)->withQueryString();
 
+        // ── Ringkasan neraca aset (seluruh aset, bukan hanya yang terfilter) ──
+        $kondisiUrut = ['baik', 'rusak_ringan', 'rusak_berat', 'hilang'];
+        $kondisiCount = Aset::selectRaw('kondisi, COUNT(*) as jml')
+            ->groupBy('kondisi')->pluck('jml', 'kondisi');
+
+        $perKategori = Aset::with('kategori:id,nama')
+            ->selectRaw('kategori_id, COUNT(*) as jml, SUM(nilai_perolehan) as nilai')
+            ->groupBy('kategori_id')->orderByDesc('nilai')->get();
+
+        // Nilai buku dihitung per aset di PHP (akurat) — ambil kolom seperlunya.
+        $totalNilaiBuku = Aset::get(['nilai_perolehan', 'masa_manfaat_tahun', 'tgl_perolehan'])
+            ->sum(fn ($a) => $a->nilaiBuku());
+
         return view('sarpras.aset.index', [
             'aset' => $aset,
             'kategori' => KategoriAset::orderBy('nama')->get(['id', 'nama']),
+            'totalAset' => Aset::count(),
+            'totalNilai' => (int) Aset::sum('nilai_perolehan'),
+            'totalNilaiBuku' => (int) $totalNilaiBuku,
+            'kondisiCount' => $kondisiCount,
+            'kondisiUrut' => $kondisiUrut,
+            'perKategori' => $perKategori,
         ]);
     }
 

@@ -5,7 +5,10 @@
 <div class="flex justify-between items-center mb-4">
     <h2 class="text-lg font-semibold text-gray-800">Pengadaan Barang</h2>
     @can('sarpras.pengadaan.ajukan')
-        <a href="{{ route('sarpras.pengadaan.create') }}" class="bg-slate-900 text-white px-4 py-2 rounded text-sm">+ Pengajuan</a>
+        <a href="{{ route('sarpras.pengadaan.create') }}" 
+           class="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-full text-xs sm:text-sm font-bold shadow-sm hover:shadow transition-all duration-200">
+            <i data-lucide="plus" class="w-4 h-4"></i> Pengajuan
+        </a>
     @endcan
 </div>
 <div class="bg-white rounded-lg shadow overflow-x-auto">

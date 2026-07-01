@@ -34,6 +34,8 @@ class AsetRequest extends FormRequest
             'tgl_perolehan' => ['nullable', 'date'],
             // UANG: integer rupiah >= 0 (tanpa desimal/float).
             'nilai_perolehan' => ['required', 'integer', 'min:0'],
+            // Masa manfaat (tahun) → dasar penyusutan/Nilai Buku.
+            'masa_manfaat_tahun' => ['nullable', 'integer', 'min:1', 'max:50'],
             'sumber_dana' => ['nullable', 'string', 'max:100'],
             // Spesifikasi key-value (array dari form).
             'spek_key' => ['nullable', 'array'],

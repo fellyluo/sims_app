@@ -13,6 +13,15 @@ class UserPreference extends Model
         'user_uuid', 'primary_color', 'secondary_color', 'accent_color',
         'sidebar_style', 'sidebar_bg', 'sidebar_text',
         'theme_mode', 'motif', 'ui_style', 'font_size', 'compact_mode', 'dashboard_widgets',
+        'dashboard_layout', 'dashboard_hidden',
+    ];
+
+    /** Urutan kanonik blok dashboard (default sebelum di-drag). */
+    public const DASHBOARD_BLOCKS = [
+        'ringkasan_siswa', 'ringkasan_guru', 'ringkasan_kelas', 'ringkasan_tahun',
+        'insight_rasio', 'insight_avg_kelas', 'insight_avg_tingkat', 'insight_terpadat',
+        'sarpras_aset', 'sarpras_kerusakan', 'sarpras_peminjaman', 'sarpras_pengadaan',
+        'recent_tingkat', 'recent_komposisi', 'sebaran', 'quicklinks'
     ];
 
     protected function casts(): array
@@ -20,6 +29,8 @@ class UserPreference extends Model
         return [
             'compact_mode'       => 'boolean',
             'dashboard_widgets'  => 'array',
+            'dashboard_layout'   => 'array',
+            'dashboard_hidden'   => 'array',
         ];
     }
 

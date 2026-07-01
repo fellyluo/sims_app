@@ -126,6 +126,31 @@
                            class="w-full h-[42px] border rounded px-1 py-1 cursor-pointer">
                 </div>
             </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block text-gray-700 mb-1">Gedung</label>
+                    <input name="gedung" placeholder="mis. Gedung A" class="w-full border rounded px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-gray-700 mb-1">Lantai</label>
+                    <input name="lantai" placeholder="mis. Lantai 1" class="w-full border rounded px-3 py-2">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="block text-gray-700 mb-1">Status</label>
+                    <select name="status" class="w-full border rounded px-3 py-2">
+                        @foreach(\App\Sarpras\Models\DenahRuangan::STATUS as $k => $l)
+                            <option value="{{ $k }}">{{ $l }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-gray-700 mb-1">Fasilitas</label>
+                    <input name="fasilitas" placeholder="Proyektor, AC, Papan Tulis" class="w-full border rounded px-3 py-2">
+                    <p class="text-[11px] text-gray-400 mt-0.5">Pisahkan dengan koma.</p>
+                </div>
+            </div>
             <div>
                 <label class="block text-gray-700 mb-1">Foto Ruangan (opsional)</label>
                 <input name="foto" type="file" accept="image/*" class="w-full text-xs">

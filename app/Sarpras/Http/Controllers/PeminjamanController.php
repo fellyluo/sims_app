@@ -5,6 +5,7 @@ namespace App\Sarpras\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Sarpras\Http\Requests\PeminjamanRequest;
 use App\Sarpras\Models\Aset;
+use App\Sarpras\Models\BookingRuangan;
 use App\Sarpras\Models\DenahRuangan;
 use App\Sarpras\Models\Peminjaman;
 use Illuminate\Http\RedirectResponse;
@@ -23,7 +24,11 @@ class PeminjamanController extends Controller
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))
             ->latest()->paginate(15)->withQueryString();
 
-        return view('sarpras.peminjaman.index', compact('peminjaman'));
+        // Log reservasi & jadwal ruangan (booking) untuk panel di samping.
+        $bookings = BookingRuangan::with(['ruangan:id,kode,nama,gedung,lantai', 'pemohon'])
+            ->latest('mulai')->limit(15)->get();
+
+        return view('sarpras.peminjaman.index', compact('peminjaman', 'bookings'));
     }
 
     public function create(): View

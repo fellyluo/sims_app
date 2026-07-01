@@ -9,12 +9,18 @@
                 <h2 class="text-lg font-semibold text-gray-800">{{ $aset->nama }}</h2>
                 <p class="text-sm text-gray-500">{{ $aset->kode }}</p>
             </div>
-            <div class="flex gap-2">
+            <div class="flex items-center gap-2">
                 @can('sarpras.aset.label')
-                    <a href="{{ route('sarpras.aset.label', $aset) }}" target="_blank" class="bg-emerald-600 text-white px-3 py-1.5 rounded text-sm">🏷️ Cetak Label</a>
+                    <a href="{{ route('sarpras.aset.label', $aset) }}" target="_blank" 
+                       class="inline-flex items-center gap-1.5 bg-[#fff1f2] text-[#9f1239] border border-[#fecdd3] px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all duration-200 shadow-sm hover:bg-[#ffe4e6]">
+                        <i data-lucide="printer" class="w-4 h-4"></i> Cetak Label
+                    </a>
                 @endcan
                 @can('sarpras.aset.kelola')
-                    <a href="{{ route('sarpras.aset.edit', $aset) }}" class="border px-3 py-1.5 rounded text-sm">Edit</a>
+                    <a href="{{ route('sarpras.aset.edit', $aset) }}" 
+                       class="inline-flex items-center gap-1.5 bg-[#f8fafc] text-[#1e293b] border border-[#cbd5e1] px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all duration-200 shadow-sm hover:bg-[#f1f5f9]">
+                        <i data-lucide="edit-2" class="w-4 h-4"></i> Edit
+                    </a>
                 @endcan
             </div>
         </div>

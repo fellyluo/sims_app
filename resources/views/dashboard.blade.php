@@ -22,6 +22,98 @@
     @media (prefers-reduced-motion: reduce) {
         .ill-bob,.ill-glow,.ill-tw1,.ill-tw2,.ill-flag,.ill-w1,.ill-w2,.ill-w3,.ill-w4 { animation: none; }
     }
+
+    /* ===== Kutipan harian: minimalis & modern ===== */
+    .motiv-card { animation: motivIn .55s cubic-bezier(.2,.8,.2,1) both; }
+    .motiv-label { font-size: 10px; letter-spacing: .22em; }
+    @keyframes motivIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @media (prefers-reduced-motion: reduce) { .motiv-card { animation: none; } }
+
+    /* ===== Tampilan Khusus Ringkasan Baru ===== */
+    .card-siswa {
+        background: linear-gradient(160deg, color-mix(in srgb, var(--cp) 18%, white), color-mix(in srgb, var(--cp) 6%, white)) !important;
+        border-color: color-mix(in srgb, var(--cp) 12%, #e2e8f0) !important;
+    }
+    .dark .card-siswa {
+        background: linear-gradient(160deg, #1e293b, #0f172a) !important;
+        border-color: #334155 !important;
+    }
+    .card-siswa .text-title { color: color-mix(in srgb, var(--cp) 78%, black); }
+    .card-siswa .text-sub { color: color-mix(in srgb, var(--cp) 62%, black); }
+
+    .card-guru {
+        background: linear-gradient(160deg, color-mix(in srgb, var(--cps) 20%, white), color-mix(in srgb, var(--cps) 8%, white)) !important;
+        border-color: color-mix(in srgb, var(--cps) 12%, #e2e8f0) !important;
+    }
+    .dark .card-guru {
+        background: linear-gradient(160deg, #1e293b, #0f172a) !important;
+        border-color: #334155 !important;
+    }
+    .card-guru .text-title { color: color-mix(in srgb, var(--cps) 80%, black); }
+    .card-guru .text-sub { color: color-mix(in srgb, var(--cps) 64%, black); }
+
+    .card-kelas {
+        background: linear-gradient(160deg, color-mix(in srgb, var(--ca) 20%, white), color-mix(in srgb, var(--ca) 8%, white)) !important;
+        border-color: color-mix(in srgb, var(--ca) 12%, #e2e8f0) !important;
+    }
+    .dark .card-kelas {
+        background: linear-gradient(160deg, #1e293b, #0f172a) !important;
+        border-color: #334155 !important;
+    }
+    .card-kelas .text-title { color: color-mix(in srgb, var(--ca) 80%, black); }
+    .card-kelas .text-sub { color: color-mix(in srgb, var(--ca) 64%, black); }
+
+    .dark .card-siswa .text-title, .dark .card-guru .text-title, .dark .card-kelas .text-title {
+        color: #f1f5f9 !important;
+    }
+    .dark .card-siswa .text-sub, .dark .card-guru .text-sub, .dark .card-kelas .text-sub {
+        color: #94a3b8 !important;
+    }
+
+    /* ===== Mode atur tata letak (drag & drop) ===== */
+    .dash-block { position: relative; }
+    .dash-handle { display: none; }
+    .dash-editing .dash-block {
+        border: 2px dashed color-mix(in srgb, var(--cp) 55%, transparent);
+        border-radius: 22px; padding: .55rem; cursor: grab;
+        background: color-mix(in srgb, var(--cp) 5%, transparent);
+        transition: border-color .2s, background .2s;
+    }
+    .dash-editing .dash-block:hover { border-color: var(--cp); }
+    .dash-editing .dash-handle {
+        display: inline-flex; align-items: center; gap: .35rem;
+        position: absolute; top: -.7rem; left: 1rem; z-index: 20;
+        padding: .15rem .55rem; border-radius: 9999px;
+        background: var(--cp); color: #fff; font-size: 11px; font-weight: 700;
+        box-shadow: 0 4px 12px rgba(15,12,10,.18); user-select: none;
+    }
+    .dash-block.sortable-ghost { opacity: .4; }
+    .dash-block.sortable-chosen { cursor: grabbing; }
+    .dash-block.sortable-drag { box-shadow: 0 18px 40px rgba(15,12,10,.22); }
+    /* matikan link saat sedang menyusun supaya tidak salah klik */
+    .dash-editing .dash-block a { pointer-events: none; }
+
+    /* tombol hapus/sembunyikan blok */
+    .dash-remove { display: none; }
+    .dash-editing .dash-remove {
+        display: inline-flex; align-items: center; justify-content: center;
+        position: absolute; top: -.7rem; right: 1rem; z-index: 21;
+        width: 1.7rem; height: 1.7rem; border-radius: 9999px;
+        background: #ef4444; color: #fff; cursor: pointer;
+        box-shadow: 0 4px 12px rgba(15,12,10,.2); transition: transform .15s, background .15s;
+    }
+    .dash-editing .dash-remove:hover { transform: scale(1.12); }
+
+    /* blok yang disembunyikan */
+    .dash-hidden { display: none; }
+    .dash-editing .dash-hidden { display: block; opacity: .55; filter: grayscale(.6); }
+    .dash-editing .dash-hidden .dash-remove { background: var(--cp); }
+    .dash-hidden-badge { display: none; }
+    .dash-editing .dash-hidden .dash-hidden-badge {
+        display: inline-block; position: absolute; top: -.7rem; left: 50%; transform: translateX(-50%);
+        z-index: 21; padding: .15rem .6rem; border-radius: 9999px;
+        background: #64748b; color: #fff; font-size: 11px; font-weight: 700; user-select: none;
+    }
 </style>
 @endpush
 
@@ -35,13 +127,137 @@
     $totalMapel = \App\Models\Pelajaran::count();
     $siswaL = \App\Models\Siswa::where('jk','L')->count();
     $siswaP = \App\Models\Siswa::where('jk','P')->count();
-    $recent = \App\Models\Siswa::with('kelas')->latest()->take(4)->get();
     $pref = auth()->user()?->preference()->firstOrCreate(
         ['user_uuid' => auth()->id()],
         \App\Models\UserPreference::defaults()
     );
     $motif = $pref->motif ?? 'botanical';
     $motifIcon = ['botanical'=>'flower-2','ocean'=>'waves','forest'=>'trees','sunset'=>'sunset','robot'=>'bot','space'=>'rocket','minimal'=>'circle'][$motif] ?? 'flower-2';
+
+    // Salam berdasarkan waktu + tanggal hari ini (Bahasa Indonesia)
+    $now  = \Carbon\Carbon::now();
+    $jam  = (int) $now->format('H');
+    $salam     = $jam < 11 ? 'Selamat Pagi' : ($jam < 15 ? 'Selamat Siang' : ($jam < 18 ? 'Selamat Sore' : 'Selamat Malam'));
+    $salamIcon = $jam < 11 ? 'sunrise' : ($jam < 15 ? 'sun' : ($jam < 18 ? 'sunset' : 'moon'));
+    $tanggalHari = $now->locale('id')->isoFormat('dddd, D MMMM Y');
+
+    // Kata motivasi harian — tetap sepanjang hari, berganti otomatis tiap hari.
+    $motivasiList = [
+        // ── Bahasa Indonesia ──
+        'Pendidikan adalah senjata paling ampuh untuk mengubah dunia.',
+        'Sedikit demi sedikit, lama-lama menjadi bukit. Konsistensi mengalahkan kesempurnaan.',
+        'Hari yang baik dimulai dari niat yang baik. Semangat untuk hari ini!',
+        'Guru terbaik adalah mereka yang menyalakan rasa ingin tahu, bukan sekadar mengisi.',
+        'Tidak ada usaha yang sia-sia, setiap langkah kecil mendekatkanmu pada tujuan.',
+        'Belajar hari ini, memimpin esok hari.',
+        'Kesabaran dan ketekunan adalah dua sahabat terbaik dalam mendidik.',
+        'Setiap anak adalah bintang dengan caranya sendiri untuk bersinar.',
+        'Mulailah dari yang kecil, mulailah dari sekarang, mulailah dari tempatmu berada.',
+        'Kualitas pendidikan menentukan kualitas masa depan bangsa.',
+        'Senyum dan semangatmu hari ini bisa menjadi inspirasi bagi orang lain.',
+        'Kerja keras tidak pernah mengkhianati hasil.',
+        'Disiplin adalah jembatan antara cita-cita dan pencapaian.',
+        'Ilmu yang bermanfaat adalah warisan terbaik yang tak pernah habis.',
+        'Jangan menunggu termotivasi untuk memulai; mulailah, maka motivasi akan datang.',
+        'Hari ini adalah kesempatan baru untuk menjadi lebih baik dari kemarin.',
+        'Mendidik dengan hati akan dikenang sepanjang masa.',
+        'Kegagalan hanyalah cara lain untuk belajar melakukannya dengan benar.',
+        'Bersyukur atas hal kecil membuat hal besar terasa lebih ringan.',
+        'Pikiran yang tenang menghasilkan keputusan yang bijak.',
+        'Ing ngarsa sung tuladha, ing madya mangun karsa, tut wuri handayani. — Ki Hajar Dewantara',
+        'Bermimpilah setinggi langit. Jika engkau jatuh, engkau akan jatuh di antara bintang-bintang. — Ir. Soekarno',
+        'Orang boleh pandai setinggi langit, tapi selama ia tidak menulis, ia akan hilang dari masyarakat dan sejarah. — Pramoedya Ananta Toer',
+        'Membaca adalah jendela dunia, dan ilmu adalah cahayanya.',
+        'Belajar tanpa berpikir itu sia-sia, berpikir tanpa belajar itu berbahaya.',
+        'Guru menggenggam masa depan bangsa di ujung penanya.',
+        'Tuntutlah ilmu dari buaian hingga ke liang lahat.',
+        'Tidak ada kata terlambat untuk belajar hal baru.',
+        'Sebaik-baik manusia adalah yang paling bermanfaat bagi sesamanya.',
+        'Kecerdasan bukan tujuan akhir, melainkan kebaikan hati yang menyertainya.',
+        'Rajin pangkal pandai, hemat pangkal kaya, malu bertanya sesat di jalan.',
+        'Pendidikan bukan mempersiapkan hidup; pendidikan adalah hidup itu sendiri.',
+        'Anak-anak kita bukan untuk kehidupan kita, melainkan untuk zamannya sendiri.',
+        'Berani bermimpi, berani belajar, berani mencoba, berani gagal, berani bangkit.',
+        'Jadikan kesalahan sebagai guru, bukan sebagai penjara.',
+        'Sebuah buku adalah teman yang tidak pernah mengkhianati.',
+        'Akar pendidikan memang pahit, tetapi buahnya manis.',
+        'Membimbing satu anak berarti menanam pohon yang teduh bagi banyak orang.',
+        'Setiap pertanyaan adalah benih dari sebuah penemuan.',
+        'Karakter yang baik lebih berharga daripada nilai yang sempurna.',
+        'Hari ini membaca, esok memimpin.',
+        'Jangan takut melangkah pelan, takutlah jika hanya berdiam diri.',
+        'Pengetahuan adalah harta yang tidak bisa dicuri.',
+        'Mengajar adalah menyentuh kehidupan selamanya.',
+        'Semangat belajar adalah api yang harus terus dijaga agar tetap menyala.',
+        'Kerendahan hati adalah awal dari semua pembelajaran.',
+        'Yang penting bukan seberapa cepat kau berlari, tapi seberapa jauh kau bertahan.',
+        'Doa, usaha, dan ilmu adalah tiga sahabat menuju kesuksesan.',
+        'Pendidikan terbaik adalah teladan yang nyata.',
+        'Sukses adalah hasil dari kebiasaan kecil yang diulang setiap hari.',
+
+        // ── English ──
+        'Education is the most powerful weapon which you can use to change the world. — Nelson Mandela',
+        'The beautiful thing about learning is that no one can take it away from you. — B.B. King',
+        'Live as if you were to die tomorrow. Learn as if you were to live forever. — Mahatma Gandhi',
+        'The roots of education are bitter, but the fruit is sweet. — Aristotle',
+        'Tell me and I forget. Teach me and I remember. Involve me and I learn. — Benjamin Franklin',
+        'The mind is not a vessel to be filled, but a fire to be kindled. — Plutarch',
+        'Education is not the filling of a pail, but the lighting of a fire. — W.B. Yeats',
+        'An investment in knowledge pays the best interest. — Benjamin Franklin',
+        'The expert in anything was once a beginner.',
+        'The only person who is educated is the one who has learned how to learn. — Carl Rogers',
+        'Develop a passion for learning. If you do, you will never cease to grow. — Anthony J. D’Angelo',
+        'Education is the passport to the future, for tomorrow belongs to those who prepare for it today. — Malcolm X',
+        'A teacher affects eternity; he can never tell where his influence stops. — Henry Adams',
+        'Learning never exhausts the mind. — Leonardo da Vinci',
+        'The capacity to learn is a gift; the ability to learn is a skill; the willingness to learn is a choice.',
+        'Change is the end result of all true learning. — Leo Buscaglia',
+        'It is the supreme art of the teacher to awaken joy in creative expression and knowledge. — Albert Einstein',
+        'The more that you read, the more things you will know. The more that you learn, the more places you’ll go. — Dr. Seuss',
+        'Anyone who stops learning is old, whether at twenty or eighty. — Henry Ford',
+        'They cannot stop me. I will get my education, if it is in the home, school, or anyplace. — Rosa Parks',
+        'The function of education is to teach one to think intensively and to think critically. — Martin Luther King Jr.',
+        'I am still learning. — Michelangelo',
+        'Success is the sum of small efforts repeated day in and day out. — Robert Collier',
+        'Strive for progress, not perfection.',
+        'Believe you can and you’re halfway there. — Theodore Roosevelt',
+        'The future belongs to those who believe in the beauty of their dreams. — Eleanor Roosevelt',
+        'Don’t watch the clock; do what it does. Keep going. — Sam Levenson',
+        'A little progress each day adds up to big results.',
+        'The harder you work for something, the greater you’ll feel when you achieve it.',
+        'Wisdom is not a product of schooling but of the lifelong attempt to acquire it. — Albert Einstein',
+        'Knowledge is power. — Francis Bacon',
+        'Curiosity is the wick in the candle of learning. — William Arthur Ward',
+        'The best way to predict your future is to create it. — Abraham Lincoln',
+        'Education breeds confidence. Confidence breeds hope. Hope breeds peace. — Confucius',
+        'The whole purpose of education is to turn mirrors into windows. — Sydney J. Harris',
+        'Learn from yesterday, live for today, hope for tomorrow. — Albert Einstein',
+        'You don’t have to be great to start, but you have to start to be great. — Zig Ziglar',
+        'Every accomplishment starts with the decision to try.',
+        'Education is not preparation for life; education is life itself. — John Dewey',
+        'There are no shortcuts to any place worth going.',
+        'Teaching is the one profession that creates all other professions.',
+        'A good teacher can inspire hope, ignite the imagination, and instill a love of learning. — Brad Henry',
+        'Genius is one percent inspiration and ninety-nine percent perspiration. — Thomas Edison',
+        'The journey of a thousand miles begins with a single step. — Lao Tzu',
+        'Do not go where the path may lead, go instead where there is no path and leave a trail. — Ralph Waldo Emerson',
+        'Small daily improvements over time lead to stunning results. — Robin Sharma',
+        'The more I learn, the more I realize how much I don’t know. — Albert Einstein',
+        'Push yourself, because no one else is going to do it for you.',
+        'Great things are done by a series of small things brought together. — Vincent van Gogh',
+        'Be a lifelong student; the day you stop learning is the day you stop growing.',
+    ];
+    // Pilih via hash tanggal: terasa acak antar-hari, tetap stabil sepanjang hari.
+    $kataMotivasi = $motivasiList[abs(crc32($now->toDateString())) % count($motivasiList)];
+
+    // Pisahkan teks dengan penulisnya (jika ada "— Penulis" di akhir).
+    if (preg_match('/^(.*?)\s+—\s+([^—]+)$/u', $kataMotivasi, $mm)) {
+        $kataTeks = trim($mm[1]);
+        $kataPenulis = trim($mm[2]);
+    } else {
+        $kataTeks = $kataMotivasi;
+        $kataPenulis = null;
+    }
 @endphp
 
 @if(auth()->user()->must_change_password)
@@ -62,315 +278,117 @@
 @endif
 
 @if(in_array($access, ['superadmin','admin']))
-<div class="space-y-6">
+@php
+    // Urutan blok: pakai preferensi tersimpan dulu, lalu blok baru yang belum tercatat.
+    $allBlocks   = \App\Models\UserPreference::DASHBOARD_BLOCKS;
+    $savedLayout = is_array($pref->dashboard_layout) ? $pref->dashboard_layout : [];
+    $blockOrder  = array_values(array_unique(array_merge(
+        array_values(array_intersect($savedLayout, $allBlocks)),
+        $allBlocks
+    )));
+    $hiddenBlocks = is_array($pref->dashboard_hidden)
+        ? array_values(array_intersect($pref->dashboard_hidden, $allBlocks))
+        : [];
+    $blockLabel = [
+        'ringkasan_siswa' => 'Ringkasan Siswa',
+        'ringkasan_guru'  => 'Ringkasan Guru',
+        'ringkasan_kelas' => 'Ringkasan Kelas',
+        'ringkasan_tahun' => 'Tahun Ajaran',
+        'insight_rasio'   => 'Insight Rasio Guru',
+        'insight_avg_kelas' => 'Insight Rata Kelas',
+        'insight_avg_tingkat' => 'Insight Rata Tingkat',
+        'insight_terpadat' => 'Insight Kelas Terpadat',
+        'sarpras_aset'    => 'Sarpras Total Aset',
+        'sarpras_kerusakan' => 'Sarpras Laporan Kerusakan',
+        'sarpras_peminjaman' => 'Sarpras Peminjaman Aktif',
+        'sarpras_pengadaan' => 'Sarpras Pengadaan Pending',
+        'recent_tingkat'  => 'Sebaran Siswa per Tingkat',
+        'recent_komposisi' => 'Komposisi Jenis Kelamin',
+        'sebaran'         => 'Grafik Sebaran Kelas',
+        'quicklinks'      => 'Tautan Cepat',
+    ];
+    $spans = [
+        'ringkasan_siswa' => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'ringkasan_guru'  => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'ringkasan_kelas' => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'ringkasan_tahun' => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'insight_rasio'   => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'insight_avg_kelas' => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'insight_avg_tingkat' => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'insight_terpadat' => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'sarpras_aset'    => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'sarpras_kerusakan' => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'sarpras_peminjaman' => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'sarpras_pengadaan' => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'recent_tingkat'  => 'col-span-12 lg:col-span-5',
+        'recent_komposisi' => 'col-span-12 lg:col-span-7',
+        'sebaran'         => 'col-span-12',
+        'quicklinks'      => 'col-span-12',
+    ];
+@endphp
 
-    {{-- ===== Top stat strip ===== --}}
-    <div class="card p-1.5">
-        <div class="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-[#f4efe8] dark:divide-slate-700">
-            @foreach([
-                ['Total Siswa', $totalSiswa, 'Terdaftar'],
-                ['Total Guru', $totalGuru, 'Aktif mengajar'],
-                ['Total Kelas', $totalKelas, 'Rombongan belajar'],
-            ] as [$label, $val, $sub])
-            <div class="px-5 py-4">
-                <p class="text-xs text-slate-400 mb-1">{{ $label }}</p>
-                <p class="text-2xl font-extrabold text-slate-700 dark:text-slate-100">{{ number_format($val) }}</p>
-                <p class="text-[11px] text-slate-400 mt-0.5">{{ $sub }}</p>
-            </div>
-            @endforeach
-            {{-- last cell with mini bar chart --}}
-            <div class="px-5 py-4 flex items-center justify-between">
-                <div>
-                    <p class="text-xs text-slate-400 mb-1">Mata Pelajaran</p>
-                    <p class="text-2xl font-extrabold text-slate-700 dark:text-slate-100">{{ number_format($totalMapel) }}</p>
-                    <p class="text-[11px] text-slate-400 mt-0.5">Kurikulum</p>
-                </div>
-                <svg width="74" height="44" viewBox="0 0 74 44" class="flex-shrink-0">
-                    @foreach([16,24,18,30,40,26,20] as $i => $h)
-                    <rect x="{{ $i*10 }}" y="{{ 44-$h }}" width="6" height="{{ $h }}" rx="3"
-                          fill="{{ $i==4 ? 'var(--cp)' : 'color-mix(in srgb, var(--cp) 22%, white)' }}"/>
-                    @endforeach
-                </svg>
-            </div>
-        </div>
-    </div>
+<div x-data="dashLayout()" :class="{ 'dash-editing': editing }">
 
-    {{-- ===== Quick Overview + Featured ===== --}}
-    <div class="grid lg:grid-cols-3 gap-5">
-        <div class="lg:col-span-2">
-            <h2 class="font-bold text-slate-700 dark:text-slate-200 mb-3 px-1">Ringkasan Cepat</h2>
-            <div class="grid sm:grid-cols-3 gap-4 stagger">
-                {{-- Card 1: Siswa (area) — warna primary --}}
-                <a href="{{ route('siswa.index') }}" class="card card-hover overflow-hidden group"
-                   style="background:linear-gradient(160deg, color-mix(in srgb, var(--cp) 22%, white), color-mix(in srgb, var(--cp) 9%, white))">
-                    <div class="p-4">
-                        <div class="flex items-start justify-between">
-                            <div>
-                                <p class="text-2xl font-extrabold" style="color:color-mix(in srgb, var(--cp) 78%, black)">{{ number_format($totalSiswa) }}</p>
-                                <p class="text-sm font-medium" style="color:color-mix(in srgb, var(--cp) 62%, black)">Siswa</p>
-                            </div>
-                            <span class="grid place-items-center w-7 h-7 rounded-lg bg-white/70 group-hover:bg-white transition" style="color:color-mix(in srgb, var(--cp) 78%, black)"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span>
-                        </div>
-                    </div>
-                    {{-- Ilustrasi: Topi Wisuda --}}
-                    <svg viewBox="0 0 200 86" class="ill w-full" style="height:84px" preserveAspectRatio="xMidYMid meet">
-                        <defs>
-                            <linearGradient id="capBoard" x1="0" y1="0" x2=".25" y2="1">
-                                <stop offset="0" stop-color="color-mix(in srgb, var(--cp) 50%, white)"/>
-                                <stop offset="1" stop-color="var(--cp)"/>
-                            </linearGradient>
-                            <linearGradient id="capBase" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0" stop-color="var(--cp)"/>
-                                <stop offset="1" stop-color="color-mix(in srgb, var(--cp) 58%, black)"/>
-                            </linearGradient>
-                            <radialGradient id="capGlow" cx=".5" cy=".5" r=".5">
-                                <stop offset="0" stop-color="var(--ca)" stop-opacity=".45"/>
-                                <stop offset="1" stop-color="var(--ca)" stop-opacity="0"/>
-                            </radialGradient>
-                        </defs>
-                        <ellipse cx="100" cy="42" rx="50" ry="36" fill="url(#capGlow)"/>
-                        <path class="ill-tw1" d="M46,22 l1.8,4 l4,1.8 l-4,1.8 l-1.8,4 l-1.8,-4 l-4,-1.8 l4,-1.8 z" fill="var(--ca)"/>
-                        <circle class="ill-tw2" cx="156" cy="22" r="3" fill="var(--cps)" opacity=".7"/>
-                        <circle class="ill-tw1" cx="150" cy="46" r="2.2" fill="var(--ca)" opacity=".7"/>
-                        <ellipse cx="100" cy="70" rx="34" ry="5" fill="#0f172a" opacity=".08"/>
-                        <g class="ill-bob"><g transform="translate(100,42)">
-                            <path d="M-18,3 L18,3 L18,15 C18,23 -18,23 -18,15 Z" fill="url(#capBase)"/>
-                            <polygon points="0,-16 42,0 0,16 -42,0" fill="url(#capBoard)"/>
-                            <polygon points="0,-16 42,0 0,1 -42,0" fill="#fff" opacity=".22"/>
-                            <circle r="3.3" fill="#fff"/>
-                            <circle r="1.4" fill="var(--cp)"/>
-                            <g>
-                                <path d="M0,0 L30,3" stroke="var(--ca)" stroke-width="2.4" stroke-linecap="round" fill="none"/>
-                                <line x1="30" y1="3" x2="30" y2="16" stroke="var(--ca)" stroke-width="2.4" stroke-linecap="round"/>
-                                <g fill="var(--ca)"><circle cx="30" cy="17" r="2.6"/><path d="M26.5,18 L33.5,18 L31.5,28 L28.5,28 Z"/></g>
-                                <animateTransform attributeName="transform" type="rotate" values="-8 0 0;9 0 0;-8 0 0" keyTimes="0;0.5;1" dur="2.8s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
-                            </g>
-                        </g></g>
-                    </svg>
-                </a>
-                {{-- Card 2: Guru (line) — warna secondary --}}
-                <a href="{{ route('guru.index') }}" class="card card-hover overflow-hidden group"
-                   style="background:linear-gradient(160deg, color-mix(in srgb, var(--cps) 24%, white), color-mix(in srgb, var(--cps) 10%, white))">
-                    <div class="p-4">
-                        <div class="flex items-start justify-between">
-                            <div>
-                                <p class="text-2xl font-extrabold" style="color:color-mix(in srgb, var(--cps) 80%, black)">{{ number_format($totalGuru) }}</p>
-                                <p class="text-sm font-medium" style="color:color-mix(in srgb, var(--cps) 64%, black)">Guru</p>
-                            </div>
-                            <span class="grid place-items-center w-7 h-7 rounded-lg bg-white/70 group-hover:bg-white transition" style="color:color-mix(in srgb, var(--cps) 80%, black)"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span>
-                        </div>
-                    </div>
-                    {{-- Ilustrasi: Buku & Bohlam Ide --}}
-                    <svg viewBox="0 0 200 86" class="ill w-full" style="height:84px" preserveAspectRatio="xMidYMid meet">
-                        <defs>
-                            <linearGradient id="pageL" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0" stop-color="color-mix(in srgb, var(--cps) 42%, white)"/>
-                                <stop offset="1" stop-color="var(--cps)"/>
-                            </linearGradient>
-                            <linearGradient id="pageR" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0" stop-color="var(--cps)"/>
-                                <stop offset="1" stop-color="color-mix(in srgb, var(--cps) 62%, black)"/>
-                            </linearGradient>
-                            <linearGradient id="bulb" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0" stop-color="color-mix(in srgb, var(--ca) 45%, white)"/>
-                                <stop offset="1" stop-color="var(--ca)"/>
-                            </linearGradient>
-                            <radialGradient id="bulbGlow" cx=".5" cy=".5" r=".5">
-                                <stop offset="0" stop-color="var(--ca)" stop-opacity=".6"/>
-                                <stop offset="1" stop-color="var(--ca)" stop-opacity="0"/>
-                            </radialGradient>
-                        </defs>
-                        <circle class="ill-glow" cx="100" cy="26" r="24" fill="url(#bulbGlow)"/>
-                        <ellipse cx="100" cy="68" rx="44" ry="5" fill="#0f172a" opacity=".08"/>
-                        <g transform="translate(100,50)">
-                            <path d="M0,2 C-12,-5 -33,-5 -43,1 L-43,19 C-33,14 -12,14 0,20 Z" fill="url(#pageL)"/>
-                            <path d="M0,2 C12,-5 33,-5 43,1 L43,19 C33,14 12,14 0,20 Z" fill="url(#pageR)"/>
-                            <g stroke="#fff" stroke-width="1" opacity=".4" stroke-linecap="round" fill="none">
-                                <path d="M-9,5 C-19,2 -29,2 -35,5"/><path d="M-9,10 C-19,7 -29,7 -35,10"/>
-                            </g>
-                            <line x1="0" y1="2" x2="0" y2="20" stroke="#fff" stroke-width="1.6" opacity=".6"/>
-                        </g>
-                        <g class="ill-bob"><g transform="translate(100,24)">
-                            <circle r="10" fill="url(#bulb)"/>
-                            <path d="M-5.5,-2.5 a5.5,5.5 0 0,1 11,0" fill="none" stroke="#fff" stroke-width="1.5" opacity=".55"/>
-                            <rect x="-4.8" y="8.5" width="9.6" height="4" rx="1.6" fill="color-mix(in srgb, var(--cps) 68%, black)"/>
-                            <rect x="-3.6" y="12" width="7.2" height="2.6" rx="1.3" fill="color-mix(in srgb, var(--cps) 56%, black)"/>
-                            <g class="ill-tw1" stroke="var(--ca)" stroke-width="1.9" stroke-linecap="round">
-                                <line x1="0" y1="-15" x2="0" y2="-19.5"/>
-                                <line x1="-13" y1="-7.5" x2="-16.5" y2="-10"/>
-                                <line x1="13" y1="-7.5" x2="16.5" y2="-10"/>
-                                <line x1="-10" y1="3" x2="-13" y2="4.5"/>
-                                <line x1="10" y1="3" x2="13" y2="4.5"/>
-                            </g>
-                        </g></g>
-                    </svg>
-                </a>
-                {{-- Card 3: Kelas (bars) — warna accent --}}
-                <a href="{{ route('kelas.index') }}" class="card card-hover overflow-hidden group"
-                   style="background:linear-gradient(160deg, color-mix(in srgb, var(--ca) 24%, white), color-mix(in srgb, var(--ca) 10%, white))">
-                    <div class="p-4">
-                        <div class="flex items-start justify-between">
-                            <div>
-                                <p class="text-2xl font-extrabold" style="color:color-mix(in srgb, var(--ca) 80%, black)">{{ number_format($totalKelas) }}</p>
-                                <p class="text-sm font-medium" style="color:color-mix(in srgb, var(--ca) 64%, black)">Kelas</p>
-                            </div>
-                            <span class="grid place-items-center w-7 h-7 rounded-lg bg-white/70 group-hover:bg-white transition" style="color:color-mix(in srgb, var(--ca) 80%, black)"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span>
-                        </div>
-                    </div>
-                    {{-- Ilustrasi: Gedung Sekolah --}}
-                    <svg viewBox="0 0 200 86" class="ill w-full" style="height:84px" preserveAspectRatio="xMidYMid meet">
-                        <defs>
-                            <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0" stop-color="color-mix(in srgb, var(--ca) 42%, white)"/>
-                                <stop offset="1" stop-color="var(--ca)"/>
-                            </linearGradient>
-                            <linearGradient id="roof" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0" stop-color="var(--ca)"/>
-                                <stop offset="1" stop-color="color-mix(in srgb, var(--ca) 58%, black)"/>
-                            </linearGradient>
-                            <radialGradient id="win" cx=".5" cy=".25" r=".9">
-                                <stop offset="0" stop-color="#ffffff"/>
-                                <stop offset="1" stop-color="color-mix(in srgb, var(--cp) 28%, white)"/>
-                            </radialGradient>
-                        </defs>
-                        <g fill="#ffffff" opacity=".55">
-                            <ellipse class="ill-tw2" cx="42" cy="24" rx="13" ry="5"/>
-                            <ellipse class="ill-tw1" cx="160" cy="18" rx="10" ry="4"/>
-                        </g>
-                        <ellipse cx="100" cy="70" rx="44" ry="5" fill="#0f172a" opacity=".08"/>
-                        <g class="ill-bob"><g transform="translate(100,4)">
-                            <rect x="-37" y="34" width="74" height="34" rx="3" fill="url(#wall)"/>
-                            <path d="M-45,35 L0,14 L45,35 Z" fill="url(#roof)"/>
-                            <path d="M-45,35 L0,14 L45,35" fill="none" stroke="#fff" stroke-width="1" opacity=".25"/>
-                            <line x1="0" y1="14" x2="0" y2="4" stroke="color-mix(in srgb, var(--ca) 58%, black)" stroke-width="1.8"/>
-                            <path class="ill-flag" d="M0,4 L12,7.5 L0,11 Z" fill="var(--cp)"/>
-                            <path d="M-7,68 L-7,55 A7,7 0 0,1 7,55 L7,68 Z" fill="#ffffff" opacity=".92"/>
-                            <circle cx="4" cy="60" r="1.1" fill="var(--ca)"/>
-                            <rect class="ill-w1" x="-30" y="40" width="12" height="12" rx="2" fill="url(#win)"/>
-                            <rect class="ill-w2" x="18"  y="40" width="12" height="12" rx="2" fill="url(#win)"/>
-                            <g stroke="var(--ca)" stroke-width="1" opacity=".45">
-                                <line x1="-24" y1="40" x2="-24" y2="52"/><line x1="-30" y1="46" x2="-18" y2="46"/>
-                                <line x1="24" y1="40" x2="24" y2="52"/><line x1="18" y1="46" x2="30" y2="46"/>
-                            </g>
-                        </g></g>
-                    </svg>
-                </a>
-            </div>
-        </div>
-
-        {{-- Featured card (school / semester) --}}
+    {{-- Toolbar: salam + tombol Tata Letak --}}
+    <div class="flex items-start justify-between gap-3 mb-5">
         <div>
-            <h2 class="font-bold text-slate-700 dark:text-slate-200 mb-3 px-1">Tahun Ajaran</h2>
-            <div class="relative overflow-hidden rounded-[22px] p-5 text-white h-[calc(100%-2.25rem)] min-h-44 flex flex-col justify-between shadow-lg" style="background:linear-gradient(150deg, var(--cp), color-mix(in srgb, var(--cp) 55%, black))">
-                <i data-lucide="{{ $motifIcon }}" class="absolute -right-7 -top-7 w-36 h-36 text-white opacity-20" style="stroke-width:1.2"></i>
-                <i data-lucide="{{ $motifIcon }}" class="absolute right-8 bottom-2 w-16 h-16 text-white opacity-15" style="stroke-width:1.2"></i>
-                <div class="relative z-10">
-                    <div class="w-10 h-10 rounded-xl bg-white/25 grid place-items-center mb-3"><i data-lucide="calendar-days" class="w-5 h-5"></i></div>
-                    <p class="text-white/70 text-xs">Semester Aktif</p>
-                    <p class="text-2xl font-extrabold">{{ $semester ? 'Semester '.$semester->semester : '—' }}</p>
-                    <p class="text-white/80 text-sm">{{ $semester->tahun ?? 'Belum diatur' }}</p>
-                </div>
-                <a href="{{ route('setting.index') }}" class="relative z-10 inline-flex items-center gap-1.5 text-xs font-semibold bg-white/20 hover:bg-white/30 transition rounded-lg px-3 py-2 w-fit">
-                    <i data-lucide="settings-2" class="w-3.5 h-3.5"></i> Kelola
-                </a>
-            </div>
+            <h1 class="flex items-center gap-2 text-lg sm:text-xl font-extrabold text-slate-700 dark:text-slate-100">
+                <span class="js-salam-icon inline-flex flex-shrink-0" data-icon-class="w-5 h-5 text-primary flex-shrink-0"><i data-lucide="{{ $salamIcon }}" class="w-5 h-5 text-primary flex-shrink-0"></i></span>
+                <span><span class="js-salam-text">{{ $salam }}</span>, {{ $nama }} <span class="ml-0.5">👋</span></span>
+            </h1>
+            <p class="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-300 mt-1 flex items-center gap-1.5">
+                <i data-lucide="calendar-days" class="w-3.5 h-3.5 flex-shrink-0"></i>
+                <span class="js-dash-date capitalize font-semibold text-slate-600 dark:text-slate-200">{{ $tanggalHari }}</span>
+                <span class="text-slate-300 dark:text-slate-600">&bull;</span>
+                <i data-lucide="clock" class="w-3.5 h-3.5 flex-shrink-0"></i>
+                <span class="js-dash-clock tabular-nums font-semibold text-slate-600 dark:text-slate-200">--:--:--</span>
+            </p>
+        </div>
+        <div class="flex items-center gap-2">
+            <span x-show="editing" x-cloak class="hidden sm:inline text-xs text-slate-400">Seret kartu untuk menyusun ulang</span>
+            <button type="button" x-show="editing" x-cloak @click="reset()"
+                    class="btn-accent inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition shadow-sm">
+                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset
+            </button>
+            <button type="button" @click="toggle()"
+                    class="btn-accent inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition shadow-sm">
+                <i data-lucide="layout-dashboard" class="w-3.5 h-3.5" x-show="!editing"></i>
+                <i data-lucide="check" class="w-3.5 h-3.5" x-show="editing" x-cloak></i>
+                <span x-text="editing ? 'Selesai' : 'Tata Letak'"></span>
+            </button>
         </div>
     </div>
 
-    {{-- ===== Ringkasan Sarpras (terintegrasi) ===== --}}
-    @can('sarpras.dashboard.lihat')
-    @php
-        $spTotalAset    = \App\Sarpras\Models\Aset::count();
-        $spKerusakan    = \App\Sarpras\Models\LaporanKerusakan::whereIn('status', ['dilaporkan','diterima'])->count();
-        $spPeminjaman   = \App\Sarpras\Models\Peminjaman::whereIn('status', ['disetujui','dipinjam','terlambat'])->count();
-        $spPengadaan    = \App\Sarpras\Models\Pengadaan::where('status','diajukan')->count();
-        $spCards = [
-            ['Total Aset',        $spTotalAset,  'package',         'text-slate-700', route('sarpras.aset.index')],
-            ['Kerusakan Terbuka', $spKerusakan,  'wrench',          'text-red-600',   route('sarpras.kerusakan.index')],
-            ['Peminjaman Aktif',  $spPeminjaman, 'clipboard-check', 'text-amber-600', route('sarpras.peminjaman.index')],
-            ['Pengadaan Pending', $spPengadaan,  'shopping-cart',   'text-blue-600',  route('sarpras.pengadaan.index')],
-        ];
-    @endphp
-    <div>
-        <div class="flex items-center justify-between mb-3 px-1">
-            <h2 class="font-bold text-slate-700 dark:text-slate-200">Sarana &amp; Prasarana</h2>
-            <a href="{{ route('sarpras.dashboard') }}" class="text-xs font-semibold text-primary hover:underline">Dashboard Sarpras &rarr;</a>
-        </div>
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            @foreach($spCards as [$label, $val, $icon, $color, $href])
-            <a href="{{ $href }}" class="card card-hover p-4 flex items-center justify-between group">
-                <div>
-                    <p class="text-xs text-slate-400 mb-1">{{ $label }}</p>
-                    <p class="text-2xl font-extrabold {{ $color }} dark:text-slate-100">{{ number_format($val) }}</p>
-                </div>
-                <span class="grid place-items-center w-9 h-9 rounded-xl bg-primary/10 text-primary group-hover:scale-110 transition">
-                    <i data-lucide="{{ $icon }}" class="w-4 h-4"></i>
-                </span>
-            </a>
-            @endforeach
-        </div>
+    {{-- Kutipan harian — minimalis --}}
+    <div class="motiv-card mb-6 border-l-2 border-primary/40 pl-4">
+        <p class="motiv-label font-bold uppercase text-primary/70">Quote of the Day</p>
+        <p class="mt-2 text-sm sm:text-[15px] font-normal leading-relaxed text-slate-600 dark:text-slate-300">{{ $kataTeks }}</p>
+        @if($kataPenulis)
+            <p class="mt-1.5 text-xs font-medium text-slate-400 dark:text-slate-500">{{ $kataPenulis }}</p>
+        @endif
     </div>
-    @endcan
 
-    {{-- ===== Recent + Activity ===== --}}
-    <div class="grid lg:grid-cols-5 gap-5">
-        {{-- Recent students --}}
-        <div class="lg:col-span-2 card p-5">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="font-bold text-slate-700 dark:text-slate-200">Siswa Terbaru</h2>
-                <a href="{{ route('siswa.index') }}" class="text-xs font-semibold text-primary hover:underline">Lihat Semua</a>
+    {{-- Grid blok yang bisa di-drag --}}
+    <div id="dashGrid" class="grid grid-cols-12 gap-5" x-ref="grid">
+        @foreach($blockOrder as $block)
+            @if(str_starts_with($block, 'sarpras_') && ! auth()->user()->can('sarpras.dashboard.lihat'))
+                @continue
+            @endif
+            <div class="dash-block {{ $spans[$block] ?? 'col-span-12' }} {{ in_array($block, $hiddenBlocks) ? 'dash-hidden' : '' }}" data-block="{{ $block }}" :class="{ 'dash-hidden': hidden.includes('{{ $block }}') }">
+                <span class="dash-handle"><i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i> {{ $blockLabel[$block] ?? $block }}</span>
+                <button type="button" class="dash-remove" @click.stop.prevent="toggleHide('{{ $block }}')"
+                        :title="hidden.includes('{{ $block }}') ? 'Tampilkan blok' : 'Sembunyikan blok'">
+                    <i data-lucide="x" class="w-3.5 h-3.5" x-show="!hidden.includes('{{ $block }}')"></i>
+                    <i data-lucide="plus" class="w-3.5 h-3.5" x-show="hidden.includes('{{ $block }}')" x-cloak></i>
+                </button>
+                <span class="dash-hidden-badge">Disembunyikan</span>
+                @includeIf('dashboard.blocks.'.$block)
             </div>
-            <div class="space-y-2">
-                @forelse($recent as $s)
-                <a href="{{ route('siswa.show', $s->uuid) }}" class="flex items-center gap-3 p-2.5 rounded-2xl hover:bg-primary-50 transition group">
-                    <div class="w-10 h-10 rounded-full grid place-items-center text-white font-bold flex-shrink-0" style="background:{{ $s->jk==='L' ? 'linear-gradient(135deg,var(--cp),var(--cps))' : 'linear-gradient(135deg,#ec9aae,#db7793)' }}">
-                        {{ strtoupper(substr($s->nama,0,1)) }}
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="font-semibold text-sm text-slate-700 dark:text-slate-200 truncate">{{ $s->nama }}</p>
-                        <p class="text-xs text-slate-400">{{ $s->created_at?->diffForHumans() }}</p>
-                    </div>
-                    @if($s->kelas)<span class="badge bg-primary-50 text-primary">{{ $s->kelas->tingkat }}{{ $s->kelas->kelas }}</span>@endif
-                </a>
-                @empty
-                <p class="text-sm text-slate-400 text-center py-8">Belum ada siswa</p>
-                @endforelse
-            </div>
-        </div>
-
-        {{-- Composition / activity --}}
-        <div class="lg:col-span-3 card p-5">
-            <div class="flex items-center justify-between mb-1">
-                <h2 class="font-bold text-slate-700 dark:text-slate-200">Komposisi Siswa</h2>
-                <span class="badge bg-primary-50 text-primary">{{ number_format($totalSiswa) }} total</span>
-            </div>
-            <p class="text-3xl font-extrabold text-slate-700 dark:text-slate-100 mt-2">{{ number_format($totalSiswa) }}</p>
-            <p class="text-sm text-slate-400 mb-4">Distribusi jenis kelamin</p>
-
-            @php $tot = max($totalSiswa,1); $pl = round($siswaL/$tot*100); $pp = 100-$pl; @endphp
-            <div class="flex h-4 rounded-full overflow-hidden mb-4 bg-slate-100 dark:bg-slate-700">
-                <div style="width:{{ $pl }}%;background:linear-gradient(90deg,var(--cp),var(--cps))" class="h-full"></div>
-                <div style="width:{{ $pp }}%;background:linear-gradient(90deg,#ec9aae,#db7793)" class="h-full"></div>
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-                <div class="p-3 rounded-2xl bg-primary-50 dark:bg-slate-800/70">
-                    <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full" style="background:var(--cp)"></span><span class="text-xs font-semibold text-slate-500 dark:text-slate-300">Laki-laki</span></div>
-                    <p class="text-xl font-extrabold text-slate-700 dark:text-slate-100">{{ number_format($siswaL) }} <span class="text-sm font-medium text-slate-400 dark:text-slate-400">({{ $pl }}%)</span></p>
-                </div>
-                <div class="p-3 rounded-2xl bg-[#fce7ec] dark:bg-slate-800/70">
-                    <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full bg-[#db7793]"></span><span class="text-xs font-semibold text-slate-500 dark:text-slate-300">Perempuan</span></div>
-                    <p class="text-xl font-extrabold text-slate-700 dark:text-slate-100">{{ number_format($siswaP) }} <span class="text-sm font-medium text-slate-400 dark:text-slate-400">({{ $pp }}%)</span></p>
-                </div>
-            </div>
-
-            <div class="flex flex-wrap gap-2 mt-4 pt-4 border-t border-[#f4efe8] dark:border-slate-700">
-                <a href="{{ route('siswa.create') }}" class="btn-primary flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold"><i data-lucide="user-plus" class="w-3.5 h-3.5"></i> Tambah Siswa</a>
-                <a href="{{ route('guru.create') }}" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-[#ece6df] dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition"><i data-lucide="user-plus" class="w-3.5 h-3.5"></i> Tambah Guru</a>
-                <a href="{{ route('kelas.setKelas') }}" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-[#ece6df] dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition"><i data-lucide="layout-grid" class="w-3.5 h-3.5"></i> Set Kelas</a>
-            </div>
-        </div>
+        @endforeach
     </div>
 </div>
+
+@include('partials.sosmed-bar')
 
 @else
 {{-- ===== Non-admin ===== --}}
@@ -409,13 +427,170 @@
                 <svg width="100" height="100" viewBox="0 0 100 100" fill="none" stroke="var(--cp)" stroke-width="2"><rect x="15" y="15" width="70" height="70" rx="16" opacity=".5" /><circle cx="50" cy="50" r="24" fill="var(--ca)" stroke="none" opacity=".8" /><line x1="15" y1="50" x2="85" y2="50" opacity=".3" /></svg>
             @endif
         </div>
-        <div class="w-16 h-16 rounded-2xl mx-auto mb-4 grid place-items-center text-white shadow-lg" style="background:linear-gradient(135deg,var(--cp),var(--ca))">
-            <i data-lucide="layout-dashboard" class="w-8 h-8"></i>
+        <div class="js-salam-icon w-16 h-16 rounded-2xl mx-auto mb-4 grid place-items-center text-white shadow-lg" data-icon-class="w-8 h-8" style="background:linear-gradient(135deg,var(--cp),var(--ca))">
+            <i data-lucide="{{ $salamIcon }}" class="w-8 h-8"></i>
         </div>
-        <h2 class="text-xl font-extrabold text-slate-700 dark:text-slate-100">Halo, {{ $nama }} 👋</h2>
+        <h2 class="text-xl font-extrabold text-slate-700 dark:text-slate-100"><span class="js-salam-text">{{ $salam }}</span>, {{ $nama }} 👋</h2>
+        <p class="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 dark:text-slate-200">
+            <i data-lucide="calendar-days" class="w-4 h-4 text-slate-400"></i>
+            <span class="js-dash-date capitalize">{{ $tanggalHari }}</span>
+        </p>
+        <p class="mt-1 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 dark:text-slate-200">
+            <i data-lucide="clock" class="w-4 h-4 text-slate-400"></i>
+            <span class="js-dash-clock tabular-nums">--:--:--</span> WIB
+        </p>
         <p class="text-sm text-slate-500 mt-1 capitalize">{{ $access }} @if($semester) • Semester {{ $semester->semester }} / {{ $semester->tahun }} @endif</p>
+        <div class="motiv-card mt-6 pt-5 border-t border-slate-100 dark:border-slate-700/60">
+            <p class="motiv-label font-bold uppercase text-primary/70">Quote of the Day</p>
+            <p class="mt-2 text-sm font-normal leading-relaxed text-slate-600 dark:text-slate-300">{{ $kataTeks }}</p>
+            @if($kataPenulis)
+                <p class="mt-1.5 text-xs font-medium text-slate-400 dark:text-slate-500">{{ $kataPenulis }}</p>
+            @endif
+        </div>
         <p class="text-sm text-slate-400 mt-4">Gunakan menu di sidebar untuk mengakses fitur yang tersedia.</p>
     </div>
+
+    @include('partials.sosmed-bar')
 </div>
 @endif
 @endsection
+
+@push('scripts')
+<script>
+// Jam + salam realtime dashboard — selalu mengikuti waktu WIB (Asia/Jakarta)
+(function () {
+    var TZ = 'Asia/Jakarta';
+    var fmtJam, fmtJam24, fmtTanggal;
+    try {
+        fmtJam     = new Intl.DateTimeFormat('id-ID', { timeZone: TZ, hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        fmtJam24   = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour12: false, hour: '2-digit' });
+        fmtTanggal = new Intl.DateTimeFormat('id-ID', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    } catch (e) { fmtJam = fmtJam24 = fmtTanggal = null; }
+
+    // Nilai awal dari server agar tidak ada "kedip" saat halaman dibuka.
+    var lastSalam = @json($salam);
+    var lastDate  = @json($tanggalHari);
+
+    function salamFor(h) {
+        if (h < 11) return ['Selamat Pagi',  'sunrise'];
+        if (h < 15) return ['Selamat Siang', 'sun'];
+        if (h < 18) return ['Selamat Sore',  'sunset'];
+        return ['Selamat Malam', 'moon'];
+    }
+
+    function tick() {
+        var now = new Date();
+
+        // Jam berdetak
+        document.querySelectorAll('.js-dash-clock').forEach(function (n) {
+            n.textContent = fmtJam ? fmtJam.format(now) : now.toTimeString().slice(0, 8);
+        });
+
+        if (!fmtJam24) return;
+
+        // Salam — perbarui hanya saat melewati batas waktu (mis. malam → pagi)
+        var jam = parseInt(fmtJam24.format(now), 10);
+        var s = salamFor(jam);
+        if (s[0] !== lastSalam) {
+            lastSalam = s[0];
+            document.querySelectorAll('.js-salam-text').forEach(function (n) { n.textContent = s[0]; });
+            document.querySelectorAll('.js-salam-icon').forEach(function (n) {
+                n.innerHTML = '<i data-lucide="' + s[1] + '" class="' + (n.getAttribute('data-icon-class') || '') + '"></i>';
+            });
+            if (window.lucide) window.lucide.createIcons();
+        }
+
+        // Tanggal — perbarui saat berganti hari (lewat tengah malam)
+        var d = fmtTanggal.format(now);
+        if (d !== lastDate) {
+            lastDate = d;
+            document.querySelectorAll('.js-dash-date').forEach(function (n) { n.textContent = d; });
+        }
+    }
+
+    tick();
+    setInterval(tick, 1000);
+})();
+</script>
+@endpush
+
+@if(in_array($access, ['superadmin','admin']))
+@push('scripts')
+<script>
+function dashLayout() {
+    return {
+        editing: false,
+        sortable: null,
+        hidden: @json($hiddenBlocks),
+        saveUrl: '{{ route('dashboard.layout') }}',
+        csrf: document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
+
+        toggle() {
+            this.editing = !this.editing;
+            if (this.editing) {
+                this.enableSort();
+            } else {
+                this.save();
+            }
+            this.$nextTick(() => window.lucide && window.lucide.createIcons());
+        },
+
+        toggleHide(block) {
+            const i = this.hidden.indexOf(block);
+            if (i === -1) this.hidden.push(block);
+            else this.hidden.splice(i, 1);
+            this.$nextTick(() => window.lucide && window.lucide.createIcons());
+        },
+
+        enableSort() {
+            if (this.sortable || typeof Sortable === 'undefined') return;
+            this.sortable = Sortable.create(this.$refs.grid, {
+                animation: 180,
+                handle: '.dash-block',
+                draggable: '.dash-block',
+                ghostClass: 'sortable-ghost',
+                chosenClass: 'sortable-chosen',
+                dragClass: 'sortable-drag',
+            });
+        },
+
+        currentOrder() {
+            return Array.from(this.$refs.grid.querySelectorAll('.dash-block'))
+                        .map(el => el.dataset.block);
+        },
+
+        save() {
+            // Urutan blok yang tampil saja; blok tersembunyi dikirim terpisah.
+            const order  = this.currentOrder();
+            const layout = order.filter(b => !this.hidden.includes(b));
+            const hidden = this.hidden;
+            fetch(this.saveUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': this.csrf,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ layout, hidden }),
+            })
+            .then(r => r.json())
+            .then(() => window.showToast && window.showToast('Tata letak dashboard tersimpan', 'success'))
+            .catch(() => window.showToast && window.showToast('Gagal menyimpan tata letak', 'error'));
+        },
+
+        reset() {
+            const def = @json($allBlocks);
+            const grid = this.$refs.grid;
+            def.forEach(key => {
+                const el = grid.querySelector('.dash-block[data-block="' + key + '"]');
+                if (el) grid.appendChild(el); // urutkan ulang sesuai default
+            });
+            this.hidden = []; // tampilkan kembali semua blok
+            this.save();
+            this.$nextTick(() => window.lucide && window.lucide.createIcons());
+        },
+    };
+}
+</script>
+@endpush
+@endif

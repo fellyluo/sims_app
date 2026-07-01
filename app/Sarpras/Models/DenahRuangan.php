@@ -12,10 +12,17 @@ class DenahRuangan extends SarprasModel
     /** Warna blok default bila ruangan belum diberi warna (emerald-600). */
     public const WARNA_DEFAULT = '#059669';
 
+    /** Status ketersediaan ruangan untuk fitur booking. */
+    public const STATUS = [
+        'tersedia'    => 'Tersedia',
+        'digunakan'   => 'Digunakan',
+        'maintenance' => 'Maintenance',
+    ];
+
     protected $fillable = [
-        'school_id', 'denah_id', 'kode', 'nama',
+        'school_id', 'denah_id', 'kode', 'nama', 'gedung', 'lantai',
         'pos_x', 'pos_y', 'lebar', 'tinggi', 'warna', 'gambar_denah_path', 'foto_path',
-        'kapasitas', 'deskripsi',
+        'kapasitas', 'fasilitas', 'status', 'deskripsi',
     ];
 
     protected $casts = [
@@ -25,7 +32,13 @@ class DenahRuangan extends SarprasModel
         'lebar' => 'decimal:2',
         'tinggi' => 'decimal:2',
         'kapasitas' => 'integer',
+        'fasilitas' => 'array',
     ];
+
+    public function getStatusLabelAttribute(): string
+    {
+        return self::STATUS[$this->status] ?? 'Tersedia';
+    }
 
     public function denah(): BelongsTo
     {
