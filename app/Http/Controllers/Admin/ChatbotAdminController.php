@@ -268,7 +268,7 @@ class ChatbotAdminController extends Controller
 
         return [
             'id' => $c->id,
-            'user_name' => $c->user?->name ?? 'Pengguna',
+            'user_name' => $c->user?->displayName() ?? 'Pengguna',
             // SIMS tidak punya kolom email — pakai username sebagai identitas pencarian.
             'user_email' => $c->user?->username,
             'user_role' => $c->user?->access,
@@ -290,7 +290,7 @@ class ChatbotAdminController extends Controller
     public function updateAvatar(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'avatar_type' => ['required', 'string', 'in:default,robot,owl,cs'],
+            'avatar_type' => ['required', 'string', 'in:default,robot,owl,cs,cat,fox,panda,bear'],
         ]);
 
         \App\Models\Setting::set('chatbot_avatar', $data['avatar_type']);

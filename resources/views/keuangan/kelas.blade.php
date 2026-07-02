@@ -104,16 +104,28 @@
                         <td class="px-1 py-1 text-center">
                             @if($p)
                             <button type="button"
-                                    class="spp-cell w-9 h-9 rounded-lg grid place-items-center mx-auto spp-{{ $p->status }}"
-                                    title="{{ $b['label'] }} {{ $b['year'] }} — {{ ucfirst($p->status) }}"
+                                    class="spp-cell w-9 h-9 rounded-lg relative mx-auto spp-{{ $p->status }}"
+                                    title="{{ $b['label'] }} {{ $b['year'] }} — {{ ucfirst($p->status) }}{{ $p->tanggal_bayar ? ' (' . $p->tanggal_bayar->format('d M Y') . ')' : '' }}"
                                     @click="openCell({{ \Illuminate\Support\Js::from($cellData) }})">
-                                @switch($p->status)
-                                    @case('lunas')<i data-lucide="check" class="w-4 h-4"></i>@break
-                                    @case('terverifikasi')<i data-lucide="badge-check" class="w-4 h-4"></i>@break
-                                    @case('menunggu')<i data-lucide="clock" class="w-4 h-4"></i>@break
-                                    @case('ditolak')<i data-lucide="x" class="w-4 h-4"></i>@break
-                                    @default<span class="text-[11px]">—</span>
-                                @endswitch
+                                @if($p->tanggal_bayar && $p->status !== 'belum')
+                                    <div class="absolute inset-0 p-1 font-bold text-[9.5px] leading-none">
+                                        <span class="absolute top-1 left-1.5">{{ $p->tanggal_bayar->format('d') }}</span>
+                                        <svg class="absolute inset-0 w-full h-full text-current opacity-15 pointer-events-none" viewBox="0 0 36 36" fill="none">
+                                            <line x1="24" y1="12" x2="12" y2="24" stroke="currentColor" stroke-width="0.8"/>
+                                        </svg>
+                                        <span class="absolute bottom-1 right-1.5">{{ $p->tanggal_bayar->format('m') }}</span>
+                                    </div>
+                                @else
+                                    <div class="absolute inset-0 grid place-items-center">
+                                        @switch($p->status)
+                                            @case('lunas')<i data-lucide="check" class="w-4 h-4"></i>@break
+                                            @case('terverifikasi')<i data-lucide="badge-check" class="w-4 h-4"></i>@break
+                                            @case('menunggu')<i data-lucide="clock" class="w-4 h-4"></i>@break
+                                            @case('ditolak')<i data-lucide="x" class="w-4 h-4"></i>@break
+                                            @default<span class="text-[11px]">—</span>
+                                        @endswitch
+                                    </div>
+                                @endif
                             </button>
                             @endif
                         </td>
@@ -152,21 +164,36 @@
 
             <div class="grid grid-cols-2 gap-3">
                 <div class="col-span-2">
-                    <label class="form-label">Status</label>
-                    <select x-model="cell.status" class="form-input text-sm">
-                        <option value="belum">Belum bayar</option>
-                        <option value="menunggu">Menunggu verifikasi</option>
-                        <option value="terverifikasi">Sudah terverifikasi</option>
-                        <option value="lunas">Lunas</option>
-                        <option value="ditolak">Ditolak</option>
-                    </select>
+                    <label class="form-label mb-2">Status</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200 cursor-pointer p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50" :class="cell.status === 'belum' && 'bg-primary/5 border-primary text-primary font-semibold'">
+                            <input type="radio" value="belum" x-model="cell.status" class="text-primary focus:ring-primary border-slate-300 dark:border-slate-600">
+                            <span>Belum bayar</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200 cursor-pointer p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50" :class="cell.status === 'menunggu' && 'bg-primary/5 border-primary text-primary font-semibold'">
+                            <input type="radio" value="menunggu" x-model="cell.status" class="text-primary focus:ring-primary border-slate-300 dark:border-slate-600">
+                            <span>Menunggu</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200 cursor-pointer p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50" :class="cell.status === 'terverifikasi' && 'bg-primary/5 border-primary text-primary font-semibold'">
+                            <input type="radio" value="terverifikasi" x-model="cell.status" class="text-primary focus:ring-primary border-slate-300 dark:border-slate-600">
+                            <span>Terverifikasi</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200 cursor-pointer p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50" :class="cell.status === 'lunas' && 'bg-primary/5 border-primary text-primary font-semibold'">
+                            <input type="radio" value="lunas" x-model="cell.status" class="text-primary focus:ring-primary border-slate-300 dark:border-slate-600">
+                            <span>Lunas</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200 cursor-pointer p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 col-span-2" :class="cell.status === 'ditolak' && 'bg-primary/5 border-primary text-primary font-semibold'">
+                            <input type="radio" value="ditolak" x-model="cell.status" class="text-primary focus:ring-primary border-slate-300 dark:border-slate-600">
+                            <span>Ditolak</span>
+                        </label>
+                    </div>
                 </div>
                 <div>
                     <label class="form-label">Nominal (Rp)</label>
                     <input type="number" min="0" x-model.number="cell.nominal" class="form-input text-sm">
                 </div>
                 <div>
-                    <label class="form-label">Tgl Bayar</label>
+                    <label class="form-label">Tgl Bayar <span class="text-rose-500" x-show="cell.status !== 'belum'">*</span></label>
                     <input type="date" x-model="cell.tanggal_bayar" class="form-input text-sm">
                 </div>
                 <div class="col-span-2" x-show="cell.status==='ditolak'">
@@ -230,6 +257,10 @@ function sppGrid() {
             this.selectedBulans = [this.cell.bulan];
         },
         async save() {
+            if (this.cell.status !== 'belum' && !this.cell.tanggal_bayar) {
+                $.alert({ title: 'Wajib Diisi', content: 'Tanggal pembayaran harus dicantumkan.', type: 'red' });
+                return;
+            }
             this.saving = true;
             try {
                 const res = await fetch(`{{ url('keuangan/pembayaran') }}/${this.cell.uuid}/cell`, {

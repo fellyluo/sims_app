@@ -177,8 +177,9 @@ class KeuanganSppTest extends TestCase
         ]);
 
         $this->actingAs($bendahara)->postJson('/keuangan/pembayaran/' . $p->uuid . '/cell', [
-            'status'  => 'lunas',
-            'nominal' => 180000,
+            'status'        => 'lunas',
+            'nominal'       => 180000,
+            'tanggal_bayar' => '2026-06-28',
         ])->assertOk()->assertJsonPath('ok', true);
 
         $p->refresh();

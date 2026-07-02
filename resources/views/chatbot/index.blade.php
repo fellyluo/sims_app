@@ -346,7 +346,7 @@
     }
 
     const quickQuestions = @json($quickQuestions);
-    const userName = "{{ auth()->user()?->siswa?->nama ?? auth()->user()?->guru?->nama ?? auth()->user()?->username }}";
+    const userName = "{{ auth()->user() ? auth()->user()->displayName() : 'User' }}";
 
     function renderWelcomeScreen() {
         elMsgs.innerHTML = '';

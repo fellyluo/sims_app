@@ -137,11 +137,18 @@
                             <button type="button" class="avatar-select-btn relative h-9 w-9 rounded-xl overflow-hidden border-2 {{ $avatarType === 'cs' ? 'border-primary-500 ring-2 ring-primary-300' : 'border-transparent' }}" data-avatar="cs" title="Petugas CS">
                                 <img src="{{ asset('images/chatbot/avatar_cs.png') }}" class="h-full w-full object-cover" alt="CS">
                             </button>
-                        </div>
-                        <div class="border-t border-slate-100 dark:border-slate-700 mt-2 pt-1">
-                            <form method="POST" action="{{ route('logout') }}">@csrf
-                                <button class="w-full text-left px-3 py-2 rounded-xl text-sm text-rose-600 hover:bg-rose-50">Keluar</button>
-                            </form>
+                            <button type="button" class="avatar-select-btn relative h-9 w-9 rounded-xl overflow-hidden border-2 {{ $avatarType === 'cat' ? 'border-primary-500 ring-2 ring-primary-300' : 'border-transparent' }}" data-avatar="cat" title="Kucing Guru">
+                                <img src="{{ asset('images/chatbot/avatar_cat.png') }}" class="h-full w-full object-cover" alt="Cat">
+                            </button>
+                            <button type="button" class="avatar-select-btn relative h-9 w-9 rounded-xl overflow-hidden border-2 {{ $avatarType === 'fox' ? 'border-primary-500 ring-2 ring-primary-300' : 'border-transparent' }}" data-avatar="fox" title="Rubah Pintar">
+                                <img src="{{ asset('images/chatbot/avatar_fox.png') }}" class="h-full w-full object-cover" alt="Fox">
+                            </button>
+                            <button type="button" class="avatar-select-btn relative h-9 w-9 rounded-xl overflow-hidden border-2 {{ $avatarType === 'panda' ? 'border-primary-500 ring-2 ring-primary-300' : 'border-transparent' }}" data-avatar="panda" title="Panda Lucu">
+                                <img src="{{ asset('images/chatbot/avatar_panda.png') }}" class="h-full w-full object-cover" alt="Panda">
+                            </button>
+                            <button type="button" class="avatar-select-btn relative h-9 w-9 rounded-xl overflow-hidden border-2 {{ $avatarType === 'bear' ? 'border-primary-500 ring-2 ring-primary-300' : 'border-transparent' }}" data-avatar="bear" title="Beruang Baik">
+                                <img src="{{ asset('images/chatbot/avatar_bear.png') }}" class="h-full w-full object-cover" alt="Bear">
+                            </button>
                         </div>
                     </div>
                 </div>

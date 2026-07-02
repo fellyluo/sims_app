@@ -81,6 +81,44 @@ class NilaiController extends Controller
         ]);
     }
 
+    /** ====== Nilai Saya: siswa (atau orangtuanya) melihat daftar nilai formatif & sumatif sendiri ====== */
+    public function selfShow()
+    {
+        $u = auth()->user();
+        $siswa = $u->siswa ?: \App\Models\Orangtua::where('id_login', $u->uuid)->first()?->siswa;
+        abort_unless($siswa, 404);
+
+        $semester = $this->semester();
+
+        $ngajars = Ngajar::where('id_kelas', $siswa->id_kelas)
+            ->whereNotNull('id_pelajaran')->whereNotNull('id_guru')
+            ->with(['pelajaran', 'guru'])->get()
+            ->filter(fn ($n) => $n->pelajaran)
+            ->sortBy(fn ($n) => [$n->pelajaran->urutan, $n->pelajaran->nama])
+            ->values();
+
+        $mapel = $ngajars->map(function ($ngajar) use ($siswa, $semester) {
+            $materi = Materi::with('tujuan')->where('id_ngajar', $ngajar->uuid)
+                ->where('id_semester', $semester?->id)->where('aktif', true)
+                ->orderBy('urutan')->get();
+            $tupeAll = $materi->flatMap(fn ($m) => $m->tujuan);
+
+            $fmtRows = NilaiFormatif::where('id_siswa', $siswa->uuid)
+                ->whereIn('id_tupe', $tupeAll->pluck('uuid'))->get()->keyBy('id_tupe');
+            $sumRows = NilaiSumatif::where('id_siswa', $siswa->uuid)
+                ->whereIn('id_materi', $materi->pluck('uuid'))->get()->keyBy('id_materi');
+
+            return [
+                'ngajar'  => $ngajar,
+                'materi'  => $materi,
+                'fmtRows' => $fmtRows,
+                'sumRows' => $sumRows,
+            ];
+        });
+
+        return view('nilai.self', compact('siswa', 'semester', 'mapel'));
+    }
+
     /** ====== KKTP (dulu KKM) per penugasan ====== */
     public function kktp()
     {

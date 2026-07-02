@@ -121,7 +121,7 @@ class KeuanganController extends Controller
         $data = $request->validate([
             'status'           => 'nullable|in:belum,menunggu,terverifikasi,lunas,ditolak',
             'nominal'          => 'nullable|integer|min:0',
-            'tanggal_bayar'    => 'nullable|date',
+            'tanggal_bayar'    => 'required_unless:status,belum|nullable|date',
             'jatuh_tempo'      => 'nullable|date',
             'catatan'          => 'nullable|string|max:500',
             'selected_bulans'  => 'nullable|array',

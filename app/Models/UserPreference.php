@@ -19,9 +19,13 @@ class UserPreference extends Model
     /** Urutan kanonik blok dashboard (default sebelum di-drag). */
     public const DASHBOARD_BLOCKS = [
         'ringkasan_siswa', 'ringkasan_guru', 'ringkasan_kelas', 'ringkasan_tahun',
-        'insight_rasio', 'insight_avg_kelas', 'insight_avg_tingkat', 'insight_terpadat',
+        'presensi_hadir', 'presensi_terlambat', 'presensi_tidak_hadir', 'presensi_belum',
         'sarpras_aset', 'sarpras_kerusakan', 'sarpras_peminjaman', 'sarpras_pengadaan',
-        'recent_tingkat', 'recent_komposisi', 'sebaran', 'quicklinks'
+        'recent_tingkat', 'recent_komposisi', 'sebaran', 'quicklinks',
+        'siswa_jadwal', 'siswa_absensi', 'siswa_poin', 'siswa_podium',
+        'guru_jadwal', 'guru_presensi', 'guru_agenda',
+        'kesiswaan_pending', 'kesiswaan_absensi',
+        'kurikulum_agenda',
     ];
 
     protected function casts(): array

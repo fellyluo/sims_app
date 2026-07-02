@@ -117,6 +117,11 @@ class QrAbsensiController extends Controller
             $row->jam_masuk = $jam;
             $row->save();
             $jamDipakai = $row->jam_masuk;
+
+            // Auto-deduksi poin bila terlambat (khusus sistem Poin/Aturan lama).
+            if ($row->terlambat(Setting::get('waktu_terlambat', '07:30'))) {
+                \App\Http\Controllers\PoinController::autoTerlambat($user->siswa->uuid, $today);
+            }
         } elseif ($user->guru) {
             // Metode absensi guru aktif harus "Barcode / QR".
             if (!\App\Support\AbsensiGuru::bolehQr()) {

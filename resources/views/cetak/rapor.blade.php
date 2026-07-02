@@ -29,7 +29,7 @@
         .kop .ident { flex: 1; text-align: center; }
         .kop .ident .nm { font-size: 22px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; margin: 0; }
         .kop .ident .ad { font-size: 13px; margin: 1px 0 0; }
-        .kop .ident p { margin: 1px 0; }   /* rapikan paragraf dari editor teks kop */
+        .kop .ident p, .kop .ident h1, .kop .ident h2, .kop .ident h3, .kop .ident h4, .kop .ident h5, .kop .ident h6 { margin: 2px 0; line-height: 1.25; }   /* rapikan margin dari editor teks kop */
         .kop .ident ul, .kop .ident ol { margin: 2px 0; padding-left: 22px; text-align: left; display: inline-block; }
         .judul { text-align: center; font-weight: 700; font-size: 17px; letter-spacing: .5px; margin: 8px 0 6px; }
         .judul small { display: block; font-size: 14px; }

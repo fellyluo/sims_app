@@ -133,7 +133,7 @@ class User extends Authenticatable implements WebAuthnAuthenticatable
     {
         if ($this->access === 'orangtua') {
             $anak = Orangtua::where('id_login', $this->uuid)->with('siswa:uuid,nama')->first()?->siswa?->nama;
-            return $anak ? 'Orang Tua ' . $anak : ($this->username ?? 'Orang Tua');
+            return $anak ? 'Ortu ' . $anak : ($this->username ?? 'Ortu');
         }
         return $this->guru?->nama ?? $this->siswa?->nama ?? $this->username ?? '-';
     }

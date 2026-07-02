@@ -6,6 +6,12 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Dashboard') — {{ $namaSekolah ?? 'Edu Nusantara' }}</title>
 
+    @if($sekolahLogoUrl)
+        <link rel="shortcut icon" href="{{ $sekolahLogoUrl }}" type="image/x-icon">
+    @else
+        <link rel="shortcut icon" href="{{ asset('favicon.ico') }}" type="image/x-icon">
+    @endif
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -306,8 +312,12 @@
 
         <div class="flex items-center gap-3 h-16 px-5 pt-2 flex-shrink-0">
             <div class="flex items-center gap-2.5 min-w-0">
-                <div class="w-9 h-9 rounded-xl grid place-items-center flex-shrink-0 shadow" style="background:linear-gradient(135deg,var(--cp),var(--cps))">
-                    <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5 text-white" stroke="currentColor" stroke-width="2.2"><path d="M12 3L1 9l11 6 9-4.91V17M1 9v7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <div class="w-9 h-9 rounded-xl grid place-items-center flex-shrink-0 shadow overflow-hidden" style="{{ $sekolahLogoUrl && $sekolahLogoExt === 'png' ? '' : 'background:linear-gradient(135deg,var(--cp),var(--cps))' }}">
+                    @if($sekolahLogoUrl)
+                        <img src="{{ $sekolahLogoUrl }}" class="w-full h-full {{ in_array($sekolahLogoExt, ['jpg', 'jpeg']) ? 'object-contain' : 'object-cover' }}" alt="Logo">
+                    @else
+                        <svg viewBox="0 0 24 24" fill="none" class="w-5 h-5 text-white" stroke="currentColor" stroke-width="2.2"><path d="M12 3L1 9l11 6 9-4.91V17M1 9v7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    @endif
                 </div>
                 <span x-show="!mini" class="font-extrabold text-[15px] truncate" style="color:var(--stx)">{{ $namaSekolah ?? 'Edu Nusantara' }}</span>
             </div>
@@ -346,13 +356,18 @@
 
                 // ── Akademik (Ruang Kelas, Jadwal, Penilaian, Ekskul) ──
                 $akademik = [];
-                $akademik[] = ['classroom.index', ['classroom.*'], 'graduation-cap', 'Ruang Kelas'];
+                if ($access !== 'orangtua') {
+                    $akademik[] = ['classroom.index', ['classroom.*'], 'graduation-cap', 'Ruang Kelas'];
+                }
                 if ($isAdmin) {
                     $akademik[] = ['jadwal.index', ['jadwal.*'], 'calendar-clock', 'Jadwal Pelajaran'];
                 }
                 if (auth()->user()?->guru || $isAdmin) {
                     $akademik[] = ['nilai.index', ['nilai.*'], 'pencil-line', $isAdmin ? 'Penilaian' : 'Buku Guru'];
                     $akademik[] = ['ekskul.index', ['ekskul.*'], 'volleyball', 'Ekstrakurikuler'];
+                }
+                if (auth()->user()?->siswa || $access === 'orangtua') {
+                    $akademik[] = ['nilai.self', ['nilai.self'], 'chart-column', 'Nilai Saya'];
                 }
                 if (!empty($akademik)) {
                     $groups['akademik'] = ['Akademik', 'book-open-check', $akademik];
@@ -378,6 +393,44 @@
                 }
                 if (!empty($raporItems)) {
                     $groups['rapor'] = ['Rapor', 'file-text', $raporItems];
+                }
+
+                // ── Kedisiplinan (Poin/Aturan lama ATAU P3, dipilih di Pengaturan) ──
+                $jenisAturan = \App\Models\Setting::get('jenis_aturan', 'p3');
+                $bolehKelolaDisiplin = $isAdmin || $access === 'kesiswaan';
+                $bolehAjukanDisiplin = auth()->user()?->guru
+                    || (auth()->user()?->siswa && \App\Models\Sekretaris::where('id_siswa', auth()->user()->siswa->uuid)->exists());
+                $bolehLihatDisiplin = auth()->user()?->siswa || $access === 'orangtua';
+
+                $disiplinItems = [];
+                if ($jenisAturan === 'poin') {
+                    if ($bolehKelolaDisiplin) {
+                        $disiplinItems[] = ['poin.index', ['poin.index', 'poin.create', 'poin.edit'], 'list-checks', 'Master Aturan'];
+                        $disiplinItems[] = ['poin.siswa.index', ['poin.siswa.*'], 'users', 'Poin Siswa'];
+                        $disiplinItems[] = ['poin.dashboard', ['poin.dashboard'], 'trophy', 'Dashboard Kedisiplinan'];
+                        $disiplinItems[] = ['poin.temp.index', ['poin.temp.*'], 'inbox', 'Pengajuan Poin'];
+                    }
+                    if ($bolehAjukanDisiplin) {
+                        $disiplinItems[] = ['poin.guru.index', ['poin.guru.*'], 'square-plus', 'Ajukan Poin'];
+                    }
+                    if ($bolehLihatDisiplin) {
+                        $disiplinItems[] = ['poin.self', ['poin.self'], 'user-round', 'Poin Saya'];
+                    }
+                } else {
+                    if ($bolehKelolaDisiplin) {
+                        $disiplinItems[] = ['p3.index', ['p3.index', 'p3.create', 'p3.edit'], 'list-checks', 'Master Kategori'];
+                        $disiplinItems[] = ['p3.siswa.index', ['p3.siswa.*'], 'users', 'P3 Siswa'];
+                        $disiplinItems[] = ['p3.temp.index', ['p3.temp.*'], 'inbox', 'Pengajuan P3'];
+                    }
+                    if ($bolehAjukanDisiplin) {
+                        $disiplinItems[] = ['p3.guru.index', ['p3.guru.*'], 'square-plus', 'Ajukan P3'];
+                    }
+                    if ($bolehLihatDisiplin) {
+                        $disiplinItems[] = ['p3.self', ['p3.self'], 'user-round', 'P3 Saya'];
+                    }
+                }
+                if (!empty($disiplinItems)) {
+                    $groups['disiplin'] = [$jenisAturan === 'poin' ? 'Poin & Aturan' : 'P3 Kedisiplinan', 'shield-alert', $disiplinItems];
                 }
 
                 // Grup Sarana & Prasarana (staf sekolah; kelola penuh utk superadmin/admin/sapras)
@@ -577,9 +630,9 @@
 
                 <div class="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1.5"></div>
                 @php
-                    $akunNama = auth()->user()?->guru?->nama ?? auth()->user()?->siswa?->nama ?? auth()->user()?->username;
+                    $akunNama = auth()->user() ? auth()->user()->displayName() : 'User';
                     $akunDepan = \Illuminate\Support\Str::of($akunNama)->explode(' ')->first();
-                    $akunInisial = strtoupper(substr($akunNama ?? 'U', 0, 1));
+                    $akunInisial = auth()->user() ? auth()->user()->initial() : 'U';
                 @endphp
                 {{-- Dropdown profil / akun --}}
                 <div class="relative" x-data="{ pOpen:false }" @keydown.escape.window="pOpen=false">

@@ -49,15 +49,25 @@ class AppServiceProvider extends ServiceProvider
         View::composer(['layouts.app', 'auth.login'], function ($view) {
             $nama = 'Edu Nusantara';
             $alamat = null;
+            $logoUrl = null;
+            $logoExt = null;
             try {
                 if (Schema::hasTable('settings')) {
                     $nama   = Setting::get('nama_sekolah', 'Edu Nusantara') ?: 'Edu Nusantara';
                     $alamat = Setting::get('alamat_sekolah');
+                    $logoPath = Setting::get('sekolah_logo');
+                    if ($logoPath && file_exists(storage_path('app/public/' . $logoPath))) {
+                        $logoUrl = asset('storage/' . $logoPath);
+                        $logoExt = strtolower(pathinfo($logoPath, PATHINFO_EXTENSION));
+                    }
                 }
             } catch (\Throwable $e) {
                 // tabel belum ada (mis. saat migrate) — pakai default
             }
-            $view->with('namaSekolah', $nama)->with('alamatSekolah', $alamat);
+            $view->with('namaSekolah', $nama)
+                 ->with('alamatSekolah', $alamat)
+                 ->with('sekolahLogoUrl', $logoUrl)
+                 ->with('sekolahLogoExt', $logoExt);
         });
     }
 }

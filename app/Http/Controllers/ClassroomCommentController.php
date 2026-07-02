@@ -12,8 +12,20 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 
 /** Komentar + balasan (1 level) untuk materi & latihan/tugas. */
-class ClassroomCommentController extends Controller
+class ClassroomCommentController extends Controller implements \Illuminate\Routing\Controllers\HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new \Illuminate\Routing\Controllers\Middleware(function ($request, $next) {
+                if ($request->user() && $request->user()->access === 'orangtua') {
+                    abort(403, 'Akses ditolak.');
+                }
+                return $next($request);
+            }),
+        ];
+    }
+
     public function storeMaterial(Request $request, ClassroomMaterial $material)
     {
         return $this->create($request, $material);

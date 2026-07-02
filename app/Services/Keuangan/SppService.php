@@ -110,13 +110,26 @@ class SppService
      */
     public function ringkasan(Collection $bayar): array
     {
+        $belumLengkap = $bayar->whereIn('status', [SppPembayaran::STATUS_BELUM, SppPembayaran::STATUS_DITOLAK]);
+        
+        $belumSudahTiba = 0;
+        $tunggakanNominal = 0;
+
+        foreach ($belumLengkap as $p) {
+            $tgl = TahunAjaran::tanggal($p->tahun_ajaran, $p->bulan)->startOfMonth();
+            if (!$tgl->isAfter(now()->startOfMonth())) {
+                $belumSudahTiba++;
+                $tunggakanNominal += $p->nominal;
+            }
+        }
+
         return [
             'total'         => $bayar->count(),
             'lunas'         => $bayar->where('status', SppPembayaran::STATUS_LUNAS)->count(),
             'terverifikasi' => $bayar->where('status', SppPembayaran::STATUS_TERVERIFIKASI)->count(),
             'menunggu'      => $bayar->where('status', SppPembayaran::STATUS_MENUNGGU)->count(),
-            'belum'         => $bayar->whereIn('status', [SppPembayaran::STATUS_BELUM, SppPembayaran::STATUS_DITOLAK])->count(),
-            'tunggakan'     => (int) $bayar->whereIn('status', [SppPembayaran::STATUS_BELUM, SppPembayaran::STATUS_DITOLAK])->sum('nominal'),
+            'belum'         => $belumSudahTiba,
+            'tunggakan'     => $tunggakanNominal,
         ];
     }
 }

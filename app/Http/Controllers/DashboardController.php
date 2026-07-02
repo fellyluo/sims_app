@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Absensi;
 use App\Models\Guru;
+use App\Models\Jadwal;
 use App\Models\Kelas;
+use App\Models\Orangtua;
 use App\Models\Semester;
 use App\Models\Setting;
 use App\Models\Siswa;
@@ -32,7 +35,90 @@ class DashboardController extends Controller
 
         $sosmed = $this->sosmedLinks();
 
-        return view('dashboard', compact('user', 'semester', 'pref', 'stats', 'sosmed'));
+        $siswaWidget = match ($user->access) {
+            'siswa'    => $this->buildSiswaWidget($user->siswa),
+            'orangtua' => $this->buildSiswaWidget(Orangtua::where('id_login', $user->uuid)->first()?->siswa),
+            default    => null,
+        };
+
+        return view('dashboard', compact('user', 'semester', 'pref', 'stats', 'sosmed', 'siswaWidget'));
+    }
+
+    /** Data widget dashboard khusus siswa: jadwal hari ini, poin/P3, absensi, podium sekolah. */
+    private function buildSiswaWidget(?Siswa $siswa): ?array
+    {
+        if (!$siswa) {
+            return null;
+        }
+
+        $hariIni = (int) now()->isoWeekday(); // 1=Senin ... 7=Minggu
+        $jadwals = Jadwal::with(['pelajaran', 'guru'])
+            ->where('id_kelas', $siswa->id_kelas)
+            ->where('hari', $hariIni)
+            ->orderBy('jam_mulai')
+            ->get();
+
+        $absensiHariIni = Absensi::where('id_siswa', $siswa->uuid)
+            ->whereDate('tanggal', now()->toDateString())
+            ->first();
+
+        $absensiBulan = Absensi::where('id_siswa', $siswa->uuid)
+            ->whereBetween('tanggal', [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()])
+            ->get()->keyBy(fn ($a) => $a->tanggal->format('Y-m-d'));
+        $rekapAbsensi = [
+            'hadir' => $absensiBulan->where('status', 'hadir')->count(),
+            'izin'  => $absensiBulan->where('status', 'izin')->count(),
+            'sakit' => $absensiBulan->where('status', 'sakit')->count(),
+            'alpa'  => $absensiBulan->where('status', 'alpa')->count(),
+        ];
+        $totalTercatat = array_sum($rekapAbsensi);
+        $persenHadir = $totalTercatat > 0 ? (int) round($rekapAbsensi['hadir'] / $totalTercatat * 100) : null;
+
+        // Kalender mini bulan berjalan: setiap tanggal dipetakan ke status (atau null bila belum ada catatan).
+        $awalBulan = now()->startOfMonth();
+        $kalenderBulan = [];
+        for ($i = 0; $i < $awalBulan->daysInMonth; $i++) {
+            $tgl = $awalBulan->copy()->addDays($i);
+            $rec = $absensiBulan->get($tgl->format('Y-m-d'));
+            $kalenderBulan[] = [
+                'tanggal'  => $tgl,
+                'status'   => $rec?->status,
+                'isToday'  => $tgl->isToday(),
+                'isWeekend' => $tgl->isWeekend(),
+                'isFuture' => $tgl->isFuture(),
+            ];
+        }
+        $offsetAwal = $awalBulan->dayOfWeekIso - 1; // 0 = Senin, kosongkan sel sebelum tanggal 1
+
+        // Streak hadir berturut-turut (mundur dari hari ini, akhir pekan dilewati tanpa memutus rentetan).
+        $riwayat60 = Absensi::where('id_siswa', $siswa->uuid)
+            ->where('tanggal', '>=', now()->subDays(60)->toDateString())
+            ->get()->keyBy(fn ($a) => $a->tanggal->format('Y-m-d'));
+        $streakHadir = 0;
+        $cursor = now()->startOfDay();
+        while (true) {
+            if ($cursor->isWeekend()) {
+                $cursor->subDay();
+                continue;
+            }
+            $rec = $riwayat60->get($cursor->format('Y-m-d'));
+            if (!$rec || $rec->status !== 'hadir') {
+                break;
+            }
+            $streakHadir++;
+            $cursor->subDay();
+        }
+
+        $jenisAturan = Setting::get('jenis_aturan', 'p3');
+        $poin = $jenisAturan === 'poin'
+            ? PoinController::hitung($siswa->uuid)
+            : P3Controller::totalsFor($siswa->uuid);
+        $podium = $jenisAturan === 'poin' ? PoinController::top3Sekolah() : null;
+
+        return compact(
+            'siswa', 'jadwals', 'hariIni', 'absensiHariIni', 'rekapAbsensi', 'persenHadir',
+            'kalenderBulan', 'offsetAwal', 'streakHadir', 'jenisAturan', 'poin', 'podium'
+        );
     }
 
     /** Bangun daftar tautan media sosial sekolah yang aktif untuk dashboard. */

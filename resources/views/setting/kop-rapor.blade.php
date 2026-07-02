@@ -104,7 +104,7 @@
             content_css: dark ? 'dark' : 'default',
             font_size_formats: '10px 11px 12px 13px 14px 16px 18px 20px 22px 24px 28px 32px 36px',
             // Tampilkan editor mendekati hasil cetak (kop rapor)
-            content_style: 'body{font-family:"Times New Roman",Georgia,serif;text-align:center;color:#000;} p{margin:1px 0;} .nm{font-size:24px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin:0;} .ad{font-size:13.5px;margin:1px 0 0;}'
+            content_style: 'body{font-family:"Times New Roman",Georgia,serif;text-align:center;color:#000;} p, h1, h2, h3, h4, h5, h6 { margin: 2px 0; line-height: 1.25; } .nm{font-size:24px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin:0;} .ad{font-size:13.5px;margin:1px 0 0;}'
         });
     })();
 </script>

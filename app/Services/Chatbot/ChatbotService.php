@@ -614,6 +614,10 @@ class ChatbotService
             'robot' => asset('images/chatbot/avatar_robot.png'),
             'owl' => asset('images/chatbot/avatar_owl.png'),
             'cs' => asset('images/chatbot/avatar_cs.png'),
+            'cat' => asset('images/chatbot/avatar_cat.png'),
+            'fox' => asset('images/chatbot/avatar_fox.png'),
+            'panda' => asset('images/chatbot/avatar_panda.png'),
+            'bear' => asset('images/chatbot/avatar_bear.png'),
             default => null,
         };
     }

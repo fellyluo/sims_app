@@ -10,7 +10,7 @@
 
     {{-- Tabs --}}
     <div class="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-2xl p-1.5 mb-6 flex-wrap">
-        @foreach(['sekolah'=>['Identitas','building-2'],'semester'=>['Semester','calendar-days'],'penilaian'=>['Penilaian','calculator'],'absensi'=>['Absensi','clock'],'sosmed'=>['Media Sosial','share-2']] as $key => [$label,$icon])
+        @foreach(['sekolah'=>['Identitas','building-2'],'semester'=>['Semester','calendar-days'],'penilaian'=>['Penilaian','calculator'],'absensi'=>['Absensi','clock'],'disiplin'=>['Kedisiplinan','shield-alert'],'sosmed'=>['Media Sosial','share-2']] as $key => [$label,$icon])
         <button @click="tab='{{ $key }}'"
                 :class="tab==='{{ $key }}' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'"
                 class="seg flex-1 min-w-fit flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold transition">
@@ -21,7 +21,7 @@
 
     {{-- Identitas --}}
     <div x-show="tab==='sekolah'" x-transition>
-        <form method="POST" action="{{ route('setting.identitas') }}" class="card p-6 space-y-4">
+        <form method="POST" action="{{ route('setting.identitas') }}" enctype="multipart/form-data" class="card p-6 space-y-4">
             @csrf
             <h2 class="font-bold text-slate-800 dark:text-slate-100 mb-2">Identitas Sekolah</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -39,6 +39,37 @@
                     <textarea name="alamat_sekolah" rows="2" class="form-input">{{ old('alamat_sekolah', $settings['alamat_sekolah'] ?? '') }}</textarea>
                 </div>
             </div>
+
+            <div class="border-t border-slate-100 dark:border-slate-700 pt-4 mt-2">
+                <label class="form-label font-bold text-slate-700 dark:text-slate-300">Logo / Ikon Sekolah</label>
+                <p class="text-xs text-slate-400 mb-3">Pilih file gambar (PNG, JPG, JPEG, SVG) untuk mengganti logo di sidebar dan shortcut-icon tab browser.</p>
+                <div class="flex items-center gap-4">
+                    <div class="w-16 h-16 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm">
+                        @php
+                            $logoPath = $settings['sekolah_logo'] ?? null;
+                            $hasLogo = $logoPath && file_exists(storage_path('app/public/' . $logoPath));
+                        @endphp
+                        @if($hasLogo)
+                            <img src="{{ asset('storage/' . $logoPath) }}" class="w-full h-full object-cover" id="logo-preview">
+                        @else
+                            <div class="w-10 h-10 rounded-xl grid place-items-center bg-gradient-to-br from-primary to-primary-700 text-white" id="logo-preview-placeholder">
+                                <svg viewBox="0 0 24 24" fill="none" class="w-6 h-6 text-white" stroke="currentColor" stroke-width="2.2"><path d="M12 3L1 9l11 6 9-4.91V17M1 9v7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </div>
+                        @endif
+                    </div>
+                    <div class="flex-1">
+                        <input type="file" name="sekolah_logo" accept="image/*" class="text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary hover:file:bg-primary-100 cursor-pointer">
+                        @if($hasLogo)
+                            <div class="mt-1.5">
+                                <label class="inline-flex items-center gap-1.5 text-xs text-rose-600 cursor-pointer">
+                                    <input type="checkbox" name="hapus_logo" value="1" class="rounded border-slate-300 text-rose-600 focus:ring-rose-500"> Hapus Logo (kembali ke default)
+                                </label>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
             <button type="submit" class="btn-primary px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> Simpan</button>
         </form>
     </div>
@@ -288,6 +319,55 @@
                 <button type="submit" class="btn-primary px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> Simpan Lokasi</button>
             </form>
         </div>
+    </div>
+
+    {{-- Kedisiplinan: sistem poin & aturan --}}
+    <div x-show="tab==='disiplin'" x-transition class="space-y-4" x-data="{ jenisAturan: @js($settings['jenis_aturan'] ?? 'p3') }">
+        <form method="POST" action="{{ route('setting.jenisAturan') }}" class="card p-6 space-y-4">
+            @csrf
+            <h2 class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2"><i data-lucide="shield-alert" class="w-[18px] h-[18px] text-primary"></i> Sistem Aturan Kedisiplinan</h2>
+            <p class="text-xs text-slate-400 -mt-2">Pilih satu sistem pencatatan kedisiplinan siswa yang aktif dipakai sekolah.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label class="cursor-pointer">
+                    <input type="radio" name="jenis_aturan" value="p3" x-model="jenisAturan" class="sr-only peer">
+                    <div class="border-2 rounded-xl p-4 transition peer-checked:border-primary peer-checked:bg-primary-50 border-slate-200 dark:border-slate-600 h-full">
+                        <i data-lucide="award" class="w-5 h-5 text-slate-400 peer-checked:text-primary mb-1.5"></i>
+                        <p class="font-bold text-sm text-slate-700 dark:text-slate-200">P3 (Rekomendasi)</p>
+                        <p class="text-xs text-slate-400 mt-0.5">Pelanggaran, Prestasi &amp; Partisipasi — tiga kategori akumulatif per semester, ada cetak laporan.</p>
+                    </div>
+                </label>
+                <label class="cursor-pointer">
+                    <input type="radio" name="jenis_aturan" value="poin" x-model="jenisAturan" class="sr-only peer">
+                    <div class="border-2 rounded-xl p-4 transition peer-checked:border-primary peer-checked:bg-primary-50 border-slate-200 dark:border-slate-600 h-full">
+                        <i data-lucide="gauge" class="w-5 h-5 text-slate-400 peer-checked:text-primary mb-1.5"></i>
+                        <p class="font-bold text-sm text-slate-700 dark:text-slate-200">Poin/Aturan</p>
+                        <p class="text-xs text-slate-400 mt-0.5">Ledger poin dari basis 100 — berkurang tiap pelanggaran, ada label Peringatan 1/2/3 otomatis.</p>
+                    </div>
+                </label>
+            </div>
+            <button type="submit" class="btn-primary px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> Simpan Sistem</button>
+        </form>
+
+        <form method="POST" action="{{ route('setting.poinTerlambatAturan') }}" class="card p-6 space-y-3" x-show="jenisAturan==='poin'" x-cloak x-transition>
+            @csrf
+            <h2 class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2"><i data-lucide="alarm-clock-minus" class="w-[18px] h-[18px] text-amber-500"></i> Aturan Poin Keterlambatan</h2>
+            <p class="text-xs text-slate-400 -mt-1">Saat siswa absen melewati batas jam terlambat, aturan ini otomatis tercatat sebagai poin dikurangi (khusus sistem Poin/Aturan).</p>
+            <div class="flex flex-wrap items-end gap-3">
+                <div class="flex-1 min-w-48">
+                    <label class="form-label">Aturan</label>
+                    <select name="poin_terlambat_aturan" class="form-select">
+                        <option value="">— Tidak diaktifkan —</option>
+                        @foreach($aturans->where('jenis', 'kurang') as $a)
+                        <option value="{{ $a->uuid }}" @selected(($settings['poin_terlambat_aturan'] ?? '')===$a->uuid)>{{ $a->kode }} — {{ \Illuminate\Support\Str::limit($a->aturan, 40) }} ({{ $a->poin }} poin)</option>
+                        @endforeach
+                    </select>
+                    @if($aturans->where('jenis', 'kurang')->isEmpty())
+                    <p class="text-xs text-amber-500 mt-1">Belum ada aturan berjenis "Kurang". Tambahkan dulu di menu Poin/Aturan.</p>
+                    @endif
+                </div>
+                <button type="submit" class="btn-primary px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> Simpan</button>
+            </div>
+        </form>
     </div>
 </div>
 

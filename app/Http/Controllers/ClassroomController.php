@@ -17,8 +17,20 @@ use Illuminate\Http\Request;
  * Ruang Kelas (model baru): otomatis per rombel. Index = daftar kelas; masuk kelas =
  * daftar mapel (dari jam ngajar); masuk mapel = ruang materi/tugas (auto-provision).
  */
-class ClassroomController extends Controller
+class ClassroomController extends Controller implements \Illuminate\Routing\Controllers\HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new \Illuminate\Routing\Controllers\Middleware(function ($request, $next) {
+                if ($request->user() && $request->user()->access === 'orangtua') {
+                    abort(403, 'Akses ditolak.');
+                }
+                return $next($request);
+            }),
+        ];
+    }
+
     public function __construct(private ClassroomService $service)
     {
     }

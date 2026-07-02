@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Aturan;
 use App\Models\Kelas;
 use App\Models\NilaiPenjabaran;
 use App\Models\Pelajaran;
@@ -23,8 +24,9 @@ class SettingController extends Controller
         $pelajarans = Pelajaran::orderBy('urutan')->orderBy('nama')->get();
 
         $settings   = Setting::pluck('value', 'key');
+        $aturans    = Aturan::orderBy('kode')->get();
 
-        return view('setting.index', compact('semester', 'semesterAktif', 'kelas', 'pelajarans', 'settings'));
+        return view('setting.index', compact('semester', 'semesterAktif', 'kelas', 'pelajarans', 'settings', 'aturans'));
     }
 
     public function updateSemester(Request $request)
@@ -49,10 +51,33 @@ class SettingController extends Controller
 
     public function setIdentitasSekolah(Request $request)
     {
+        $request->validate([
+            'sekolah_logo' => 'nullable|image|mimes:png,jpg,jpeg,svg,webp|max:2048',
+            'hapus_logo'   => 'nullable|boolean',
+        ]);
+
         $fields = ['nama_sekolah', 'npsn', 'alamat_sekolah', 'kepala_sekolah', 'nip_kepala', 'kota', 'provinsi', 'telp_sekolah'];
         foreach ($fields as $f) {
             if ($request->has($f)) Setting::set($f, $request->$f);
         }
+
+        if ($request->hasFile('sekolah_logo')) {
+            // hapus logo lama jika ada
+            $old = Setting::get('sekolah_logo');
+            if ($old && Storage::disk('public')->exists($old)) {
+                Storage::disk('public')->delete($old);
+            }
+            $ext = $request->file('sekolah_logo')->getClientOriginalExtension() ?: 'png';
+            $path = $request->file('sekolah_logo')->storeAs('logo', 'sekolah_logo_' . now()->format('YmdHis') . '.' . $ext, 'public');
+            Setting::set('sekolah_logo', $path);
+        } elseif ($request->boolean('hapus_logo')) {
+            $old = Setting::get('sekolah_logo');
+            if ($old && Storage::disk('public')->exists($old)) {
+                Storage::disk('public')->delete($old);
+            }
+            Setting::set('sekolah_logo', '');
+        }
+
         return back()->with('success', 'Identitas sekolah disimpan.');
     }
 
@@ -124,6 +149,22 @@ class SettingController extends Controller
     {
         Setting::set('agenda_wajib_pulang', $request->boolean('agenda_wajib_pulang') ? '1' : '0');
         return back()->with('success', 'Pengaturan agenda sebelum pulang disimpan.');
+    }
+
+    /** Sistem aturan kedisiplinan siswa: 'poin' (ledger 100) atau 'p3' (Pelanggaran/Prestasi/Partisipasi). */
+    public function setJenisAturan(Request $request)
+    {
+        $request->validate(['jenis_aturan' => 'required|in:poin,p3']);
+        Setting::set('jenis_aturan', $request->jenis_aturan);
+        return back()->with('success', 'Sistem aturan kedisiplinan disimpan.');
+    }
+
+    /** Aturan (poin/aturan lama) yang dipakai untuk auto-deduksi saat siswa terlambat absen. */
+    public function setPoinTerlambatAturan(Request $request)
+    {
+        $request->validate(['poin_terlambat_aturan' => 'nullable|exists:aturan,uuid']);
+        Setting::set('poin_terlambat_aturan', $request->poin_terlambat_aturan ?: '');
+        return back()->with('success', 'Aturan poin keterlambatan disimpan.');
     }
 
     public function setRumusRapor(Request $request)

@@ -18,9 +18,21 @@ use App\Support\RichText;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
-class ClassroomMaterialController extends Controller
+class ClassroomMaterialController extends Controller implements \Illuminate\Routing\Controllers\HasMiddleware
 {
     use HandlesClassroomUploads, HandlesContentLock;
+
+    public static function middleware(): array
+    {
+        return [
+            new \Illuminate\Routing\Controllers\Middleware(function ($request, $next) {
+                if ($request->user() && $request->user()->access === 'orangtua') {
+                    abort(403, 'Akses ditolak.');
+                }
+                return $next($request);
+            }),
+        ];
+    }
 
     public function __construct(private ClassroomService $service)
     {

@@ -41,6 +41,21 @@
     .card-siswa .text-title { color: color-mix(in srgb, var(--cp) 78%, black); }
     .card-siswa .text-sub { color: color-mix(in srgb, var(--cp) 62%, black); }
 
+    /* ===== Kartu sambutan bermotif batik "Kawung" ===== */
+    .card-batik {
+        background: linear-gradient(120deg,
+            color-mix(in srgb, var(--cp) 16%, white),
+            color-mix(in srgb, var(--ca) 12%, white) 55%,
+            color-mix(in srgb, var(--cps) 14%, white)) !important;
+        border-color: color-mix(in srgb, var(--cp) 18%, #e2e8f0) !important;
+    }
+    .dark .card-batik {
+        background: linear-gradient(120deg, #1e293b, #17233a 55%, #0f172a) !important;
+        border-color: #334155 !important;
+    }
+    .dark .card-batik svg rect:first-of-type { opacity: .28 !important; }
+    .dark .card-batik svg rect:last-of-type { opacity: .22 !important; }
+
     .card-guru {
         background: linear-gradient(160deg, color-mix(in srgb, var(--cps) 20%, white), color-mix(in srgb, var(--cps) 8%, white)) !important;
         border-color: color-mix(in srgb, var(--cps) 12%, #e2e8f0) !important;
@@ -120,7 +135,7 @@
 @section('content')
 @php
     $access = auth()->user()?->access;
-    $nama = auth()->user()?->guru?->nama ?? auth()->user()?->siswa?->nama ?? auth()->user()?->username;
+    $nama = auth()->user() ? auth()->user()->displayName() : 'Tamu';
     $totalSiswa = $stats['total_siswa'] ?? \App\Models\Siswa::count();
     $totalGuru  = $stats['total_guru'] ?? \App\Models\Guru::count();
     $totalKelas = $stats['total_kelas'] ?? \App\Models\Kelas::count();
@@ -280,7 +295,15 @@
 @if(in_array($access, ['superadmin','admin']))
 @php
     // Urutan blok: pakai preferensi tersimpan dulu, lalu blok baru yang belum tercatat.
-    $allBlocks   = \App\Models\UserPreference::DASHBOARD_BLOCKS;
+    // (DASHBOARD_BLOCKS juga memuat blok khusus per-peran lain — disaring di sini karena bukan blok admin.
+    // sarpras_* dikecualikan dari filter ini karena admin memang memakainya juga.)
+    $rolePrefixes = ['siswa_', 'guru_', 'kesiswaan_', 'kurikulum_'];
+    $allBlocks = array_values(array_filter(\App\Models\UserPreference::DASHBOARD_BLOCKS, function ($b) use ($rolePrefixes) {
+        foreach ($rolePrefixes as $prefix) {
+            if (str_starts_with($b, $prefix)) return false;
+        }
+        return true;
+    }));
     $savedLayout = is_array($pref->dashboard_layout) ? $pref->dashboard_layout : [];
     $blockOrder  = array_values(array_unique(array_merge(
         array_values(array_intersect($savedLayout, $allBlocks)),
@@ -294,10 +317,10 @@
         'ringkasan_guru'  => 'Ringkasan Guru',
         'ringkasan_kelas' => 'Ringkasan Kelas',
         'ringkasan_tahun' => 'Tahun Ajaran',
-        'insight_rasio'   => 'Insight Rasio Guru',
-        'insight_avg_kelas' => 'Insight Rata Kelas',
-        'insight_avg_tingkat' => 'Insight Rata Tingkat',
-        'insight_terpadat' => 'Insight Kelas Terpadat',
+        'presensi_hadir'   => 'Presensi Guru: Hadir',
+        'presensi_terlambat' => 'Presensi Guru: Terlambat',
+        'presensi_tidak_hadir' => 'Presensi Guru: Izin/Sakit/Alpa',
+        'presensi_belum'   => 'Presensi Guru: Belum Presensi',
         'sarpras_aset'    => 'Sarpras Total Aset',
         'sarpras_kerusakan' => 'Sarpras Laporan Kerusakan',
         'sarpras_peminjaman' => 'Sarpras Peminjaman Aktif',
@@ -312,10 +335,10 @@
         'ringkasan_guru'  => 'col-span-12 sm:col-span-6 lg:col-span-3',
         'ringkasan_kelas' => 'col-span-12 sm:col-span-6 lg:col-span-3',
         'ringkasan_tahun' => 'col-span-12 sm:col-span-6 lg:col-span-3',
-        'insight_rasio'   => 'col-span-12 sm:col-span-6 lg:col-span-3',
-        'insight_avg_kelas' => 'col-span-12 sm:col-span-6 lg:col-span-3',
-        'insight_avg_tingkat' => 'col-span-12 sm:col-span-6 lg:col-span-3',
-        'insight_terpadat' => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'presensi_hadir'   => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'presensi_terlambat' => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'presensi_tidak_hadir' => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'presensi_belum'   => 'col-span-12 sm:col-span-6 lg:col-span-3',
         'sarpras_aset'    => 'col-span-12 sm:col-span-6 lg:col-span-3',
         'sarpras_kerusakan' => 'col-span-12 sm:col-span-6 lg:col-span-3',
         'sarpras_peminjaman' => 'col-span-12 sm:col-span-6 lg:col-span-3',
@@ -328,45 +351,7 @@
 @endphp
 
 <div x-data="dashLayout()" :class="{ 'dash-editing': editing }">
-
-    {{-- Toolbar: salam + tombol Tata Letak --}}
-    <div class="flex items-start justify-between gap-3 mb-5">
-        <div>
-            <h1 class="flex items-center gap-2 text-lg sm:text-xl font-extrabold text-slate-700 dark:text-slate-100">
-                <span class="js-salam-icon inline-flex flex-shrink-0" data-icon-class="w-5 h-5 text-primary flex-shrink-0"><i data-lucide="{{ $salamIcon }}" class="w-5 h-5 text-primary flex-shrink-0"></i></span>
-                <span><span class="js-salam-text">{{ $salam }}</span>, {{ $nama }} <span class="ml-0.5">👋</span></span>
-            </h1>
-            <p class="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-300 mt-1 flex items-center gap-1.5">
-                <i data-lucide="calendar-days" class="w-3.5 h-3.5 flex-shrink-0"></i>
-                <span class="js-dash-date capitalize font-semibold text-slate-600 dark:text-slate-200">{{ $tanggalHari }}</span>
-                <span class="text-slate-300 dark:text-slate-600">&bull;</span>
-                <i data-lucide="clock" class="w-3.5 h-3.5 flex-shrink-0"></i>
-                <span class="js-dash-clock tabular-nums font-semibold text-slate-600 dark:text-slate-200">--:--:--</span>
-            </p>
-        </div>
-        <div class="flex items-center gap-2">
-            <span x-show="editing" x-cloak class="hidden sm:inline text-xs text-slate-400">Seret kartu untuk menyusun ulang</span>
-            <button type="button" x-show="editing" x-cloak @click="reset()"
-                    class="btn-accent inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition shadow-sm">
-                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset
-            </button>
-            <button type="button" @click="toggle()"
-                    class="btn-accent inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition shadow-sm">
-                <i data-lucide="layout-dashboard" class="w-3.5 h-3.5" x-show="!editing"></i>
-                <i data-lucide="check" class="w-3.5 h-3.5" x-show="editing" x-cloak></i>
-                <span x-text="editing ? 'Selesai' : 'Tata Letak'"></span>
-            </button>
-        </div>
-    </div>
-
-    {{-- Kutipan harian — minimalis --}}
-    <div class="motiv-card mb-6 border-l-2 border-primary/40 pl-4">
-        <p class="motiv-label font-bold uppercase text-primary/70">Quote of the Day</p>
-        <p class="mt-2 text-sm sm:text-[15px] font-normal leading-relaxed text-slate-600 dark:text-slate-300">{{ $kataTeks }}</p>
-        @if($kataPenulis)
-            <p class="mt-1.5 text-xs font-medium text-slate-400 dark:text-slate-500">{{ $kataPenulis }}</p>
-        @endif
-    </div>
+    @include('partials.dash-greeting')
 
     {{-- Grid blok yang bisa di-drag --}}
     <div id="dashGrid" class="grid grid-cols-12 gap-5" x-ref="grid">
@@ -374,18 +359,127 @@
             @if(str_starts_with($block, 'sarpras_') && ! auth()->user()->can('sarpras.dashboard.lihat'))
                 @continue
             @endif
-            <div class="dash-block {{ $spans[$block] ?? 'col-span-12' }} {{ in_array($block, $hiddenBlocks) ? 'dash-hidden' : '' }}" data-block="{{ $block }}" :class="{ 'dash-hidden': hidden.includes('{{ $block }}') }">
-                <span class="dash-handle"><i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i> {{ $blockLabel[$block] ?? $block }}</span>
-                <button type="button" class="dash-remove" @click.stop.prevent="toggleHide('{{ $block }}')"
-                        :title="hidden.includes('{{ $block }}') ? 'Tampilkan blok' : 'Sembunyikan blok'">
-                    <i data-lucide="x" class="w-3.5 h-3.5" x-show="!hidden.includes('{{ $block }}')"></i>
-                    <i data-lucide="plus" class="w-3.5 h-3.5" x-show="hidden.includes('{{ $block }}')" x-cloak></i>
-                </button>
-                <span class="dash-hidden-badge">Disembunyikan</span>
-                @includeIf('dashboard.blocks.'.$block)
-            </div>
+            @include('partials.dash-block-item', ['block' => $block, 'spans' => $spans, 'hiddenBlocks' => $hiddenBlocks, 'blockLabel' => $blockLabel])
         @endforeach
     </div>
+</div>
+
+@include('partials.sosmed-bar')
+
+@elseif(in_array($access, ['siswa', 'orangtua']) && $siswaWidget)
+{{-- ===== Siswa & Orangtua: kartu batik + blok yang bisa disusun ulang, sama seperti admin ===== --}}
+@php
+    $siswa = $siswaWidget['siswa']; $jadwals = $siswaWidget['jadwals']; $hariIni = $siswaWidget['hariIni'];
+    $absensiHariIni = $siswaWidget['absensiHariIni']; $rekapAbsensi = $siswaWidget['rekapAbsensi'];
+    $persenHadir = $siswaWidget['persenHadir']; $kalenderBulan = $siswaWidget['kalenderBulan'];
+    $offsetAwal = $siswaWidget['offsetAwal']; $streakHadir = $siswaWidget['streakHadir'];
+    $jenisAturan = $siswaWidget['jenisAturan']; $poin = $siswaWidget['poin']; $podium = $siswaWidget['podium'];
+
+    $allBlocks = ['siswa_jadwal', 'siswa_absensi', 'siswa_poin'];
+    if ($jenisAturan === 'poin') {
+        $allBlocks[] = 'siswa_podium';
+    }
+    $savedLayout = is_array($pref->dashboard_layout) ? $pref->dashboard_layout : [];
+    $blockOrder  = array_values(array_unique(array_merge(
+        array_values(array_intersect($savedLayout, $allBlocks)),
+        $allBlocks
+    )));
+    $hiddenBlocks = is_array($pref->dashboard_hidden)
+        ? array_values(array_intersect($pref->dashboard_hidden, $allBlocks))
+        : [];
+    $blockLabel = [
+        'siswa_jadwal'  => 'Jadwal Hari Ini',
+        'siswa_absensi' => 'Absensi Saya',
+        'siswa_poin'    => $jenisAturan === 'poin' ? 'Poin Kedisiplinan' : 'P3 Kedisiplinan',
+        'siswa_podium'  => 'Papan Peringkat Sekolah',
+    ];
+    $spans = [
+        'siswa_jadwal'  => 'col-span-12 lg:col-span-6',
+        'siswa_absensi' => 'col-span-12 lg:col-span-6',
+        'siswa_poin'    => 'col-span-12 lg:col-span-5',
+        'siswa_podium'  => 'col-span-12 lg:col-span-7',
+    ];
+@endphp
+
+<div x-data="dashLayout()" :class="{ 'dash-editing': editing }">
+    @include('partials.dash-greeting')
+
+    <div id="dashGrid" class="grid grid-cols-12 gap-5" x-ref="grid">
+        @foreach($blockOrder as $block)
+            @include('partials.dash-block-item', ['block' => $block, 'spans' => $spans, 'hiddenBlocks' => $hiddenBlocks, 'blockLabel' => $blockLabel])
+        @endforeach
+    </div>
+</div>
+
+@include('partials.sosmed-bar')
+
+@elseif(in_array($access, ['guru', 'kurikulum', 'kesiswaan', 'sapras']))
+{{-- ===== Guru/Kurikulum/Kesiswaan/Sapras: kartu batik + blok sesuai kebutuhan peran, sama seperti admin ===== --}}
+@php
+    $allBlocks = match ($access) {
+        'guru' => auth()->user()->guru ? ['guru_jadwal', 'guru_presensi', 'guru_agenda'] : [],
+        'kurikulum' => ['ringkasan_siswa', 'ringkasan_guru', 'ringkasan_kelas', 'ringkasan_tahun', 'kurikulum_agenda'],
+        'kesiswaan' => ['ringkasan_siswa', 'kesiswaan_pending', 'kesiswaan_absensi'],
+        'sapras' => auth()->user()->can('sarpras.dashboard.lihat') ? ['sarpras_aset', 'sarpras_kerusakan', 'sarpras_peminjaman', 'sarpras_pengadaan'] : [],
+        default => [],
+    };
+    $savedLayout = is_array($pref->dashboard_layout) ? $pref->dashboard_layout : [];
+    $blockOrder  = array_values(array_unique(array_merge(
+        array_values(array_intersect($savedLayout, $allBlocks)),
+        $allBlocks
+    )));
+    $hiddenBlocks = is_array($pref->dashboard_hidden)
+        ? array_values(array_intersect($pref->dashboard_hidden, $allBlocks))
+        : [];
+    $blockLabel = [
+        'guru_jadwal'        => 'Jadwal Mengajar',
+        'guru_presensi'      => 'Presensi Saya',
+        'guru_agenda'        => 'Agenda Hari Ini',
+        'ringkasan_siswa'    => 'Ringkasan Siswa',
+        'ringkasan_guru'     => 'Ringkasan Guru',
+        'ringkasan_kelas'    => 'Ringkasan Kelas',
+        'ringkasan_tahun'    => 'Tahun Ajaran',
+        'kurikulum_agenda'   => 'Agenda Menunggu Validasi',
+        'kesiswaan_pending'  => 'Pengajuan Menunggu',
+        'kesiswaan_absensi'  => 'Absensi Siswa Hari Ini',
+        'sarpras_aset'       => 'Total Aset',
+        'sarpras_kerusakan'  => 'Laporan Kerusakan',
+        'sarpras_peminjaman' => 'Peminjaman Aktif',
+        'sarpras_pengadaan'  => 'Pengadaan Pending',
+    ];
+    $spans = [
+        'guru_jadwal'        => 'col-span-12 lg:col-span-6',
+        'guru_presensi'      => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'guru_agenda'        => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'ringkasan_siswa'    => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'ringkasan_guru'     => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'ringkasan_kelas'    => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'ringkasan_tahun'    => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'kurikulum_agenda'   => 'col-span-12',
+        'kesiswaan_pending'  => 'col-span-12 lg:col-span-4',
+        'kesiswaan_absensi'  => 'col-span-12 lg:col-span-8',
+        'sarpras_aset'       => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'sarpras_kerusakan'  => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'sarpras_peminjaman' => 'col-span-12 sm:col-span-6 lg:col-span-3',
+        'sarpras_pengadaan'  => 'col-span-12 sm:col-span-6 lg:col-span-3',
+    ];
+@endphp
+
+<div x-data="dashLayout()" :class="{ 'dash-editing': editing }">
+    @include('partials.dash-greeting')
+
+    @if(empty($allBlocks))
+    <div class="card p-8 text-center text-slate-400">
+        <i data-lucide="layout-dashboard" class="w-10 h-10 mx-auto mb-2 opacity-30"></i>
+        <p class="text-sm font-medium">Belum ada widget untuk peran Anda.</p>
+    </div>
+    @else
+    <div id="dashGrid" class="grid grid-cols-12 gap-5" x-ref="grid">
+        @foreach($blockOrder as $block)
+            @include('partials.dash-block-item', ['block' => $block, 'spans' => $spans, 'hiddenBlocks' => $hiddenBlocks, 'blockLabel' => $blockLabel])
+        @endforeach
+    </div>
+    @endif
 </div>
 
 @include('partials.sosmed-bar')
@@ -514,7 +608,7 @@
 </script>
 @endpush
 
-@if(in_array($access, ['superadmin','admin']))
+@if(in_array($access, ['superadmin','admin']) || (in_array($access, ['siswa', 'orangtua']) && $siswaWidget) || in_array($access, ['guru', 'kurikulum', 'kesiswaan', 'sapras']))
 @push('scripts')
 <script>
 function dashLayout() {

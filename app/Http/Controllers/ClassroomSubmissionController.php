@@ -11,9 +11,19 @@ use App\Models\ClassroomSubmissionFile;
 use App\Support\Audit;
 use Illuminate\Support\Facades\Storage;
 
-class ClassroomSubmissionController extends Controller
+class ClassroomSubmissionController extends Controller implements \Illuminate\Routing\Controllers\HasMiddleware
 {
-    use HandlesClassroomUploads;
+    public static function middleware(): array
+    {
+        return [
+            new \Illuminate\Routing\Controllers\Middleware(function ($request, $next) {
+                if ($request->user() && $request->user()->access === 'orangtua') {
+                    abort(403, 'Akses ditolak.');
+                }
+                return $next($request);
+            }),
+        ];
+    }
 
     /** Siswa mengumpulkan tugas (boleh banyak file). */
     public function store(StoreClassroomSubmissionRequest $request, ClassroomAssignment $assignment)

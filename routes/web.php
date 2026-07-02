@@ -4,6 +4,8 @@ use App\Http\Controllers\AbsensiController;
 use App\Http\Controllers\Admin\ChatbotAdminController;
 use App\Http\Controllers\AgendaController;
 use App\Http\Controllers\KalenderController;
+use App\Http\Controllers\PoinController;
+use App\Http\Controllers\P3Controller;
 use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EkskulController;
@@ -103,6 +105,7 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
     // ─── Penilaian (guru menilai penugasan mengajarnya; admin akses semua) ───
     Route::controller(NilaiController::class)->group(function () {
         Route::get('/nilai', 'index')->name('nilai.index');
+        Route::get('/nilai/saya', 'selfShow')->name('nilai.self');
         // KKTP (dulu KKM) per penugasan
         Route::get('/nilai/kktp', 'kktp')->name('nilai.kktp');
         Route::post('/nilai/kktp', 'kktpSave')->name('nilai.kktp.save');
@@ -245,6 +248,78 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
         Route::post('/{agenda}/validasi', 'validasi')->name('validasi');
     });
 
+    // ─── Poin/Aturan (lama, ledger basis 100) — dua sistem, dipilih di Pengaturan ───
+    Route::prefix('poin')->name('poin.')->group(function () {
+        Route::middleware('role:admin,kesiswaan')->group(function () {
+            Route::get('/', [PoinController::class, 'index'])->name('index');
+            Route::get('/buat', [PoinController::class, 'create'])->name('create');
+            Route::post('/', [PoinController::class, 'store'])->name('store');
+            Route::get('/{aturan}/edit', [PoinController::class, 'edit'])->name('edit');
+            Route::put('/{aturan}', [PoinController::class, 'update'])->name('update');
+            Route::delete('/{aturan}', [PoinController::class, 'destroy'])->name('destroy');
+            Route::get('/export', [PoinController::class, 'exportAturan'])->name('export');
+            Route::get('/import', [PoinController::class, 'importForm'])->name('importForm');
+            Route::post('/import', [PoinController::class, 'importAturan'])->name('import');
+
+            Route::get('/siswa', [PoinController::class, 'poinIndex'])->name('siswa.index');
+            Route::get('/siswa/{siswa}', [PoinController::class, 'poinShow'])->name('siswa.show');
+            Route::get('/siswa/{siswa}/buat', [PoinController::class, 'poinCreate'])->name('siswa.create');
+            Route::post('/siswa/{siswa}', [PoinController::class, 'poinStore'])->name('siswa.store');
+            Route::delete('/entri/{poin}', [PoinController::class, 'poinDelete'])->name('entri.delete');
+            Route::get('/aturan-json', [PoinController::class, 'poinGetAturan'])->name('aturan.json');
+
+            Route::get('/temp', [PoinController::class, 'tempIndex'])->name('temp.index');
+            Route::get('/temp/riwayat', [PoinController::class, 'tempHistory'])->name('temp.history');
+            Route::post('/temp/bulk', [PoinController::class, 'tempBulkUpdate'])->name('temp.bulkUpdate');
+            Route::post('/temp/{temp}', [PoinController::class, 'tempUpdate'])->name('temp.update');
+
+            Route::get('/dashboard', [PoinController::class, 'dashboard'])->name('dashboard');
+        });
+
+        // Pengajuan guru/walikelas/sekretaris — guard peran dilakukan di controller
+        Route::get('/guru', [PoinController::class, 'guruIndex'])->name('guru.index');
+        Route::get('/guru/{siswa}/buat', [PoinController::class, 'guruCreate'])->name('guru.create');
+        Route::post('/guru/{siswa}', [PoinController::class, 'guruStore'])->name('guru.store');
+        Route::get('/guru/riwayat', [PoinController::class, 'guruRiwayat'])->name('guru.riwayat');
+
+        // Lihat sendiri (siswa/orangtua)
+        Route::get('/saya', [PoinController::class, 'selfShow'])->name('self');
+    });
+
+    // ─── P3: Pelanggaran, Prestasi, Partisipasi (baru, akumulatif per semester) ───
+    Route::prefix('p3')->name('p3.')->group(function () {
+        Route::middleware('role:admin,kesiswaan')->group(function () {
+            Route::get('/', [P3Controller::class, 'index'])->name('index');
+            Route::get('/buat', [P3Controller::class, 'create'])->name('create');
+            Route::post('/', [P3Controller::class, 'store'])->name('store');
+            Route::get('/{kategori}/edit', [P3Controller::class, 'edit'])->name('edit');
+            Route::put('/{kategori}', [P3Controller::class, 'update'])->name('update');
+            Route::delete('/{kategori}', [P3Controller::class, 'destroy'])->name('destroy');
+            Route::get('/kategori-json', [P3Controller::class, 'kategoriGet'])->name('kategori.json');
+
+            Route::get('/siswa', [P3Controller::class, 'siswaIndex'])->name('siswa.index');
+            Route::get('/siswa/{siswa}', [P3Controller::class, 'siswaShow'])->name('siswa.show');
+            Route::get('/siswa/{siswa}/buat', [P3Controller::class, 'createPoin'])->name('siswa.create');
+            Route::post('/siswa/{siswa}', [P3Controller::class, 'storePoin'])->name('siswa.store');
+            Route::get('/siswa/{siswa}/print', [P3Controller::class, 'printPoin'])->name('siswa.print');
+            Route::get('/entri/{poin}/edit', [P3Controller::class, 'editPoin'])->name('entri.edit');
+            Route::put('/entri/{poin}', [P3Controller::class, 'updatePoin'])->name('entri.update');
+            Route::delete('/entri/{poin}', [P3Controller::class, 'deletePoin'])->name('entri.delete');
+
+            Route::get('/temp', [P3Controller::class, 'tempIndex'])->name('temp.index');
+            Route::get('/temp/riwayat', [P3Controller::class, 'tempHistory'])->name('temp.history');
+            Route::put('/temp/{temp}/approve', [P3Controller::class, 'tempApprove'])->name('temp.approve');
+            Route::put('/temp/{temp}/disapprove', [P3Controller::class, 'tempDisapprove'])->name('temp.disapprove');
+        });
+
+        Route::get('/guru', [P3Controller::class, 'guruIndex'])->name('guru.index');
+        Route::get('/guru/{siswa}/buat', [P3Controller::class, 'guruCreate'])->name('guru.create');
+        Route::post('/guru/{siswa}', [P3Controller::class, 'guruStore'])->name('guru.store');
+        Route::get('/guru/riwayat', [P3Controller::class, 'guruRiwayat'])->name('guru.riwayat');
+
+        Route::get('/saya', [P3Controller::class, 'selfShow'])->name('self');
+    });
+
     // ─── Admin ─────────────────────────────────────────────────────────────
     Route::middleware('role:admin')->group(function () {
 
@@ -330,6 +405,8 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
             Route::post('/tanggal-rapor', 'setTanggalRapor')->name('setting.tanggalRapor');
             Route::post('/cara-absensi', 'setCaraAbsensi')->name('setting.caraAbsensi');
             Route::post('/agenda-wajib-pulang', 'setAgendaWajibPulang')->name('setting.agendaWajibPulang');
+            Route::post('/jenis-aturan', 'setJenisAturan')->name('setting.jenisAturan');
+            Route::post('/poin-terlambat-aturan', 'setPoinTerlambatAturan')->name('setting.poinTerlambatAturan');
             Route::post('/lokasi-qr', 'setLokasiQr')->name('setting.lokasiQr');
             Route::post('/rumus-rapor', 'setRumusRapor')->name('setting.rumusRapor');
             Route::get('/penjabaran', 'penjabaran')->name('setting.penjabaran');

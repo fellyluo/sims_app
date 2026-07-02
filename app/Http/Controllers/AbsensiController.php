@@ -221,16 +221,22 @@ class AbsensiController extends Controller
         $row->keterangan   = 'Scan wajah';
         $row->dicatat_oleh = auth()->id();
         // catat jam masuk hanya sekali (scan pertama) agar deteksi terlambat akurat
-        if (empty($row->jam_masuk)) {
+        $scanPertama = empty($row->jam_masuk);
+        if ($scanPertama) {
             $row->jam_masuk = now()->format('H:i:s');
         }
         $row->save();
 
         $batas = Setting::get('waktu_terlambat', '07:30');
+        $terlambat = $row->terlambat($batas);
+        if ($scanPertama && $terlambat) {
+            \App\Http\Controllers\PoinController::autoTerlambat($data['id_siswa'], $data['tanggal']);
+        }
+
         return response()->json([
             'success'   => true,
             'jam'       => substr($row->jam_masuk, 0, 5),
-            'terlambat' => $row->terlambat($batas),
+            'terlambat' => $terlambat,
         ]);
     }
 }

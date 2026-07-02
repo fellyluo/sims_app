@@ -127,8 +127,19 @@
         @foreach($bulanList as $b)
             @php
                 $p = $bayar[$b['idx']] ?? null;
-                [$label, $cls, $icon, $ket] = $statusMeta[$p?->status ?? 'belum'];
-                $bisaBayar = $p && in_array($p->status, ['belum','ditolak']);
+                $tglBulan = \App\Support\TahunAjaran::tanggal($ta, $b['idx'])->startOfMonth();
+                $belumTiba = $tglBulan->isAfter(now()->startOfMonth());
+
+                if ($p && $p->status === 'belum' && $belumTiba) {
+                    $label = 'Belum ditagih';
+                    $cls = 'bg-slate-50 dark:bg-slate-800/40 text-slate-400 dark:text-slate-500 border border-dashed border-slate-200 dark:border-slate-700/60';
+                    $icon = 'calendar';
+                    $ket = 'Pembayaran dapat dilakukan lebih awal.';
+                    $bisaBayar = true;
+                } else {
+                    [$label, $cls, $icon, $ket] = $statusMeta[$p?->status ?? 'belum'];
+                    $bisaBayar = $p && in_array($p->status, ['belum','ditolak']);
+                }
             @endphp
             <div class="card p-4 flex items-center gap-3">
                 <div class="w-11 h-11 rounded-xl bg-slate-100 dark:bg-slate-700 grid place-items-center flex-shrink-0">
