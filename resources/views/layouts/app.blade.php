@@ -433,6 +433,23 @@
                     $groups['disiplin'] = [$jenisAturan === 'poin' ? 'Poin & Aturan' : 'P3 Kedisiplinan', 'shield-alert', $disiplinItems];
                 }
 
+                // ── Wali Kelas (data siswa kelasnya, sekretaris, absensi & poin/P3 kelasnya) ──
+                if (auth()->user()?->guru?->walikelas) {
+                    $walikelasItems = [
+                        ['walikelas.siswa.index', ['walikelas.siswa.*'], 'users-round', 'Data Siswa Kelas'],
+                        ['walikelas.sekretaris.form', ['walikelas.sekretaris.*'], 'user-cog', 'Set Sekretaris'],
+                        ['absensi.index', ['absensi.index', 'absensi.store'], 'clipboard-check', 'Absensi Kelas Saya'],
+                        ['absensi.rekap', ['absensi.rekap'], 'calendar-check-2', 'Rekap Absensi Kelas'],
+                    ];
+                    $walikelasItems[] = $jenisAturan === 'poin'
+                        ? ['poin.siswa.index', ['poin.siswa.*'], 'shield-alert', 'Poin Siswa Kelas']
+                        : ['p3.siswa.index', ['p3.siswa.*'], 'shield-alert', 'P3 Siswa Kelas'];
+                    if (\App\Models\Setting::get('walikelas_lihat_nilai', '0') === '1') {
+                        $walikelasItems[] = ['walikelas.nilai.index', ['walikelas.nilai.*'], 'graduation-cap', 'Nilai Kelas Saya'];
+                    }
+                    $groups['walikelas'] = ['Wali Kelas', 'presentation', $walikelasItems];
+                }
+
                 // Grup Sarana & Prasarana (staf sekolah; kelola penuh utk superadmin/admin/sapras)
                 if (in_array($access, ['superadmin','admin','sapras','kepala','kurikulum','kesiswaan','sekretaris','walikelas','guru'])) {
                     $sarprasFull = [

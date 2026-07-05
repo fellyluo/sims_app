@@ -184,7 +184,7 @@
                     <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400"></i> <span x-text="item.guruNama"></span>
                 </p>
                 @endif
-                
+
                 <div class="grid grid-cols-2 gap-2 mt-2">
                     <a :href="item.materiUrl" class="flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-white/40 dark:hover:bg-slate-700/50 transition">
                         <i data-lucide="book-open" class="w-3.5 h-3.5"></i> Materi

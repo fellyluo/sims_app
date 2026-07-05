@@ -1,18 +1,18 @@
 @php
-    $tabs = [
-        ['nilai.materi',   'Materi & TP', 'book-open'],
-        ['nilai.formatif', 'Formatif',    'pencil'],
-        ['nilai.sumatif',  'Sumatif',     'clipboard-check'],
-    ];
+    $readOnly = $readOnly ?? false;
+    $tabs = [];
+    if (!$readOnly) $tabs[] = ['nilai.materi', 'Materi & TP', 'book-open'];
+    $tabs[] = ['nilai.formatif', 'Formatif', 'pencil'];
+    $tabs[] = ['nilai.sumatif',  'Sumatif',  'clipboard-check'];
     // Tab Penjabaran hanya bila mapel ini dikonfigurasi punya komponen penjabaran (admin)
-    if ($ngajar->pelajaran && $ngajar->pelajaran->penjabaranKomponen()->exists()) {
+    if (!$readOnly && $ngajar->pelajaran && $ngajar->pelajaran->penjabaranKomponen()->exists()) {
         $tabs[] = ['nilai.penjabaran', 'Penjabaran', 'list-tree'];
     }
-    $tabs[] = ['nilai.pts',   'PTS',    'file-clock'];
-    $tabs[] = ['nilai.pas',   'PAS',    'file-check-2'];
-    $tabs[] = ['nilai.rapor', 'Rapor',  'file-text'];
+    if (!$readOnly) $tabs[] = ['nilai.pts', 'PTS', 'file-clock'];
+    $tabs[] = ['nilai.pas', 'PAS', 'file-check-2'];
+    if (!$readOnly) $tabs[] = ['nilai.rapor', 'Rapor', 'file-text'];
 
-    $otherClasses = \App\Models\Ngajar::with('kelas')
+    $otherClasses = $readOnly ? collect() : \App\Models\Ngajar::with('kelas')
         ->where('id_guru', $ngajar->id_guru)
         ->where('id_pelajaran', $ngajar->id_pelajaran)
         ->get()
@@ -125,7 +125,7 @@
 <div class="space-y-4">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div class="flex items-start gap-3 min-w-0">
-            <a href="{{ route('nilai.index') }}" class="grid place-items-center w-10 h-10 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-primary hover:border-primary transition flex-shrink-0">
+            <a href="{{ $readOnly ? route('walikelas.nilai.index') : route('nilai.index') }}" class="grid place-items-center w-10 h-10 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-primary hover:border-primary transition flex-shrink-0">
                 <i data-lucide="arrow-left" class="w-5 h-5"></i>
             </a>
             <div class="min-w-0">
@@ -134,6 +134,7 @@
                     Kelas {{ $ngajar->kelas?->tingkat }}{{ $ngajar->kelas?->kelas }}
                     <span class="text-slate-300 dark:text-slate-600">&bull;</span> {{ $ngajar->guru?->nama }}
                     @if($sem) <span class="text-slate-300 dark:text-slate-600">&bull;</span> {{ $sem->nama_lengkap }} @endif
+                    @if($readOnly) <span class="badge bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300 ml-1"><i data-lucide="eye" class="w-3 h-3 inline"></i> Lihat saja</span> @endif
                 </p>
             </div>
         </div>

@@ -42,7 +42,7 @@
                         <td class="font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap sticky-col-nama">{{ $s->nama }}</td>
                         @foreach($materi as $ki => $m)
                         <td class="text-center col-nilai">
-                            <div class="nilai-cell" contenteditable="{{ $terkunci ? 'false' : 'true' }}" inputmode="numeric" data-col="{{ $ki }}" data-kkm="{{ $kktp }}"
+                            <div class="nilai-cell" contenteditable="{{ ($terkunci || $readOnly) ? 'false' : 'true' }}" inputmode="numeric" data-col="{{ $ki }}" data-kkm="{{ $kktp }}"
                                  data-url="{{ route('nilai.sumatif.cell', $ngajar->uuid) }}"
                                  data-body='@json(["id_materi" => $m->uuid, "id_siswa" => $s->uuid])'>{{ isset($skor[$m->uuid][$s->uuid]) ? (int) $skor[$m->uuid][$s->uuid] : '' }}</div>
                         </td>

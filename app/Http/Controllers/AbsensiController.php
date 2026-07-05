@@ -13,10 +13,21 @@ use Illuminate\Support\Carbon;
 
 class AbsensiController extends Controller
 {
+    /** Kelas homeroom guru saat ini bila BUKAN admin (null berarti admin = boleh semua kelas). */
+    private function walikelasKelasId(): ?string
+    {
+        return auth()->user()->isAdmin() ? null : auth()->user()->guru?->walikelas?->id_kelas;
+    }
+
     public function index(Request $request)
     {
         $kelasList = Kelas::orderBy('tingkat')->orderBy('kelas')->get();
-        $selectedKelas = $request->kelas ?: optional($kelasList->first())->uuid;
+        $walikelasKelas = $this->walikelasKelasId();
+        abort_if(!auth()->user()->isAdmin() && !$walikelasKelas, 403, 'Hanya admin/wali kelas yang dapat mengakses absensi.');
+        if ($walikelasKelas) {
+            $kelasList = $kelasList->where('uuid', $walikelasKelas)->values();
+        }
+        $selectedKelas = $walikelasKelas ?: ($request->kelas ?: optional($kelasList->first())->uuid);
         $tanggal = $request->tanggal ?: now()->toDateString();
 
         $siswas = collect();
@@ -40,6 +51,9 @@ class AbsensiController extends Controller
             'tanggal'  => 'required|date',
             'status'   => 'nullable|array',   // hanya siswa yang ditandai yang disimpan
         ]);
+
+        $walikelasKelas = $this->walikelasKelasId();
+        abort_if(!auth()->user()->isAdmin() && $request->id_kelas !== $walikelasKelas, 403, 'Anda hanya dapat mengisi absensi kelas Anda sendiri.');
 
         $tanggal = $request->tanggal;
         $count = 0;
@@ -66,7 +80,12 @@ class AbsensiController extends Controller
     public function rekap(Request $request)
     {
         $kelasList = Kelas::orderBy('tingkat')->orderBy('kelas')->get();
-        $selectedKelas = $request->kelas ?: optional($kelasList->first())->uuid;
+        $walikelasKelas = $this->walikelasKelasId();
+        abort_if(!auth()->user()->isAdmin() && !$walikelasKelas, 403, 'Hanya admin/wali kelas yang dapat mengakses rekap absensi.');
+        if ($walikelasKelas) {
+            $kelasList = $kelasList->where('uuid', $walikelasKelas)->values();
+        }
+        $selectedKelas = $walikelasKelas ?: ($request->kelas ?: optional($kelasList->first())->uuid);
 
         $dari   = $request->dari   ?: now()->startOfMonth()->toDateString();
         $sampai = $request->sampai ?: now()->toDateString();

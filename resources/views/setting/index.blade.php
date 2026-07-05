@@ -179,6 +179,23 @@
             <button type="submit" class="btn-primary px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> Simpan Rumus Rapor</button>
         </form>
 
+        {{-- Wali kelas boleh lihat nilai mapel lain di kelasnya --}}
+        <form method="POST" action="{{ route('setting.walikelasLihatNilai') }}" class="card p-6"
+              x-data="{ on: {{ ($settings['walikelas_lihat_nilai'] ?? '0')=='1' ? 'true' : 'false' }} }">
+            @csrf
+            <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                    <h2 class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2"><i data-lucide="eye" class="w-4 h-4 text-sky-500"></i> Wali Kelas Lihat Nilai Mapel Lain</h2>
+                    <p class="text-xs text-slate-400 mt-1 leading-relaxed">Jika aktif, wali kelas bisa <b>melihat (tanpa mengubah)</b> nilai Formatif, Sumatif, dan PAS semua mata pelajaran di kelasnya — bukan hanya mapel yang ia ajar sendiri.</p>
+                    <p class="text-xs mt-2 font-semibold" :class="on ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'" x-text="on ? '● Aktif' : '○ Nonaktif'"></p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-1">
+                    <input type="checkbox" name="walikelas_lihat_nilai" value="1" class="sr-only peer" x-model="on" @change="$el.form.submit()">
+                    <div class="relative w-11 h-6 bg-slate-200 dark:bg-slate-600 rounded-full peer-checked:bg-[color:var(--cp)] transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition peer-checked:after:translate-x-5"></div>
+                </label>
+            </div>
+        </form>
+
         <a href="{{ route('setting.penjabaran') }}" class="card p-6 flex items-center justify-between gap-3 hover:border-primary transition">
             <div>
                 <h2 class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2"><i data-lucide="list-tree" class="w-[18px] h-[18px] text-primary"></i> Nilai Penjabaran</h2>

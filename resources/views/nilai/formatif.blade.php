@@ -71,7 +71,7 @@
                         @foreach($materiIsi as $m)
                             @foreach($m->tujuan as $t)
                             <td class="text-center col-nilai tp-col" data-materi-col="{{ $m->uuid }}" style="display:none">
-                                <div class="nilai-cell formatif-cell" contenteditable="{{ $terkunci ? 'false' : 'true' }}" inputmode="numeric"
+                                <div class="nilai-cell formatif-cell" contenteditable="{{ ($terkunci || $readOnly) ? 'false' : 'true' }}" inputmode="numeric"
                                      data-col="{{ $colOf[$t->uuid] }}" data-materi="{{ $m->uuid }}" data-siswa="{{ $s->uuid }}" data-kkm="{{ $kktp }}"
                                      data-url="{{ route('nilai.formatif.cell', $ngajar->uuid) }}"
                                      data-body='@json(["id_tupe" => $t->uuid, "id_siswa" => $s->uuid])'>{{ isset($skor[$t->uuid][$s->uuid]) ? (int) $skor[$t->uuid][$s->uuid] : '' }}</div>

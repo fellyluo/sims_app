@@ -34,6 +34,17 @@ class PoinController extends Controller
         abort_unless($this->bisaKelola(), 403, 'Hanya admin/kesiswaan yang dapat mengelola poin.');
     }
 
+    /** Bisa melihat ringkasan/ledger poin: admin/kesiswaan (semua siswa) atau wali kelas (kelasnya saja). */
+    private function bisaLihatSiswa(): bool
+    {
+        return $this->bisaKelola() || (bool) auth()->user()->guru?->walikelas;
+    }
+
+    private function guardLihatSiswa(): void
+    {
+        abort_unless($this->bisaLihatSiswa(), 403, 'Hanya admin/kesiswaan/wali kelas yang dapat melihat data ini.');
+    }
+
     private function bisaAjukan(): bool
     {
         $u = auth()->user();
@@ -278,10 +289,10 @@ class PoinController extends Controller
 
     public function poinIndex(Request $request)
     {
-        $this->guardKelola();
+        $this->guardLihatSiswa();
         [$sort, $dir] = \App\Support\TableSort::resolve($request, ['nama', 'nis', 'kelas', 'sisa'], 'nama');
 
-        $siswas = Siswa::with('kelas')
+        $siswas = ($this->bisaKelola() ? Siswa::with('kelas') : $this->siswaScope()->with('kelas'))
             ->when($request->search, fn ($q) => $q->where(fn ($q2) => $q2
                 ->where('nama', 'like', '%' . $request->search . '%')
                 ->orWhere('nis', 'like', '%' . $request->search . '%')))
@@ -306,7 +317,11 @@ class PoinController extends Controller
 
     public function poinShow(Request $request, Siswa $siswa)
     {
-        $this->guardKelola();
+        $this->guardLihatSiswa();
+        if (!$this->bisaKelola()) {
+            $u = auth()->user();
+            abort_unless($u->guru?->walikelas && $siswa->id_kelas === $u->guru->walikelas->id_kelas, 403, 'Siswa ini bukan siswa kelas Anda.');
+        }
         $h = self::hitung($siswa->uuid);
         return view('poin.siswa.show', [
             'siswa' => $siswa, 'ledger' => $this->ledgerSorted($h['ledger'], $request),

@@ -19,10 +19,12 @@ $p3Icon  = ['prestasi'=>'award','partisipasi'=>'handshake','pelanggaran'=>'trian
                 <p class="text-xs text-slate-400">NIS {{ $siswa->nis }} &bull; Kelas {{ $siswa->kelas ? $siswa->kelas->tingkat.$siswa->kelas->kelas : '-' }}</p>
             </div>
         </div>
+        @if(in_array(auth()->user()->access, ['superadmin', 'admin', 'kesiswaan']))
         <div class="flex items-center gap-2">
             <a href="{{ route('p3.siswa.print', $siswa) }}" target="_blank" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition"><i data-lucide="printer" class="w-4 h-4"></i> Cetak</a>
             <a href="{{ route('p3.siswa.create', $siswa) }}" class="btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm"><i data-lucide="plus" class="w-4 h-4"></i> Tambah P3</a>
         </div>
+        @endif
     </div>
 
     {{-- 3 kartu total --}}
@@ -50,7 +52,9 @@ $p3Icon  = ['prestasi'=>'award','partisipasi'=>'handshake','pelanggaran'=>'trian
                         <x-sortable-th field="jenis" label="Jenis" />
                         <x-sortable-th field="deskripsi" label="Keterangan" />
                         <x-sortable-th field="poin" label="Poin" align="right" />
+                        @if(in_array(auth()->user()->access, ['superadmin', 'admin', 'kesiswaan']))
                         <th class="text-right">Aksi</th>
+                        @endif
                     </tr>
                 </thead>
                 <tbody>
@@ -62,6 +66,7 @@ $p3Icon  = ['prestasi'=>'award','partisipasi'=>'handshake','pelanggaran'=>'trian
                         <td><span class="badge bg-{{ $w }}-100 dark:bg-{{ $w }}-900 text-{{ $w }}-700 dark:text-{{ $w }}-300">{{ \App\Models\P3Kategori::JENIS[$r->jenis] ?? $r->jenis }}</span></td>
                         <td class="text-sm text-slate-600 dark:text-slate-300">{{ $r->deskripsi }}</td>
                         <td class="text-right font-bold text-slate-700 dark:text-slate-200">{{ $r->poin }}</td>
+                        @if(in_array(auth()->user()->access, ['superadmin', 'admin', 'kesiswaan']))
                         <td class="text-right">
                             <div class="flex items-center justify-end gap-1.5">
                                 <a href="{{ route('p3.entri.edit', $r) }}" class="p-1.5 rounded-lg border border-slate-200 dark:border-slate-600 text-slate-400 hover:text-primary"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></a>
@@ -71,6 +76,7 @@ $p3Icon  = ['prestasi'=>'award','partisipasi'=>'handshake','pelanggaran'=>'trian
                                 </form>
                             </div>
                         </td>
+                        @endif
                     </tr>
                     @empty
                     <tr><td colspan="6" class="text-center text-slate-400 py-8">Belum ada catatan P3.</td></tr>

@@ -151,6 +151,13 @@ class SettingController extends Controller
         return back()->with('success', 'Pengaturan agenda sebelum pulang disimpan.');
     }
 
+    /** Izinkan wali kelas melihat (read-only) nilai formatif/sumatif/PAS mapel lain di kelasnya. */
+    public function setWalikelasLihatNilai(Request $request)
+    {
+        Setting::set('walikelas_lihat_nilai', $request->boolean('walikelas_lihat_nilai') ? '1' : '0');
+        return back()->with('success', 'Pengaturan akses nilai wali kelas disimpan.');
+    }
+
     /** Sistem aturan kedisiplinan siswa: 'poin' (ledger 100) atau 'p3' (Pelanggaran/Prestasi/Partisipasi). */
     public function setJenisAturan(Request $request)
     {

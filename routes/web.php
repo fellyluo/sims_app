@@ -32,6 +32,7 @@ use App\Http\Controllers\ForumReactionController;
 use App\Http\Controllers\RekapController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SiswaController;
+use App\Http\Controllers\WalikelasController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Keuangan\KeuanganController;
 use App\Http\Controllers\Keuangan\TagihanController;
@@ -261,8 +262,6 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
             Route::get('/import', [PoinController::class, 'importForm'])->name('importForm');
             Route::post('/import', [PoinController::class, 'importAturan'])->name('import');
 
-            Route::get('/siswa', [PoinController::class, 'poinIndex'])->name('siswa.index');
-            Route::get('/siswa/{siswa}', [PoinController::class, 'poinShow'])->name('siswa.show');
             Route::get('/siswa/{siswa}/buat', [PoinController::class, 'poinCreate'])->name('siswa.create');
             Route::post('/siswa/{siswa}', [PoinController::class, 'poinStore'])->name('siswa.store');
             Route::delete('/entri/{poin}', [PoinController::class, 'poinDelete'])->name('entri.delete');
@@ -274,6 +273,12 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
             Route::post('/temp/{temp}', [PoinController::class, 'tempUpdate'])->name('temp.update');
 
             Route::get('/dashboard', [PoinController::class, 'dashboard'])->name('dashboard');
+        });
+
+        // Lihat ringkasan poin siswa: admin/kesiswaan (semua kelas) + walikelas (kelasnya saja, disaring di controller)
+        Route::middleware('role:admin,kesiswaan,walikelas')->group(function () {
+            Route::get('/siswa', [PoinController::class, 'poinIndex'])->name('siswa.index');
+            Route::get('/siswa/{siswa}', [PoinController::class, 'poinShow'])->name('siswa.show');
         });
 
         // Pengajuan guru/walikelas/sekretaris — guard peran dilakukan di controller
@@ -297,8 +302,6 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
             Route::delete('/{kategori}', [P3Controller::class, 'destroy'])->name('destroy');
             Route::get('/kategori-json', [P3Controller::class, 'kategoriGet'])->name('kategori.json');
 
-            Route::get('/siswa', [P3Controller::class, 'siswaIndex'])->name('siswa.index');
-            Route::get('/siswa/{siswa}', [P3Controller::class, 'siswaShow'])->name('siswa.show');
             Route::get('/siswa/{siswa}/buat', [P3Controller::class, 'createPoin'])->name('siswa.create');
             Route::post('/siswa/{siswa}', [P3Controller::class, 'storePoin'])->name('siswa.store');
             Route::get('/siswa/{siswa}/print', [P3Controller::class, 'printPoin'])->name('siswa.print');
@@ -312,12 +315,36 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
             Route::put('/temp/{temp}/disapprove', [P3Controller::class, 'tempDisapprove'])->name('temp.disapprove');
         });
 
+        // Lihat ringkasan P3 siswa: admin/kesiswaan (semua kelas) + walikelas (kelasnya saja, disaring di controller)
+        Route::middleware('role:admin,kesiswaan,walikelas')->group(function () {
+            Route::get('/siswa', [P3Controller::class, 'siswaIndex'])->name('siswa.index');
+            Route::get('/siswa/{siswa}', [P3Controller::class, 'siswaShow'])->name('siswa.show');
+        });
+
         Route::get('/guru', [P3Controller::class, 'guruIndex'])->name('guru.index');
         Route::get('/guru/{siswa}/buat', [P3Controller::class, 'guruCreate'])->name('guru.create');
         Route::post('/guru/{siswa}', [P3Controller::class, 'guruStore'])->name('guru.store');
         Route::get('/guru/riwayat', [P3Controller::class, 'guruRiwayat'])->name('guru.riwayat');
 
         Route::get('/saya', [P3Controller::class, 'selfShow'])->name('self');
+    });
+
+    // ─── Absensi Siswa: admin (semua kelas) + wali kelas (kelasnya saja, disaring di controller) ───
+    Route::middleware('role:admin,walikelas')->group(function () {
+        Route::get('/absensi', [AbsensiController::class, 'index'])->name('absensi.index');
+        Route::post('/absensi', [AbsensiController::class, 'store'])->name('absensi.store');
+        Route::get('/absensi/rekap', [AbsensiController::class, 'rekap'])->name('absensi.rekap');
+    });
+
+    // ─── Wali Kelas: data siswa kelasnya, reset password, set sekretaris ───
+    Route::middleware('role:admin,walikelas')->prefix('walikelas')->name('walikelas.')->group(function () {
+        Route::get('/siswa', [WalikelasController::class, 'siswaIndex'])->name('siswa.index');
+        Route::get('/siswa/{siswa}', [WalikelasController::class, 'siswaShow'])->name('siswa.show');
+        Route::post('/siswa/{siswa}/reset', [WalikelasController::class, 'resetSiswa'])->name('siswa.reset');
+        Route::post('/siswa/{siswa}/reset-ortu', [WalikelasController::class, 'resetOrangtua'])->name('siswa.resetOrtu');
+        Route::get('/sekretaris', [WalikelasController::class, 'sekretarisForm'])->name('sekretaris.form');
+        Route::post('/sekretaris', [WalikelasController::class, 'sekretarisStore'])->name('sekretaris.store');
+        Route::get('/nilai', [NilaiController::class, 'walikelasNilaiIndex'])->name('nilai.index');
     });
 
     // ─── Admin ─────────────────────────────────────────────────────────────
@@ -368,10 +395,6 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
         Route::post('/jadwal/jam/copy', [JadwalController::class, 'jamCopy'])->name('jadwal.jam.copy');
         Route::delete('/jadwal/jam/{uuid}', [JadwalController::class, 'jamDestroy'])->name('jadwal.jam.destroy');
 
-        // Absensi
-        Route::get('/absensi', [AbsensiController::class, 'index'])->name('absensi.index');
-        Route::post('/absensi', [AbsensiController::class, 'store'])->name('absensi.store');
-        Route::get('/absensi/rekap', [AbsensiController::class, 'rekap'])->name('absensi.rekap');
         // Absensi wajah (face recognition)
         Route::get('/absensi/wajah', [AbsensiController::class, 'wajah'])->name('absensi.wajah');
         Route::get('/absensi/scan', [AbsensiController::class, 'scan'])->name('absensi.scan');
@@ -409,6 +432,7 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
             Route::post('/poin-terlambat-aturan', 'setPoinTerlambatAturan')->name('setting.poinTerlambatAturan');
             Route::post('/lokasi-qr', 'setLokasiQr')->name('setting.lokasiQr');
             Route::post('/rumus-rapor', 'setRumusRapor')->name('setting.rumusRapor');
+            Route::post('/walikelas-lihat-nilai', 'setWalikelasLihatNilai')->name('setting.walikelasLihatNilai');
             Route::get('/penjabaran', 'penjabaran')->name('setting.penjabaran');
             Route::post('/penjabaran', 'penjabaranSave')->name('setting.penjabaran.save');
             Route::post('/tp-range', 'setTpRange')->name('setting.tpRange');

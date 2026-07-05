@@ -33,6 +33,17 @@ class P3Controller extends Controller
         abort_unless($this->bisaKelola(), 403, 'Hanya admin/kesiswaan yang dapat mengelola P3.');
     }
 
+    /** Bisa melihat ringkasan/riwayat P3: admin/kesiswaan (semua siswa) atau wali kelas (kelasnya saja). */
+    private function bisaLihatSiswa(): bool
+    {
+        return $this->bisaKelola() || (bool) auth()->user()->guru?->walikelas;
+    }
+
+    private function guardLihatSiswa(): void
+    {
+        abort_unless($this->bisaLihatSiswa(), 403, 'Hanya admin/kesiswaan/wali kelas yang dapat melihat data ini.');
+    }
+
     private function bisaAjukan(): bool
     {
         $u = auth()->user();
@@ -131,12 +142,12 @@ class P3Controller extends Controller
 
     public function siswaIndex(Request $request)
     {
-        $this->guardKelola();
+        $this->guardLihatSiswa();
         [$sort, $dir] = \App\Support\TableSort::resolve(
             $request, ['nama', 'nis', 'kelas', 'prestasi', 'partisipasi', 'pelanggaran'], 'nama'
         );
 
-        $siswas = Siswa::with('kelas')
+        $siswas = ($this->bisaKelola() ? Siswa::with('kelas') : $this->siswaScope()->with('kelas'))
             ->when($request->search, fn ($q) => $q->where(fn ($q2) => $q2
                 ->where('nama', 'like', '%' . $request->search . '%')
                 ->orWhere('nis', 'like', '%' . $request->search . '%')))
@@ -161,7 +172,11 @@ class P3Controller extends Controller
 
     public function siswaShow(Request $request, Siswa $siswa)
     {
-        $this->guardKelola();
+        $this->guardLihatSiswa();
+        if (!$this->bisaKelola()) {
+            $u = auth()->user();
+            abort_unless($u->guru?->walikelas && $siswa->id_kelas === $u->guru->walikelas->id_kelas, 403, 'Siswa ini bukan siswa kelas Anda.');
+        }
         $totals = $this->totalsFor($siswa->uuid);
         [$sort, $dir] = \App\Support\TableSort::resolve($request, ['tanggal', 'jenis', 'deskripsi', 'poin'], 'tanggal', 'desc');
         $rows = P3Poin::where('id_siswa', $siswa->uuid)->orderBy($sort, $dir)->paginate(20)->withQueryString();

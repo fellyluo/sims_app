@@ -29,15 +29,29 @@ class NilaiController extends Controller
         return Semester::aktif() ?? Semester::first();
     }
 
-    /** Ambil ngajar + cek hak akses (admin = semua, guru = miliknya). */
-    private function ngajarOrAbort(string $uuid): Ngajar
+    /** Admin atau guru pengajar penugasan ini (boleh mengubah nilai). */
+    private function bisaEdit(Ngajar $ngajar): bool
+    {
+        $user = auth()->user();
+        if ($user->isAdmin()) return true;
+        return (bool) ($user->guru && $ngajar->id_guru === $user->guru->uuid);
+    }
+
+    /** Wali kelas boleh LIHAT (read-only) nilai mapel lain di kelasnya, bila diizinkan admin lewat Setting. */
+    private function walikelasBolehLihat(Ngajar $ngajar): bool
+    {
+        if (Setting::get('walikelas_lihat_nilai', '0') !== '1') return false;
+        $idKelasWali = auth()->user()->guru?->walikelas?->id_kelas;
+        return $idKelasWali && $idKelasWali === $ngajar->id_kelas;
+    }
+
+    /** Ambil ngajar + cek hak akses. $write=true (default) = admin/guru pengajar saja (ubah nilai).
+     *  $write=false = boleh juga wali kelas read-only (lihat formatif/sumatif/PAS mapel lain di kelasnya). */
+    private function ngajarOrAbort(string $uuid, bool $write = true): Ngajar
     {
         $ngajar = Ngajar::with(['pelajaran', 'kelas', 'guru'])->findOrFail($uuid);
-        $user = auth()->user();
-        if (!$user->isAdmin()) {
-            $guru = $user->guru;
-            abort_unless($guru && $ngajar->id_guru === $guru->uuid, 403, 'Anda tidak mengajar kelas/mapel ini.');
-        }
+        if ($this->bisaEdit($ngajar)) return $ngajar;
+        abort_unless(!$write && $this->walikelasBolehLihat($ngajar), 403, 'Anda tidak mengajar kelas/mapel ini.');
         return $ngajar;
     }
 
@@ -78,6 +92,26 @@ class NilaiController extends Controller
             'ngajars'  => $ngajars,
             'semester' => $this->semester(),
             'isAdmin'  => $user->isAdmin(),
+        ]);
+    }
+
+    /** ====== Daftar mapel di kelas wali kelas (read-only, dipakai halaman Wali Kelas) ====== */
+    public function walikelasNilaiIndex()
+    {
+        $kelas = auth()->user()->guru?->walikelas?->kelas;
+        abort_unless($kelas, 403, 'Anda bukan wali kelas.');
+        abort_unless(Setting::get('walikelas_lihat_nilai', '0') === '1', 403, 'Fitur lihat nilai kelas belum diaktifkan admin.');
+
+        $ngajars = Ngajar::with(['pelajaran', 'kelas', 'guru'])
+            ->where('id_kelas', $kelas->uuid)
+            ->whereNotNull('id_guru')->whereNotNull('id_pelajaran')
+            ->get()->sortBy(fn ($n) => [$n->pelajaran?->urutan, $n->pelajaran?->nama])->values();
+        foreach ($ngajars as $n) { $n->mine = $this->bisaEdit($n); }
+
+        return view('walikelas.nilai.index', [
+            'kelas'    => $kelas,
+            'ngajars'  => $ngajars,
+            'semester' => $this->semester(),
         ]);
     }
 
@@ -350,7 +384,8 @@ class NilaiController extends Controller
     /** ====== Formatif: grid siswa × TP ====== */
     public function formatif(string $uuid)
     {
-        $ngajar = $this->ngajarOrAbort($uuid);
+        $ngajar = $this->ngajarOrAbort($uuid, write: false);
+        $readOnly = !$this->bisaEdit($ngajar);
         $sem = $this->semester();
         $materi = Materi::with('tujuan')
             ->where('id_ngajar', $uuid)->where('id_semester', $sem?->id)
@@ -365,13 +400,14 @@ class NilaiController extends Controller
 
         $kktp = $ngajar->kktp;
         $terkunci = $this->terkunci($ngajar);
-        return view('nilai.formatif', compact('ngajar', 'materi', 'siswas', 'skor', 'sem', 'kktp', 'terkunci'));
+        return view('nilai.formatif', compact('ngajar', 'materi', 'siswas', 'skor', 'sem', 'kktp', 'terkunci', 'readOnly'));
     }
 
     /** ====== Sumatif: grid siswa × materi ====== */
     public function sumatif(string $uuid)
     {
-        $ngajar = $this->ngajarOrAbort($uuid);
+        $ngajar = $this->ngajarOrAbort($uuid, write: false);
+        $readOnly = !$this->bisaEdit($ngajar);
         $sem = $this->semester();
         $materi = Materi::with('tujuan')->where('id_ngajar', $uuid)->where('id_semester', $sem?->id)
             ->orderBy('urutan')->get();
@@ -384,13 +420,14 @@ class NilaiController extends Controller
 
         $kktp = $ngajar->kktp;
         $terkunci = $this->terkunci($ngajar);
-        return view('nilai.sumatif', compact('ngajar', 'materi', 'siswas', 'skor', 'sem', 'kktp', 'terkunci'));
+        return view('nilai.sumatif', compact('ngajar', 'materi', 'siswas', 'skor', 'sem', 'kktp', 'terkunci', 'readOnly'));
     }
 
     /** ====== PAS: 1 nilai per siswa ====== */
     public function pas(string $uuid)
     {
-        $ngajar = $this->ngajarOrAbort($uuid);
+        $ngajar = $this->ngajarOrAbort($uuid, write: false);
+        $readOnly = !$this->bisaEdit($ngajar);
         $sem = $this->semester();
         $siswas = $this->siswaKelas($ngajar->id_kelas);
         $skor = NilaiPas::where('id_ngajar', $uuid)->where('id_semester', $sem?->id)
@@ -398,7 +435,7 @@ class NilaiController extends Controller
 
         $kktp = $ngajar->kktp;
         $terkunci = $this->terkunci($ngajar);
-        return view('nilai.pas', compact('ngajar', 'siswas', 'skor', 'sem', 'kktp', 'terkunci'));
+        return view('nilai.pas', compact('ngajar', 'siswas', 'skor', 'sem', 'kktp', 'terkunci', 'readOnly'));
     }
 
     // ====== Simpan per-sel (AJAX, input langsung di tabel) ======

@@ -413,11 +413,11 @@
 
 @include('partials.sosmed-bar')
 
-@elseif(in_array($access, ['guru', 'kurikulum', 'kesiswaan', 'sapras']))
-{{-- ===== Guru/Kurikulum/Kesiswaan/Sapras: kartu batik + blok sesuai kebutuhan peran, sama seperti admin ===== --}}
+@elseif(in_array($access, ['guru', 'walikelas', 'kurikulum', 'kesiswaan', 'sapras']))
+{{-- ===== Guru/Walikelas/Kurikulum/Kesiswaan/Sapras: kartu batik + blok sesuai kebutuhan peran, sama seperti admin ===== --}}
 @php
     $allBlocks = match ($access) {
-        'guru' => auth()->user()->guru ? ['guru_jadwal', 'guru_presensi', 'guru_agenda'] : [],
+        'guru', 'walikelas' => auth()->user()->guru ? ['guru_jadwal', 'guru_presensi', 'guru_agenda'] : [],
         'kurikulum' => ['ringkasan_siswa', 'ringkasan_guru', 'ringkasan_kelas', 'ringkasan_tahun', 'kurikulum_agenda'],
         'kesiswaan' => ['ringkasan_siswa', 'kesiswaan_pending', 'kesiswaan_absensi'],
         'sapras' => auth()->user()->can('sarpras.dashboard.lihat') ? ['sarpras_aset', 'sarpras_kerusakan', 'sarpras_peminjaman', 'sarpras_pengadaan'] : [],
@@ -608,7 +608,7 @@
 </script>
 @endpush
 
-@if(in_array($access, ['superadmin','admin']) || (in_array($access, ['siswa', 'orangtua']) && $siswaWidget) || in_array($access, ['guru', 'kurikulum', 'kesiswaan', 'sapras']))
+@if(in_array($access, ['superadmin','admin']) || (in_array($access, ['siswa', 'orangtua']) && $siswaWidget) || in_array($access, ['guru', 'walikelas', 'kurikulum', 'kesiswaan', 'sapras']))
 @push('scripts')
 <script>
 function dashLayout() {

@@ -27,9 +27,11 @@
         </div>
     </div>
 
+    @if(in_array(auth()->user()->access, ['superadmin', 'admin', 'kesiswaan']))
     <div class="flex justify-end">
         <a href="{{ route('poin.siswa.create', $siswa) }}" class="btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm"><i data-lucide="plus" class="w-4 h-4"></i> Tambah Poin</a>
     </div>
+    @endif
 
     {{-- Ledger --}}
     <div class="card overflow-hidden">
@@ -43,7 +45,9 @@
                         <th>Aturan</th>
                         <x-sortable-th field="poin" label="Poin" align="right" />
                         <x-sortable-th field="sisa" label="Sisa" align="right" />
+                        @if(in_array(auth()->user()->access, ['superadmin', 'admin', 'kesiswaan']))
                         <th class="text-right">Aksi</th>
+                        @endif
                     </tr>
                 </thead>
                 <tbody>
@@ -68,12 +72,14 @@
                         <td class="text-sm text-slate-600 dark:text-slate-300"><span class="font-mono text-xs text-slate-400">{{ $l['row']->aturan?->kode }}</span> {{ $l['row']->aturan?->aturan }}</td>
                         <td class="text-right font-semibold {{ $l['delta'] < 0 ? 'text-rose-600' : 'text-emerald-600' }}">{{ $l['delta'] > 0 ? '+' : '' }}{{ $l['delta'] }}</td>
                         <td class="text-right font-bold text-slate-700 dark:text-slate-200">{{ $l['sisa'] }}</td>
+                        @if(in_array(auth()->user()->access, ['superadmin', 'admin', 'kesiswaan']))
                         <td class="text-right">
                             <form method="POST" action="{{ route('poin.entri.delete', $l['row']) }}" onsubmit="return confirmDelete(this)">
                                 @csrf @method('DELETE')
                                 <button class="p-1.5 rounded-lg border border-rose-200 dark:border-rose-800 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
                             </form>
                         </td>
+                        @endif
                     </tr>
                     @empty
                     <tr><td colspan="7" class="text-center text-slate-400 py-8">Belum ada catatan poin.</td></tr>
