@@ -95,6 +95,8 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
     Route::get('/notifications-json', [NotificationController::class, 'getNotifications'])->name('notifications.json');
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.readAll');
+    Route::post('/notifications/fcm-token', [NotificationController::class, 'storeFcmToken'])->name('notifications.fcmToken.store');
+    Route::delete('/notifications/fcm-token', [NotificationController::class, 'destroyFcmToken'])->name('notifications.fcmToken.destroy');
 
     // Statistik real-time untuk ticker SIMS-NET (angka dari cache TickerStats).
     Route::get('/dashboard/ticker-stats', function () {
