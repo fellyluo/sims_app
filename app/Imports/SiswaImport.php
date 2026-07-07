@@ -17,6 +17,9 @@ class SiswaImport implements ToCollection, WithStartRow
     public int $imported = 0;
     public int $skipped = 0;
 
+    /** Kredensial akun yang baru dibuat batch ini — nilai plaintext, HANYA ada di sini sebelum di-hash. */
+    public array $kredensial = [];
+
     /** Mulai dari baris 2 (lewati header) */
     public function startRow(): int
     {
@@ -34,9 +37,14 @@ class SiswaImport implements ToCollection, WithStartRow
                 continue;
             }
 
-            // NIS: pakai input jika ada & unik, jika tidak generate otomatis
+            // NIS: pakai input jika ada & unik; kalau NIS input sudah ada, lewati baris ini
+            // (jangan buat siswa baru dgn NIS auto-generate — itu akan jadi duplikat siswa).
             $inputNis = trim((string)($row[1] ?? ''));
-            if ($inputNis !== '' && !Siswa::where('nis', $inputNis)->exists()) {
+            if ($inputNis !== '') {
+                if (Siswa::where('nis', $inputNis)->exists()) {
+                    $this->skipped++;
+                    continue;
+                }
                 $nis = $inputNis;
             } else {
                 $nisRecord = Nis::firstOrCreate([], ['kode' => 1]);
@@ -47,10 +55,12 @@ class SiswaImport implements ToCollection, WithStartRow
             }
 
             // Akun siswa
+            $passwordSiswa = Str::random(8);
+            $usernameSiswa = 'siswa.' . $nis;
             $userSiswa = User::create([
-                'username'   => 'siswa.' . $nis,
+                'username'   => $usernameSiswa,
                 'identifier' => $nis,
-                'password'   => Str::random(8),
+                'password'   => $passwordSiswa,
                 'access'     => 'siswa',
                 'must_change_password' => true,
             ]);
@@ -77,10 +87,12 @@ class SiswaImport implements ToCollection, WithStartRow
             ]);
 
             // Akun orang tua
+            $passwordOrtu = Str::random(8);
+            $usernameOrtu = 'ortu.' . $nis;
             $userOrtu = User::create([
-                'username'   => 'ortu.' . $nis,
+                'username'   => $usernameOrtu,
                 'identifier' => $nis . '-ortu',
-                'password'   => Str::random(8),
+                'password'   => $passwordOrtu,
                 'access'     => 'orangtua',
                 'must_change_password' => true,
             ]);
@@ -88,6 +100,15 @@ class SiswaImport implements ToCollection, WithStartRow
                 'id_siswa' => $siswa->uuid,
                 'id_login' => $userOrtu->uuid,
             ]);
+
+            $this->kredensial[] = [
+                'nama' => $nama,
+                'nis' => $nis,
+                'username_siswa' => $usernameSiswa,
+                'password_siswa' => $passwordSiswa,
+                'username_ortu' => $usernameOrtu,
+                'password_ortu' => $passwordOrtu,
+            ];
 
             $this->imported++;
         }

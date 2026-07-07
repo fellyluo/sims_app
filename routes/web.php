@@ -19,6 +19,7 @@ use App\Http\Controllers\PelajaranController;
 use App\Http\Controllers\PresensiGuruController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QrAbsensiController;
+use App\Http\Controllers\CetakController;
 use App\Http\Controllers\CetakRaporController;
 use App\Http\Controllers\ClassroomAssignmentController;
 use App\Http\Controllers\ClassroomCommentController;
@@ -259,6 +260,8 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
         Route::get('/buat', 'create')->name('create');
         Route::post('/', 'store')->middleware('throttle:60,1')->name('store');
         Route::get('/rekap', 'rekap')->name('rekap');
+        Route::get('/batas', 'batas')->name('batas');
+        Route::get('/batas/unduh', 'cetakBatas')->name('batas.excel');
         Route::get('/{agenda}/edit', 'edit')->name('edit');
         Route::put('/{agenda}', 'update')->name('update');
         Route::delete('/{agenda}', 'destroy')->name('destroy');
@@ -401,7 +404,35 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
         Route::get('/siswa/import', [SiswaController::class, 'importForm'])->name('siswa.importForm');
         Route::post('/siswa/import', [SiswaController::class, 'import'])->name('siswa.import');
         Route::get('/siswa/import/template', [SiswaController::class, 'downloadTemplate'])->name('siswa.template');
+        Route::get('/siswa/import/kredensial', [SiswaController::class, 'importKredensial'])->name('siswa.import.kredensial');
 
+    });
+
+    // ─── Cetak Data (admin only) — export Excel siswa/guru/kelas/absensi guru/agenda/nilai ───
+    Route::middleware('role:admin')->prefix('cetak')->name('cetak.')->controller(CetakController::class)->group(function () {
+        Route::get('/siswa', 'siswa')->name('siswa.index');
+        Route::get('/siswa/{params}', 'cetakSiswa')->name('siswa.excel');
+        Route::get('/guru', 'guru')->name('guru.index');
+        Route::get('/guru/unduh', 'cetakGuru')->name('guru.excel');
+        Route::get('/kelas', 'kelas')->name('kelas.index');
+        Route::get('/kelas/unduh', 'cetakKelas')->name('kelas.excel');
+        Route::get('/absensi-guru', 'absensiGuru')->name('absensiGuru.index');
+        Route::get('/absensi-guru/unduh', 'cetakAbsensiGuru')->name('absensiGuru.excel');
+        Route::get('/agenda', 'agenda')->name('agenda.index');
+        Route::get('/agenda/unduh', 'cetakAgenda')->name('agenda.excel');
+        Route::get('/buku-batas', 'bukuBatas')->name('bukuBatas.index');
+        Route::get('/buku-batas/unduh', 'cetakBukuBatas')->name('bukuBatas.excel');
+        Route::get('/formatif', 'formatif')->name('formatif.index');
+        Route::get('/formatif/{params}', 'cetakFormatif')->name('formatif.excel');
+        Route::get('/sumatif', 'sumatif')->name('sumatif.index');
+        Route::get('/sumatif/{params}', 'cetakSumatif')->name('sumatif.excel');
+        // nama route "nilaiRapor" (bukan "rapor") supaya tidak bentrok dgn cetak.rapor.index (Cetak Rapor/CetakRaporController)
+        Route::get('/rapor', 'rapor')->name('nilaiRapor.index');
+        Route::get('/rapor/{params}', 'cetakRapor')->name('nilaiRapor.excel');
+        Route::get('/pas', 'pas')->name('pas.index');
+        Route::get('/pas/{params}', 'cetakPas')->name('pas.excel');
+        Route::get('/penjabaran', 'penjabaran')->name('penjabaran.index');
+        Route::get('/penjabaran/{params}', 'cetakPenjabaran')->name('penjabaran.excel');
     });
 
     Route::middleware('permission:manage_jadwal')->group(function () {

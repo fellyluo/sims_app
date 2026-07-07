@@ -271,10 +271,27 @@ class SiswaController extends Controller
             $msg = "Import selesai: {$import->imported} siswa berhasil ditambahkan."
                  . ($import->skipped > 0 ? " ({$import->skipped} baris dilewati)" : '');
 
+            // Kredensial (password plaintext) HANYA ada di titik ini — simpan sementara
+            // di session supaya bisa diunduh sekali via tombol di halaman berikutnya.
+            if (!empty($import->kredensial)) {
+                session(['import_kredensial_siswa' => $import->kredensial]);
+            }
+
             return redirect()->route('siswa.index')->with('success', $msg);
         } catch (\Exception $e) {
             return back()->with('error', 'Import gagal: ' . $e->getMessage());
         }
+    }
+
+    /** Unduh sekali kredensial login siswa+ortu hasil import terakhir, lalu hapus dari session. */
+    public function importKredensial()
+    {
+        $data = session('import_kredensial_siswa');
+        abort_if(empty($data), 404, 'Tidak ada data kredensial untuk diunduh (mungkin sudah diunduh atau sesi berakhir).');
+
+        session()->forget('import_kredensial_siswa');
+
+        return Excel::download(new \App\Exports\SiswaImportKredensialExport($data), 'Kredensial Siswa Baru.xlsx');
     }
 
     public function downloadTemplate()

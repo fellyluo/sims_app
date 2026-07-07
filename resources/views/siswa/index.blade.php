@@ -4,6 +4,21 @@
 @section('content')
 <div class="space-y-5" x-data="{ importModal: false }">
 
+    @if(session()->has('import_kredensial_siswa'))
+    <div class="card p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 flex items-center justify-between gap-3 flex-wrap">
+        <div class="flex items-start gap-2.5">
+            <i data-lucide="key-round" class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5"></i>
+            <div>
+                <p class="text-sm font-bold text-amber-800 dark:text-amber-300">Kredensial login {{ count(session('import_kredensial_siswa')) }} siswa+ortu baru siap diunduh</p>
+                <p class="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Unduh sekarang — password tidak bisa ditampilkan ulang setelah ini.</p>
+            </div>
+        </div>
+        <a href="{{ route('siswa.import.kredensial') }}" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-amber-600 text-white hover:bg-amber-700 transition flex-shrink-0">
+            <i data-lucide="download" class="w-4 h-4"></i> Unduh Kredensial
+        </a>
+    </div>
+    @endif
+
     {{-- Header --}}
     <div class="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -161,7 +176,7 @@
                     <ul class="text-xs space-y-0.5 list-disc list-inside">
                         <li>Gunakan template Excel yang tersedia</li>
                         <li>Baris contoh (diawali "CONTOH") otomatis dilewati</li>
-                        <li>NIS bisa diisi manual (harus unik) atau dibuat otomatis</li>
+                        <li>NIS bisa diisi manual atau dikosongkan (dibuat otomatis). Baris dgn NIS yang sudah terdaftar akan dilewati</li>
                         <li>Akun siswa & orang tua dibuat otomatis</li>
                         <li>Format file: .xlsx atau .xls (maks 5MB)</li>
                     </ul>
@@ -172,15 +187,13 @@
                 </a>
                 <form method="POST" action="{{ route('siswa.import') }}" enctype="multipart/form-data">
                     @csrf
-                    <div class="border-2 border-dashed border-slate-200 dark:border-slate-600 rounded-xl p-6 text-center mb-3 hover:border-primary transition">
+                    <label class="block border-2 border-dashed border-slate-200 dark:border-slate-600 rounded-xl p-6 text-center mb-3 hover:border-primary transition cursor-pointer">
                         <i data-lucide="file-spreadsheet" class="w-8 h-8 mx-auto text-slate-400 mb-2"></i>
-                        <label class="cursor-pointer">
-                            <span class="text-sm text-slate-500">Pilih file Excel (.xlsx / .xls)</span>
-                            <input type="file" name="file" accept=".xlsx,.xls" required class="hidden"
-                                   onchange="document.getElementById('fileName').textContent = this.files[0]?.name || ''">
-                        </label>
+                        <span class="text-sm text-slate-500">Pilih file Excel (.xlsx / .xls)</span>
+                        <input type="file" name="file" accept=".xlsx,.xls" required class="hidden"
+                               onchange="document.getElementById('fileName').textContent = this.files[0]?.name || ''">
                         <p id="fileName" class="text-xs text-primary mt-1 font-semibold"></p>
-                    </div>
+                    </label>
                     <button type="submit" class="btn-primary w-full py-2.5 rounded-xl text-sm font-semibold">
                         Upload &amp; Import
                     </button>

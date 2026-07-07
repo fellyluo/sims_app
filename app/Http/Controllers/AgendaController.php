@@ -6,6 +6,7 @@ use App\Models\Agenda;
 use App\Models\AgendaAbsensi;
 use App\Models\Guru;
 use App\Models\Jadwal;
+use App\Models\Kelas;
 use App\Models\Semester;
 use App\Models\Siswa;
 use Carbon\Carbon;
@@ -389,6 +390,49 @@ class AgendaController extends Controller
         }
 
         return view('agenda.rekap', compact('guruList', 'selectedGuru', 'dari', 'sampai', 'daftar', 'sudah', 'belum'));
+    }
+
+    /**
+     * Buku Batas: rekap jadwal + agenda satu kelas per hari dalam rentang tanggal
+     * (default satu minggu berjalan, Senin–Sabtu) — replikasi "Buku Batas" smp_ver5,
+     * dipakai admin/kepala sekolah/kurikulum utk memantau materi yang sudah diajarkan.
+     */
+    public function batas(Request $request)
+    {
+        abort_unless($this->bisaRekap(), 403);
+
+        $kelasList = Kelas::orderBy('tingkat')->orderBy('kelas')->get();
+        $idKelas = $request->kelas ?: optional($kelasList->first())->uuid;
+        $kelas = $idKelas ? $kelasList->firstWhere('uuid', $idKelas) : null;
+
+        [$dari, $sampai] = $this->rentangBatas($request);
+        $hari = $kelas ? \App\Support\BukuBatas::build($kelas->uuid, $dari, $sampai) : [];
+
+        return view('agenda.batas', compact('kelasList', 'kelas', 'idKelas', 'dari', 'sampai', 'hari'));
+    }
+
+    /** Unduh Buku Batas (kelas + rentang tanggal terpilih) sebagai Excel. */
+    public function cetakBatas(Request $request)
+    {
+        abort_unless($this->bisaRekap(), 403);
+
+        $data = $request->validate(['kelas' => 'required|exists:kelas,uuid']);
+        [$dari, $sampai] = $this->rentangBatas($request);
+        $kelas = Kelas::findOrFail($data['kelas']);
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\Cetak\BukuBatasExport($kelas->uuid, $dari, $sampai),
+            "Buku Batas Kelas {$kelas->tingkat}{$kelas->kelas}.xlsx"
+        );
+    }
+
+    /** Rentang tanggal Buku Batas dari request, default minggu berjalan (Senin–Sabtu). */
+    private function rentangBatas(Request $request): array
+    {
+        $dari   = $request->dari   ?: now()->startOfWeek(Carbon::MONDAY)->toDateString();
+        $sampai = $request->sampai ?: now()->startOfWeek(Carbon::MONDAY)->addDays(5)->toDateString();
+        if ($dari > $sampai) [$dari, $sampai] = [$sampai, $dari];
+        return [$dari, $sampai];
     }
 
     /** Validasi/catatan kepala sekolah pada satu agenda. */

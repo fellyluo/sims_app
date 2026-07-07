@@ -468,6 +468,7 @@
                 }
                 if ($isAdmin || auth()->user()?->canAccess('manage_agenda')) {
                     $agendaItems[] = ['agenda.rekap', ['agenda.rekap','agenda.validasi'], 'calendar-check-2', 'Rekap Agenda'];
+                    $agendaItems[] = ['agenda.batas', ['agenda.batas'], 'book-open-text', 'Buku Batas'];
                 }
                 if (!empty($agendaItems)) {
                     $groups['agenda'] = ['Agenda', 'notebook-pen', $agendaItems];
@@ -562,6 +563,23 @@
                         ['keuangan.index',      ['keuangan.index','keuangan.kelas'], 'layout-dashboard', 'Pembayaran SPP'],
                         ['keuangan.verifikasi', ['keuangan.verifikasi'],             'badge-check',      'Verifikasi'],
                         ['keuangan.bank',       ['keuangan.bank'],                   'landmark',         'Bank & Metode'],
+                    ]];
+                }
+
+                // ── Cetak Data (export Excel: siswa, guru, kelas, absensi guru, agenda, nilai) ──
+                if ($isAdmin) {
+                    $groups['cetak'] = ['Cetak Data', 'printer', [
+                        ['cetak.siswa.index', ['cetak.siswa.*'], 'users-round', 'Data Siswa'],
+                        ['cetak.guru.index', ['cetak.guru.*'], 'user-round', 'Data Guru'],
+                        ['cetak.kelas.index', ['cetak.kelas.*'], 'school', 'Data Kelas'],
+                        ['cetak.absensiGuru.index', ['cetak.absensiGuru.*'], 'clipboard-check', 'Absensi Guru'],
+                        ['cetak.agenda.index', ['cetak.agenda.*'], 'notebook-pen', 'Data Agenda'],
+                        ['cetak.bukuBatas.index', ['cetak.bukuBatas.*'], 'book-open-text', 'Buku Batas'],
+                        ['cetak.formatif.index', ['cetak.formatif.*'], 'pencil', 'Nilai Formatif'],
+                        ['cetak.sumatif.index', ['cetak.sumatif.*'], 'clipboard-check', 'Nilai Sumatif'],
+                        ['cetak.nilaiRapor.index', ['cetak.nilaiRapor.*'], 'file-text', 'Nilai Rapor'],
+                        ['cetak.pas.index', ['cetak.pas.*'], 'file-check-2', 'Nilai PAS'],
+                        ['cetak.penjabaran.index', ['cetak.penjabaran.*'], 'list-tree', 'Nilai Penjabaran'],
                     ]];
                 }
 
