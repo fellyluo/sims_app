@@ -64,11 +64,25 @@ class User extends Authenticatable implements WebAuthnAuthenticatable
     }
 
     /**
+     * Izin bawaan per-peran yang MELEKAT tanpa perlu dikonfigurasi lewat RBAC.
+     * Dipakai untuk peran fungsional yang modulnya memang miliknya (mis.
+     * bendahara ↔ Keuangan) supaya modul tetap bisa diakses out-of-the-box
+     * meski matriks RolePermission masih kosong. RBAC tetap bisa MENAMBAH izin
+     * lain di atas ini, tapi tak bisa mencabut default (selain admin yang selalu boleh).
+     */
+    public const DEFAULT_ROLE_PERMISSIONS = [
+        'bendahara' => ['manage_keuangan'],
+    ];
+
+    /**
      * Check if the user's role has a specific application permission.
      */
     public function canAccess(string $permission): bool
     {
         if ($this->isAdmin()) {
+            return true;
+        }
+        if (in_array($permission, self::DEFAULT_ROLE_PERMISSIONS[$this->access] ?? [], true)) {
             return true;
         }
         return \App\Models\RolePermission::granted((string) $this->access, $permission);
