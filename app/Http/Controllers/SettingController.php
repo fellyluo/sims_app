@@ -16,6 +16,24 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class SettingController extends Controller
 {
+    /** Role & permission yang sah untuk matriks hak akses (satu sumber kebenaran). */
+    private const VALID_ROLES = ['kepala', 'kurikulum', 'kesiswaan', 'sarpras', 'bendahara', 'guru', 'orangtua', 'siswa'];
+
+    private const PERMISSION_LABELS = [
+        'manage_users'   => 'Mengelola Data Siswa & Guru (Data Master)',
+        'manage_absensi' => 'Mengelola Absensi & Presensi',
+        'manage_jadwal'  => 'Mengelola Jadwal Pelajaran',
+        'view_all_nilai' => 'Melihat Nilai Semua Mapel & Guru',
+        'edit_all_nilai' => 'Mengubah Nilai Semua Mapel & Guru',
+        'manage_agenda'  => 'Mengelola & Validasi Rekap Agenda',
+        'manage_rapor'   => 'Mengelola Rekap Nilai & Cetak Rapor',
+        'manage_disiplin'=> 'Mengelola Modul Kedisiplinan (Poin/P3)',
+        'manage_sarpras' => 'Mengelola Sarana & Prasarana',
+        'manage_keuangan'=> 'Mengelola Modul Keuangan',
+        'manage_pengumuman'=> 'Membuat & Mengelola Pengumuman',
+        'manage_settings'=> 'Mengelola Pengaturan Sistem',
+    ];
+
     public function index()
     {
         $semester   = Semester::orderBy('tahun')->orderBy('semester')->get();
@@ -291,22 +309,9 @@ class SettingController extends Controller
 
     public function roles()
     {
-        $roles = ['kepala', 'kurikulum', 'kesiswaan', 'sarpras', 'bendahara', 'guru', 'orangtua', 'siswa'];
-        $permissions = [
-            'manage_users'   => 'Mengelola Data Siswa & Guru (Data Master)',
-            'manage_absensi' => 'Mengelola Absensi & Presensi',
-            'manage_jadwal'  => 'Mengelola Jadwal Pelajaran',
-            'view_all_nilai' => 'Melihat Nilai Semua Mapel & Guru',
-            'edit_all_nilai' => 'Mengubah Nilai Semua Mapel & Guru',
-            'manage_agenda'  => 'Mengelola & Validasi Rekap Agenda',
-            'manage_rapor'   => 'Mengelola Rekap Nilai & Cetak Rapor',
-            'manage_disiplin'=> 'Mengelola Modul Kedisiplinan (Poin/P3)',
-            'manage_sarpras' => 'Mengelola Sarana & Prasarana',
-            'manage_keuangan'=> 'Mengelola Modul Keuangan',
-            'manage_pengumuman'=> 'Membuat & Mengelola Pengumuman',
-            'manage_settings'=> 'Mengelola Pengaturan Sistem',
-        ];
-        
+        $roles = self::VALID_ROLES;
+        $permissions = self::PERMISSION_LABELS;
+
         $granted = \App\Models\RolePermission::all()->groupBy('role')->map(function($items) {
             return $items->pluck('permission')->toArray();
         })->toArray();
@@ -316,16 +321,27 @@ class SettingController extends Controller
 
     public function rolesSave(\Illuminate\Http\Request $request)
     {
-        $perms = $request->input('perms', []); // array of role => [permission => 1]
-        
-        \Illuminate\Support\Facades\DB::transaction(function() use ($perms) {
+        // 'perms' opsional (boleh kosong bila semua checkbox dilepas), tapi kalau
+        // ada wajib berbentuk array — cegah TypeError dari input non-array.
+        $data = $request->validate(['perms' => 'nullable|array']);
+        $perms = $data['perms'] ?? [];
+
+        $validRoles = self::VALID_ROLES;
+        $validPermissions = array_keys(self::PERMISSION_LABELS);
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($perms, $validRoles, $validPermissions) {
             \App\Models\RolePermission::query()->delete();
             foreach ($perms as $role => $rolePerms) {
+                // Whitelist role & pastikan nilainya array — abaikan entri di luar itu
+                // (mencegah role/permission sembarang tersimpan ke tabel hak akses).
+                if (!in_array($role, $validRoles, true) || !is_array($rolePerms)) {
+                    continue;
+                }
                 foreach ($rolePerms as $permission => $val) {
-                    if ($val) {
+                    if ($val && in_array($permission, $validPermissions, true)) {
                         \App\Models\RolePermission::create([
                             'role' => $role,
-                            'permission' => $permission
+                            'permission' => $permission,
                         ]);
                     }
                 }
