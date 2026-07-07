@@ -163,8 +163,8 @@ class FcmTest extends TestCase
         $user = $this->makeUser('guru', 'fcm_job_disabled');
         UserFcmToken::create(['user_uuid' => $user->uuid, 'token' => 'tok-disabled']);
 
-        // FcmService asli: di lingkungan test tidak ada storage/app/firebase/service-account.json,
-        // jadi enabled() harus false secara alami (bukan di-mock) — inilah kondisi dev sebenarnya.
+        // Simulasikan FCM disabled tanpa bergantung pada ada/tidaknya file credential lokal.
+        config(['services.firebase.credentials' => base_path('storage/app/firebase/not-found-service-account.json')]);
         $fcm = app(FcmService::class);
         $this->assertFalse($fcm->enabled());
 
