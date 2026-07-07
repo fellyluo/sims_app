@@ -291,7 +291,7 @@ class SettingController extends Controller
 
     public function roles()
     {
-        $roles = ['kepala', 'kurikulum', 'kesiswaan', 'sarpras', 'guru', 'orangtua', 'siswa'];
+        $roles = ['kepala', 'kurikulum', 'kesiswaan', 'sarpras', 'bendahara', 'guru', 'orangtua', 'siswa'];
         $permissions = [
             'manage_users'   => 'Mengelola Data Siswa & Guru (Data Master)',
             'manage_absensi' => 'Mengelola Absensi & Presensi',
