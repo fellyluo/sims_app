@@ -3,6 +3,11 @@
 use App\Http\Controllers\AbsensiController;
 use App\Http\Controllers\Admin\ChatbotAdminController;
 use App\Http\Controllers\AgendaController;
+use App\Http\Controllers\AiController;
+use App\Http\Controllers\AiChatController;
+use App\Http\Controllers\AiTeacherController;
+use App\Http\Controllers\AiAnalyzeController;
+use App\Http\Controllers\AiRagController;
 use App\Http\Controllers\KalenderController;
 use App\Http\Controllers\PoinController;
 use App\Http\Controllers\P3Controller;
@@ -65,6 +70,48 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
     Route::get('/home', [LoginController::class, 'home'])->name('auth.home');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::post('/dashboard/tata-letak', [DashboardController::class, 'saveLayout'])->name('dashboard.layout');
+
+    // ─── AsistenAI (Gateway Gemini — Fase 1) ────────────────────────────────────
+    // Gateway generik; dibatasi superadmin. Fitur per-role menyusul di fase berikut.
+    Route::middleware('role:superadmin')->prefix('ai')->name('ai.')->group(function () {
+        Route::post('/generate', [AiController::class, 'generate'])->name('generate');
+    });
+
+    // ─── AsistenAI Chatbot (Fase 2) ─────────────────────────────────────────────
+    // Widget mengambang untuk SEMUA role login. Percakapan di-scope per user.
+    Route::prefix('ai/chat')->name('ai.chat.')->controller(AiChatController::class)->group(function () {
+        Route::post('/', 'send')->name('send');
+        Route::get('/history', 'history')->name('history');
+        Route::get('/{conversation}', 'show')->name('show');
+        Route::delete('/{conversation}', 'destroy')->name('destroy');
+    });
+
+    // ─── AsistenAI Asisten Guru (Fase 3) ────────────────────────────────────────
+    // Panel tool guru (soal/rangkum/feedback). Hanya guru & wali kelas.
+    Route::middleware('role:guru,walikelas')->prefix('ai/teacher')->name('ai.teacher.')->controller(AiTeacherController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/quiz', 'quiz')->name('quiz');
+        Route::post('/summary', 'summary')->name('summary');
+        Route::post('/feedback', 'feedback')->name('feedback');
+    });
+
+    // ─── AsistenAI Narasi Data (Fase 4) ─────────────────────────────────────────
+    // Controller agregasi angka server-side → AI narasikan. Pimpinan/staf sekolah.
+    Route::middleware('role:admin,kepala,kurikulum,kesiswaan')->prefix('ai/analyze')->name('ai.analyze.')->controller(AiAnalyzeController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/nilai', 'nilai')->name('nilai');
+        Route::post('/absensi', 'absensi')->name('absensi');
+        Route::post('/keuangan', 'keuangan')->name('keuangan');
+    });
+
+    // ─── AsistenAI RAG Dokumen (Fase 5) ─────────────────────────────────────────
+    // Unggah dokumen → embed; tanya-jawab berbasis isi dokumen + sitasi.
+    Route::middleware('role:admin,kepala,kurikulum,kesiswaan')->prefix('ai/rag')->name('ai.rag.')->controller(AiRagController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::post('/', 'store')->name('store');
+        Route::post('/ask', 'ask')->name('ask');
+        Route::delete('/{document}', 'destroy')->name('destroy');
+    });
 
     // Wajib daftar wajah sendiri (dipakai gate di atas)
     Route::get('/wajah-saya', [FaceController::class, 'self'])->name('face.self');

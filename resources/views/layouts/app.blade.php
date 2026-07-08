@@ -452,6 +452,11 @@
                     $akademik[] = ['rekap.nilai', ['rekap.*'], 'table-2', 'Rekap Nilai'];
                     $akademik[] = ['cetak.rapor.index', ['cetak.*'], 'printer', 'Cetak Rapor'];
                 }
+
+                // Asisten AI untuk guru & wali kelas (Fase 3)
+                if (in_array($access, ['guru', 'walikelas'])) {
+                    $akademik[] = ['ai.teacher.index', ['ai.teacher.*'], 'sparkles', 'Asisten AI'];
+                }
                 
                 if (auth()->user()?->siswa || $access === 'orangtua') {
                     $akademik[] = ['nilai.self', ['nilai.self'], 'chart-column', 'Nilai Saya'];
@@ -459,6 +464,14 @@
                 
                 if (!empty($akademik)) {
                     $groups['akademik'] = ['Akademik', 'book-open-check', $akademik];
+                }
+
+                // ── Analisis AI (Fase 4) — narasi data untuk pimpinan/staf ──
+                if ($isAdmin || in_array($access, ['kepala', 'kurikulum', 'kesiswaan'])) {
+                    $groups['analisis'] = ['Analisis AI', 'sparkles', [
+                        ['ai.analyze.index', ['ai.analyze.*'], 'chart-line', 'Narasi Data AI'],
+                        ['ai.rag.index',     ['ai.rag.*'],     'file-search', 'Dokumen AI'],
+                    ]];
                 }
 
                 // ── Agenda ──
@@ -1042,12 +1055,13 @@
     @endif
 </div>
 
-@if(!$isAdmin)
+@if(in_array($access, ['siswa', 'orangtua']))
 {{-- ─── Floating Asisten Sekolah ─────────────────────────────────────────────
-     Bola mengambang untuk SEMUA role non-admin (siswa, ortu, guru, walikelas,
-     waka, kepala, dll). Klik membuka panel chat yang meng-embed /chatbot via
-     iframe (di-load saat pertama dibuka). Panel mengirim 'chatfab:close' lewat
-     postMessage saat tombol tutup di dalam widget ditekan. --}}
+     Bola mengambang khusus SISWA & ORANG TUA untuk menghubungi admin manusia
+     (handoff). Staf & admin memakai widget AsistenAI, bukan ini — agar tiap
+     pengguna hanya melihat SATU bola sesuai kebutuhannya. Klik membuka panel
+     chat yang meng-embed /chatbot via iframe; panel mengirim 'chatfab:close'
+     lewat postMessage saat tombol tutup di dalam widget ditekan. --}}
 <div x-data="chatFab()" x-cloak class="fixed bottom-14 right-6 z-[9990] flex flex-col items-end gap-3 print:hidden">
     {{-- Panel chat --}}
     <div x-show="open" x-cloak
@@ -1118,6 +1132,12 @@
     }
 </script>
 @endif
+
+{{-- Widget AsistenAI (Fase 2) — STAF & ADMIN saja. Siswa & orang tua tidak
+     mendapat AI generatif; mereka memakai chatbot handoff ke admin di atas. --}}
+@unless(in_array($access, ['siswa', 'orangtua']))
+@include('partials.ai-assistant')
+@endunless
 
 <script>
     function appShell() {
