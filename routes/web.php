@@ -16,6 +16,7 @@ use App\Http\Controllers\KelasController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\NilaiController;
 use App\Http\Controllers\PelajaranController;
+use App\Http\Controllers\PerangkatAjarController;
 use App\Http\Controllers\PresensiGuruController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QrAbsensiController;
@@ -58,6 +59,11 @@ Route::post('/password/request', [LoginController::class, 'requestResetPassword'
 
 // WebAuthn (Fingerprint / Face ID)
 WebAuthnRoutes::register('webauthn');
+
+// ─── Kiosk Absensi: link rahasia PUBLIK (tanpa login) — dipasang sbg shortcut di komputer
+//     meja piket supaya guru bisa langsung scan tanpa minta admin buka/login-kan dulu.
+//     Token di URL didapat dari Pengaturan → Absensi (admin-only, lihat setting.kioskToken.regenerate). ───
+Route::get('/kiosk-absensi/{token}', [AbsensiController::class, 'kioskEnter'])->name('absensi.kioskEnter');
 
 // ─── Authenticated ────────────────────────────────────────────────────────────
 // Gate EnsureFaceRegistered: siswa & guru wajib daftar wajah dulu sebelum lanjut
@@ -193,6 +199,7 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
 
         // Materi (segmen literal — sebelum {classroom})
         Route::get('/materi/file/{file}', [ClassroomMaterialController::class, 'download'])->name('material.file');
+        Route::get('/materi/file/{file}/lihat', [ClassroomMaterialController::class, 'preview'])->name('material.file.preview');
         Route::get('/materi/{material}/edit', [ClassroomMaterialController::class, 'edit'])->name('material.edit');
         Route::post('/materi/{material}/kunci', [ClassroomMaterialController::class, 'toggleLock'])->name('material.togglelock');
         Route::post('/materi/{material}/buka', [ClassroomMaterialController::class, 'unlock'])->middleware('throttle:20,1')->name('material.unlock');
@@ -242,6 +249,21 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
         Route::delete('/ekskul/{uuid}', 'destroy')->name('ekskul.destroy');
         Route::get('/ekskul/{uuid}/nilai', 'nilai')->name('ekskul.nilai');
         Route::post('/ekskul/{uuid}/nilai/sel', 'nilaiCell')->name('ekskul.nilai.cell');
+    });
+
+    // ─── Perangkat Ajar (guru upload sendiri; monitoring via permission manage_perangkat, guard di controller) ───
+    Route::prefix('perangkat-ajar')->name('perangkat.')->controller(PerangkatAjarController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/saya', 'self')->name('self');
+        Route::post('/jenis', 'store')->name('jenis.store');
+        Route::put('/jenis/{list}', 'update')->name('jenis.update');
+        Route::delete('/jenis/{list}', 'destroy')->name('jenis.destroy');
+        Route::get('/file/{file}/unduh', 'download')->name('download');
+        Route::get('/file/{file}/lihat', 'preview')->name('preview');
+        Route::delete('/file/{file}', 'destroyFile')->name('file.destroy');
+        Route::get('/{guru}/zip', 'zip')->name('zip');
+        Route::post('/{guru}/{list}/upload', 'upload')->middleware('throttle:30,1')->name('upload');
+        Route::get('/{guru}', 'show')->name('show');
     });
 
     // ─── Kalender Absensi & Agenda (admin & kurikulum; guard di controller) ───
@@ -352,15 +374,20 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
         Route::get('/saya', [P3Controller::class, 'selfShow'])->name('self');
     });
 
-    // ─── Absensi Siswa: admin (semua kelas) + wali kelas (kelasnya saja, disaring di controller) ───
-    Route::middleware('permission:manage_absensi')->group(function () {
+    // ─── Absensi Siswa: admin (semua kelas) + wali kelas (kelasnya saja) — guard peran
+    //     ditangani langsung di AbsensiController (canAccess('manage_absensi') || walikelas),
+    //     JANGAN pasang middleware permission: di sini, nanti wali kelas dgn access role lain
+    //     (mis. kesiswaan/guru) yg belum diberi izin manage_absensi malah keblokir duluan. ───
+    Route::group([], function () {
         Route::get('/absensi', [AbsensiController::class, 'index'])->name('absensi.index');
         Route::post('/absensi', [AbsensiController::class, 'store'])->name('absensi.store');
         Route::get('/absensi/rekap', [AbsensiController::class, 'rekap'])->name('absensi.rekap');
     });
 
-    // ─── Wali Kelas: data siswa kelasnya, reset password, set sekretaris ───
-    Route::middleware('role:admin,walikelas')->prefix('walikelas')->name('walikelas.')->group(function () {
+    // ─── Wali Kelas: data siswa kelasnya, reset password, set sekretaris — guard peran
+    //     ditangani langsung di WalikelasController/NilaiController (cek relasi guru->walikelas,
+    //     bukan access role), sama seperti Absensi di atas. JANGAN pasang role: di sini. ───
+    Route::prefix('walikelas')->name('walikelas.')->group(function () {
         Route::get('/siswa', [WalikelasController::class, 'siswaIndex'])->name('siswa.index');
         Route::get('/siswa/{siswa}', [WalikelasController::class, 'siswaShow'])->name('siswa.show');
         Route::post('/siswa/{siswa}/reset', [WalikelasController::class, 'resetSiswa'])->name('siswa.reset');
@@ -369,10 +396,13 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
         Route::post('/sekretaris', [WalikelasController::class, 'sekretarisStore'])->name('sekretaris.store');
         Route::get('/nilai', [NilaiController::class, 'walikelasNilaiIndex'])->name('nilai.index');
     });
-
     // ─── Admin ─────────────────────────────────────────────────────────────
     Route::middleware('permission:manage_users')->group(function () {
         // Guru
+        Route::get('/guru/import/kredensial', [GuruController::class, 'importKredensial'])->name('guru.import.kredensial');
+        Route::get('/guru/import/template', [GuruController::class, 'downloadTemplate'])->name('guru.import.template');
+        Route::get('/guru/import', [GuruController::class, 'importForm'])->name('guru.import.form');
+        Route::post('/guru/import', [GuruController::class, 'import'])->name('guru.import');
         Route::resource('/guru', GuruController::class);
         Route::post('/guru/{uuid}/reset', [GuruController::class, 'reset'])->name('guru.reset');
         Route::get('/guru/{uuid}/pelajaran', [GuruController::class, 'pelajaran'])->name('guru.pelajaran');
@@ -486,6 +516,7 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
             Route::post('/mapel-rapor', 'setMapelRapor')->name('setting.mapelRapor');
             Route::post('/tanggal-rapor', 'setTanggalRapor')->name('setting.tanggalRapor');
             Route::post('/cara-absensi', 'setCaraAbsensi')->name('setting.caraAbsensi');
+            Route::post('/kiosk-token/regenerate', 'regenerateKioskToken')->name('setting.kioskToken.regenerate');
             Route::post('/agenda-wajib-pulang', 'setAgendaWajibPulang')->name('setting.agendaWajibPulang');
             Route::post('/jenis-aturan', 'setJenisAturan')->name('setting.jenisAturan');
             Route::post('/poin-terlambat-aturan', 'setPoinTerlambatAturan')->name('setting.poinTerlambatAturan');

@@ -37,26 +37,17 @@ class SiswaImport implements ToCollection, WithStartRow
                 continue;
             }
 
-            // NIS: pakai input jika ada & unik; kalau NIS input sudah ada, lewati baris ini
-            // (jangan buat siswa baru dgn NIS auto-generate — itu akan jadi duplikat siswa).
+            // NIS wajib ada & unik; kalau NIS kosong atau sudah ada, lewati baris ini
             $inputNis = trim((string)($row[1] ?? ''));
-            if ($inputNis !== '') {
-                if (Siswa::where('nis', $inputNis)->exists()) {
-                    $this->skipped++;
-                    continue;
-                }
-                $nis = $inputNis;
-            } else {
-                $nisRecord = Nis::firstOrCreate([], ['kode' => 1]);
-                do {
-                    $nis = str_pad($nisRecord->kode, 5, '0', STR_PAD_LEFT);
-                    $nisRecord->increment('kode');
-                } while (Siswa::where('nis', $nis)->exists());
+            if ($inputNis === '' || Siswa::where('nis', $inputNis)->exists()) {
+                $this->skipped++;
+                continue;
             }
+            $nis = $inputNis;
 
             // Akun siswa
             $passwordSiswa = Str::random(8);
-            $usernameSiswa = 'siswa.' . $nis;
+            $usernameSiswa = $nis;
             $userSiswa = User::create([
                 'username'   => $usernameSiswa,
                 'identifier' => $nis,
@@ -88,7 +79,7 @@ class SiswaImport implements ToCollection, WithStartRow
 
             // Akun orang tua
             $passwordOrtu = Str::random(8);
-            $usernameOrtu = 'ortu.' . $nis;
+            $usernameOrtu = 'P.' . $nis;
             $userOrtu = User::create([
                 'username'   => $usernameOrtu,
                 'identifier' => $nis . '-ortu',

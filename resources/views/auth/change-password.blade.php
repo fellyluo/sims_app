@@ -68,7 +68,7 @@
                 <div>
                     <p class="font-bold">Langkah 2: Amankan Akun Anda</p>
                     <p class="mt-0.5 text-xs text-amber-700/90 dark:text-amber-300/90 leading-relaxed">
-                        Username Anda berhasil diperbarui. Silakan pilih salah satu metode pengamanan akun di bawah ini (Ubah Password, Atur PIN, atau Aktifkan Biometrik) untuk menyelesaikan proses keamanan.
+                        Username Anda berhasil diperbarui. Silakan ubah password Anda di bawah ini untuk menyelesaikan proses keamanan.
                     </p>
                 </div>
             </div>
@@ -76,24 +76,8 @@
     @endif
 
     @if(!auth()->user()->must_change_password || auth()->user()->username_customized)
-        {{-- Tabs --}}
-        <div class="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-xl p-1 mb-5">
-            <button @click="setTab('password')" :class="tab==='password' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-slate-100' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'"
-                    class="flex-1 py-1.5 rounded-lg text-sm font-medium transition flex items-center justify-center gap-1.5">
-                <i data-lucide="key-round" class="w-4 h-4"></i> Password
-            </button>
-            <button @click="setTab('pin')" :class="tab==='pin' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-slate-100' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'"
-                    class="flex-1 py-1.5 rounded-lg text-sm font-medium transition flex items-center justify-center gap-1.5">
-                <i data-lucide="lock-keyhole" class="w-4 h-4"></i> PIN
-            </button>
-            <button @click="setTab('biometric')" :class="tab==='biometric' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-slate-100' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'"
-                    class="flex-1 py-1.5 rounded-lg text-sm font-medium transition flex items-center justify-center gap-1.5">
-                <i data-lucide="fingerprint" class="w-4 h-4"></i> Biometrik
-            </button>
-        </div>
-
         {{-- ===== Password Tab ===== --}}
-        <div x-show="tab==='password'" x-transition>
+        <div>
             <form method="POST" action="/ganti-password" class="card p-6 space-y-4" x-data="{ s1:false, s2:false, s3:false }">
                 @csrf
                 <div>
@@ -126,50 +110,8 @@
             </form>
         </div>
 
-        {{-- ===== PIN Tab ===== --}}
-        <div x-show="tab==='pin'" x-transition>
-            <div class="flex items-center gap-3 mb-4 p-4 rounded-xl bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700">
-                <div class="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-900 grid place-items-center flex-shrink-0">
-                    <i data-lucide="lock-keyhole" class="w-5 h-5 text-violet-600"></i>
-                </div>
-                <p class="text-xs text-violet-800 dark:text-violet-300">PIN 6 digit angka memungkinkan login kilat di perangkat mobile tanpa mengetik password.</p>
-            </div>
 
-            <form method="POST" action="/ganti-pin" class="card p-6 space-y-4">
-                @csrf
-                <div>
-                    <label class="form-label">Password (verifikasi)</label>
-                    <input type="password" name="password" required placeholder="Masukkan password Anda" class="form-input">
-                    @error('password')<p class="text-rose-500 text-xs mt-1.5">{{ $message }}</p>@enderror
-                </div>
-                <div>
-                    <label class="form-label">PIN Baru (6 digit)</label>
-                    <input type="password" name="pin" inputmode="numeric" maxlength="6" pattern="\d{6}" required placeholder="••••••" class="form-input text-center text-2xl tracking-[0.5em] font-mono">
-                    @error('pin')<p class="text-rose-500 text-xs mt-1.5">{{ $message }}</p>@enderror
-                </div>
-                <div>
-                    <label class="form-label">Konfirmasi PIN</label>
-                    <input type="password" name="pin_confirmation" inputmode="numeric" maxlength="6" pattern="\d{6}" required placeholder="••••••" class="form-input text-center text-2xl tracking-[0.5em] font-mono">
-                </div>
-                <button type="submit" class="btn-primary w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2">
-                    <i data-lucide="lock-keyhole" class="w-4 h-4"></i> Simpan PIN
-                </button>
-            </form>
-        </div>
 
-        {{-- ===== Biometric Tab ===== --}}
-        <div x-show="tab==='biometric'" x-transition class="card p-6 text-center space-y-5">
-            <div class="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 grid place-items-center mx-auto shadow-sm">
-                <i data-lucide="fingerprint" class="w-8 h-8"></i>
-            </div>
-            <div>
-                <h3 class="font-bold text-slate-800 dark:text-slate-100 text-base">Verifikasi Biometrik (WebAuthn)</h3>
-                <p class="text-xs text-slate-400 mt-1 leading-relaxed">Daftarkan sidik jari atau Face ID perangkat Anda untuk login cepat di peramban (browser) ini tanpa mengetik password.</p>
-            </div>
-            <button type="button" onclick="registerBiometric()" class="btn-primary w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2">
-                <i data-lucide="plus-circle" class="w-4 h-4"></i> Daftarkan Perangkat Biometrik
-            </button>
-        </div>
     @endif
 </div>
 

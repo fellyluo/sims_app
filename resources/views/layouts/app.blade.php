@@ -21,6 +21,12 @@
             ['user_uuid' => auth()->id()],
             \App\Models\UserPreference::defaults()
         );
+        // Mode kiosk: sidebar/header/ticker disembunyikan (lihat AbsensiController::kioskEnter).
+        $kioskChrome = (bool) session('kiosk_chrome', false);
+        // $access/$isAdmin dipakai di luar blok sidebar juga (mis. floating chat) — jadi
+        // dihitung di sini, bukan cuma di dalam <aside> yang bisa disembunyikan (mode kiosk).
+        $access  = auth()->user()?->access;
+        $isAdmin = in_array($access, ['superadmin','admin']);
         $fontMap = ['sm' => ['11px','13px','15px'], 'md' => ['12px','14px','16px'], 'lg' => ['13px','15px','17px']];
         $fonts = $fontMap[$pref->font_size ?? 'md'];
 
@@ -377,7 +383,8 @@
     <div class="flex-1 flex relative overflow-hidden">
         <div class="sidebar-overlay lg:hidden" @click="mobileOpen=false"></div>
 
-    {{-- ============ SIDEBAR ============ --}}
+    {{-- ============ SIDEBAR (disembunyikan di mode kiosk) ============ --}}
+    @unless($kioskChrome)
     <aside class="sidebar flex flex-col flex-shrink-0 z-50 fixed inset-y-0 left-0 lg:relative -translate-x-full lg:translate-x-0"
            :class="mini ? 'w-[78px] is-mini' : 'w-[258px]'"
            :style="sidebarStyle">
@@ -397,9 +404,7 @@
 
         <nav class="flex-1 overflow-y-auto px-3 py-2 pb-6 space-y-0.5">
             @php
-                $access  = auth()->user()?->access;
-                $isAdmin = in_array($access, ['superadmin','admin']);
-
+                // $access/$isAdmin sudah dihitung di atas (dekat $kioskChrome), dipakai lagi di sini.
                 // Grup menu: key => [label, ikon, items[]]; item = [route, [pattern...], ikon, label]
                 $groups = [];
                 if ($isAdmin || auth()->user()?->canAccess('manage_users')) {
@@ -452,7 +457,13 @@
                     $akademik[] = ['rekap.nilai', ['rekap.*'], 'table-2', 'Rekap Nilai'];
                     $akademik[] = ['cetak.rapor.index', ['cetak.*'], 'printer', 'Cetak Rapor'];
                 }
-                
+
+                if ($isAdmin || auth()->user()?->canAccess('manage_perangkat')) {
+                    $akademik[] = ['perangkat.index', ['perangkat.index', 'perangkat.show'], 'folder-check', 'Perangkat Ajar'];
+                } elseif (auth()->user()?->guru) {
+                    $akademik[] = ['perangkat.self', ['perangkat.self', 'perangkat.show'], 'folder-check', 'Perangkat Ajar Saya'];
+                }
+
                 if (auth()->user()?->siswa || $access === 'orangtua') {
                     $akademik[] = ['nilai.self', ['nilai.self'], 'chart-column', 'Nilai Saya'];
                 }
@@ -695,10 +706,12 @@
                 title="Seret untuk mengubah lebar menu. Klik dua kali untuk ciutkan."></button>
 
     </aside>
+    @endunless
 
     {{-- ============ MAIN ============ --}}
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
 
+        @unless($kioskChrome)
         <header class="h-16 flex items-center justify-between px-5 md:px-7 flex-shrink-0 gap-4 z-30">
             <div class="flex items-center gap-3 min-w-0 flex-1">
                 <button @click="mobileOpen=!mobileOpen" class="lg:hidden grid place-items-center w-9 h-9 rounded-xl hover:bg-black/5 text-slate-500 flex-shrink-0"><i data-lucide="menu" class="w-5 h-5"></i></button>
@@ -832,6 +845,7 @@
                 <span class="text-slate-600 dark:text-slate-300 font-semibold truncate">@yield('title', 'Dashboard')</span>
             @endisset
         </div>
+        @endunless
 
         <main class="flex-1 overflow-y-auto px-5 md:px-7 py-4 flex flex-col">
             <div class="anim-fade flex-1">@yield('content')</div>
@@ -843,7 +857,8 @@
     </div>
 </div>
 
-        {{-- SIMS-NET System Ticker Bar (Integrated for all roles, displaying real dashboard statistics) --}}
+        {{-- SIMS-NET System Ticker Bar (Integrated for all roles, displaying real dashboard statistics) — disembunyikan di mode kiosk --}}
+        @unless($kioskChrome)
         @php
             // Angka ticker diambil dari cache (App\Support\TickerStats) — menghindari
             // ~15 query agregat di setiap load halaman. Penyaringan per-role di bawah
@@ -1021,6 +1036,7 @@
                 </div>
             </div>
         </div>
+        @endunless
 </div>
 
 @if($myFace)
@@ -1060,7 +1076,7 @@
     @endif
 </div>
 
-@if(!$isAdmin)
+@if(!$isAdmin && !$kioskChrome)
 {{-- ─── Floating Asisten Sekolah ─────────────────────────────────────────────
      Bola mengambang untuk SEMUA role non-admin (siswa, ortu, guru, walikelas,
      waka, kepala, dll). Klik membuka panel chat yang meng-embed /chatbot via

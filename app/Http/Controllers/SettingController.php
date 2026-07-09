@@ -32,6 +32,7 @@ class SettingController extends Controller
         'manage_keuangan'=> 'Mengelola Modul Keuangan',
         'manage_pengumuman'=> 'Membuat & Mengelola Pengumuman',
         'manage_settings'=> 'Mengelola Pengaturan Sistem',
+        'manage_perangkat'=> 'Memantau Perangkat Ajar Guru',
     ];
 
     public function index()
@@ -161,6 +162,13 @@ class SettingController extends Controller
         $request->validate(['cara_absensi' => 'required|in:wajah,barcode']);
         Setting::set('cara_absensi_guru', $request->cara_absensi);
         return back()->with('success', 'Cara absensi disimpan.');
+    }
+
+    /** Buat/ganti token link kiosk absensi publik. Mengganti token otomatis mematikan link lama. */
+    public function regenerateKioskToken()
+    {
+        Setting::set('kiosk_token', \Illuminate\Support\Str::random(40));
+        return back()->with('success', 'Link kiosk absensi berhasil dibuat ulang. Link lama tidak berlaku lagi.');
     }
 
     public function setAgendaWajibPulang(Request $request)

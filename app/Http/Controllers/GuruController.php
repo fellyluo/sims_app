@@ -51,9 +51,9 @@ class GuruController extends Controller
         ]);
 
         // Buat akun login
-        $username = Str::slug($data['nama'], '.') . '.' . Str::random(4);
-        $password = Str::random(8);
         $identifier = $data['nik'] ?? $data['nip'] ?? null;
+        $username = $identifier ?? (Str::slug($data['nama'], '.') . '.' . Str::random(4));
+        $password = Str::random(8);
 
         $user = User::create([
             'username'   => $username,
@@ -264,5 +264,51 @@ class GuruController extends Controller
     {
         Guru::findOrFail($uuid)->update(['face_descriptor' => null, 'face_registered_at' => null]);
         return response()->json(['success' => true, 'message' => 'Data wajah dihapus.']);
+    }
+
+    // ─── Import Data ───────────────────────────────────────────────────────
+
+    public function importForm()
+    {
+        return view('guru.import');
+    }
+
+    public function import(Request $request)
+    {
+        $request->validate(['file' => 'required|mimes:xlsx,xls,csv|max:5120']);
+
+        try {
+            $import = new \App\Imports\GuruImport;
+            \Maatwebsite\Excel\Facades\Excel::import($import, $request->file('file'));
+
+            $msg = "Import selesai: {$import->imported} guru berhasil ditambahkan."
+                 . ($import->skipped > 0 ? " ({$import->skipped} baris dilewati)" : '');
+
+            // Simpan kredensial plaintext sementara ke session untuk diunduh.
+            if (!empty($import->kredensial)) {
+                session(['import_kredensial_guru' => $import->kredensial]);
+                $msg .= ' Silakan unduh Kredensial Login di halaman utama data guru.';
+            }
+
+            return redirect()->route('guru.index')->with('success', $msg);
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Gagal import: ' . $e->getMessage());
+        }
+    }
+
+    /** Unduh sekali kredensial login guru hasil import terakhir, lalu hapus dari session. */
+    public function importKredensial()
+    {
+        $data = session('import_kredensial_guru');
+        abort_if(empty($data), 404, 'Tidak ada data kredensial untuk diunduh (mungkin sudah diunduh atau sesi berakhir).');
+
+        session()->forget('import_kredensial_guru');
+
+        return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\GuruImportKredensialExport($data), 'Kredensial Guru Baru.xlsx');
+    }
+
+    public function downloadTemplate()
+    {
+        return \Maatwebsite\Excel\Facades\Excel::download(new \App\Exports\GuruTemplateExport, 'template_import_guru.xlsx');
     }
 }

@@ -28,8 +28,8 @@
                     <input type="text" name="nama" value="{{ old('nama', $guru->nama) }}" required class="form-input">
                 </div>
                 <div>
-                    <label class="form-label">NIK</label>
-                    <input type="text" name="nik" value="{{ old('nik', $guru->nik) }}" class="form-input">
+                    <label class="form-label">NIK (Nomor Induk Karyawan)</label>
+                    <input type="text" name="nik" value="{{ old('nik', $guru->nik) }}" class="form-input" placeholder="Masukkan NIK">
                 </div>
                 <div>
                     <label class="form-label">NIP</label>

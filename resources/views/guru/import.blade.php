@@ -1,17 +1,17 @@
 @extends('layouts.app')
-@section('title', 'Import Siswa')
+@section('title', 'Import Guru')
 
 @section('content')
-@php $breadcrumbs = [['label'=>'Data Siswa','url'=>route('siswa.index')], ['label'=>'Import','url'=>'#']]; @endphp
+@php $breadcrumbs = [['label'=>'Data Guru','url'=>route('guru.index')], ['label'=>'Import','url'=>'#']]; @endphp
 
 <div class="max-w-xl mx-auto space-y-5">
     <div class="flex items-center gap-3">
-        <a href="{{ route('siswa.index') }}" class="grid place-items-center w-10 h-10 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-primary hover:border-primary transition">
+        <a href="{{ route('guru.index') }}" class="grid place-items-center w-10 h-10 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-primary hover:border-primary transition">
             <i data-lucide="arrow-left" class="w-5 h-5"></i>
         </a>
         <div>
-            <h1 class="page-title">Import Siswa</h1>
-            <p class="text-sm text-slate-500 dark:text-slate-400">Tambah banyak siswa sekaligus via Excel</p>
+            <h1 class="page-title">Import Guru</h1>
+            <p class="text-sm text-slate-500 dark:text-slate-400">Tambah banyak guru sekaligus via Excel</p>
         </div>
     </div>
 
@@ -21,24 +21,24 @@
             <ul class="space-y-1 list-disc list-inside text-xs">
                 <li>Download template Excel terlebih dahulu</li>
                 <li>Isi data mulai baris setelah contoh — baris "CONTOH" otomatis dilewati</li>
-                <li>Kolom NIS wajib diisi (harus unik). Baris dgn NIS yang sudah terdaftar akan dilewati</li>
-                <li>Akun login siswa dan orang tua dibuat otomatis</li>
+                <li>Kolom NIK wajib diisi dengan Nomor Induk Karyawan</li>
+                <li>Akun login guru dibuat otomatis (username menggunakan NIK/NIP)</li>
                 <li>Format: .xlsx atau .xls (maksimal 5MB)</li>
             </ul>
         </div>
 
-        <a href="{{ route('siswa.template') }}"
+        <a href="{{ route('guru.import.template') }}"
            class="flex items-center gap-3 p-4 rounded-xl border-2 border-dashed border-emerald-300 dark:border-emerald-700 hover:border-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition text-emerald-700 dark:text-emerald-400">
             <div class="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900 grid place-items-center flex-shrink-0">
                 <i data-lucide="download" class="w-5 h-5"></i>
             </div>
             <div>
                 <p class="font-semibold text-sm">Download Template Excel</p>
-                <p class="text-xs opacity-70">template_import_siswa.xlsx</p>
+                <p class="text-xs opacity-70">template_import_guru.xlsx</p>
             </div>
         </a>
 
-        <form method="POST" action="{{ route('siswa.import') }}" enctype="multipart/form-data" class="space-y-4">
+        <form method="POST" action="{{ route('guru.import') }}" enctype="multipart/form-data" class="space-y-4">
             @csrf
             <div>
                 <label class="form-label">Upload File Excel</label>
@@ -51,7 +51,7 @@
                 </label>
             </div>
             <button type="submit" class="btn-primary w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2">
-                <i data-lucide="upload" class="w-4 h-4"></i> Upload &amp; Import Siswa
+                <i data-lucide="upload" class="w-4 h-4"></i> Upload &amp; Import Guru
             </button>
         </form>
     </div>

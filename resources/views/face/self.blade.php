@@ -23,7 +23,7 @@
         <div class="grid md:grid-cols-2 gap-0">
             {{-- Kamera --}}
             <div class="p-5 sm:p-6 space-y-4 md:border-r border-slate-100 dark:border-slate-700">
-                <div class="relative rounded-2xl overflow-hidden bg-slate-900 aspect-[4/3]">
+                <div class="relative rounded-2xl overflow-hidden bg-slate-900 aspect-[3/4] sm:aspect-[4/3]">
                     <video x-ref="video" autoplay muted playsinline class="w-full h-full object-cover" :class="streaming ? '' : 'opacity-0'"></video>
                     <div x-show="!streaming" class="absolute inset-0 grid place-items-center text-slate-300 text-sm">
                         <div class="text-center px-6">

@@ -176,6 +176,18 @@ class ClassroomMaterialController extends Controller implements \Illuminate\Rout
         return Storage::disk('public')->download($file->path, $file->original_name);
     }
 
+    /** Tampilkan file (gambar/PDF) inline di modal tanpa pindah halaman — dibutuhkan utk materi terkunci (layar penuh). */
+    public function preview(ClassroomMaterialFile $file)
+    {
+        $this->authorize('view', $file->material->classroom);
+        abort_unless(Storage::disk('public')->exists($file->path), 404);
+
+        return response()->file(Storage::disk('public')->path($file->path), [
+            'Content-Type' => $file->mime,
+            'Content-Disposition' => 'inline; filename="' . $file->original_name . '"',
+        ]);
+    }
+
     // ─────────────── Materi terkunci (token + layar penuh) — via HandlesContentLock ───────────────
 
     public function toggleLock(Request $request, ClassroomMaterial $material)

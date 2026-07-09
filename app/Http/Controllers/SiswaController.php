@@ -80,7 +80,7 @@ class SiswaController extends Controller
         $nis = $data['nis'];
 
         // Akun siswa
-        $username = 'siswa.' . $nis;
+        $username = $nis;
         $password = Str::random(8);
 
         $userSiswa = User::create([
@@ -94,7 +94,7 @@ class SiswaController extends Controller
         $siswa = Siswa::create($data);
 
         // Akun orang tua
-        $usernameOrtu = 'ortu.' . $nis;
+        $usernameOrtu = 'P.' . $nis;
         $passwordOrtu = Str::random(8);
         $userOrtu = User::create([
             'username'   => $usernameOrtu,

@@ -28,8 +28,8 @@
                     <input type="text" name="nama" value="{{ old('nama') }}" required autofocus class="form-input" placeholder="Nama sesuai ijazah">
                 </div>
                 <div>
-                    <label class="form-label">NIK</label>
-                    <input type="text" name="nik" value="{{ old('nik') }}" class="form-input" placeholder="16 digit NIK">
+                    <label class="form-label">NIK (Nomor Induk Karyawan)</label>
+                    <input type="text" name="nik" value="{{ old('nik') }}" class="form-input" placeholder="Masukkan NIK">
                 </div>
                 <div>
                     <label class="form-label">NIP</label>

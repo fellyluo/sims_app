@@ -176,7 +176,7 @@
                     <ul class="text-xs space-y-0.5 list-disc list-inside">
                         <li>Gunakan template Excel yang tersedia</li>
                         <li>Baris contoh (diawali "CONTOH") otomatis dilewati</li>
-                        <li>NIS bisa diisi manual atau dikosongkan (dibuat otomatis). Baris dgn NIS yang sudah terdaftar akan dilewati</li>
+                        <li>Kolom NIS wajib diisi (harus unik). Baris dgn NIS yang sudah terdaftar akan dilewati</li>
                         <li>Akun siswa & orang tua dibuat otomatis</li>
                         <li>Format file: .xlsx atau .xls (maks 5MB)</li>
                     </ul>

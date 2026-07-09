@@ -15,19 +15,19 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
 
-class SiswaTemplateExport implements FromArray, WithHeadings, WithStyles, WithColumnWidths, WithTitle, WithEvents
+class GuruTemplateExport implements FromArray, WithHeadings, WithStyles, WithColumnWidths, WithTitle, WithEvents
 {
     /** Kolom dalam bahasa Indonesia yang rapi */
     public array $columns = [
-        'Nama Lengkap', 'NIS', 'NISN', 'Jenis Kelamin (L/P)',
-        'Tempat Lahir', 'Tanggal Lahir (YYYY-MM-DD)', 'Agama', 'No. HP',
-        'Alamat', 'Nama Ayah', 'Pekerjaan Ayah', 'No. HP Ayah',
-        'Nama Ibu', 'Pekerjaan Ibu', 'No. HP Ibu', 'Asal Sekolah', 'SPP',
+        'Nama Lengkap', 'NIK (Nomor Induk Karyawan)', 'NIP (opsional)', 'Jenis Kelamin (L/P)',
+        'Tempat Lahir', 'Tanggal Lahir (YYYY-MM-DD)', 'Agama', 'Alamat',
+        'Tingkat Studi', 'Program Studi', 'Universitas', 'Tahun Tamat',
+        'TMT Mengajar (YYYY-MM-DD)', 'TMT SMP (YYYY-MM-DD)', 'No. Telp',
     ];
 
     public function title(): string
     {
-        return 'Data Siswa';
+        return 'Data Guru';
     }
 
     public function headings(): array
@@ -39,28 +39,28 @@ class SiswaTemplateExport implements FromArray, WithHeadings, WithStyles, WithCo
     public function array(): array
     {
         return [
-            ['CONTOH - Ahmad Fauzi', '', '0098765432', 'L', 'Jakarta', '2011-03-12', 'Islam', '081234567890',
-             'Jl. Melati No. 10, Jakarta', 'Budi Santoso', 'Wiraswasta', '081200000001',
-             'Siti Aminah', 'Ibu Rumah Tangga', '081200000002', 'SD Negeri 1 Jakarta', '350000'],
-            ['CONTOH - Putri Lestari', '24001', '0091234567', 'P', 'Bandung', '2011-07-25', 'Kristen', '081298765432',
-             'Jl. Mawar No. 5, Bandung', 'Anton Wijaya', 'PNS', '081300000001',
-             'Dewi Sartika', 'Guru', '081300000002', 'SD Negeri 3 Bandung', '350000'],
+            ['CONTOH - Budi Santoso, S.Pd', '1234567890', '198001012005011001', 'L', 'Jakarta', '1980-01-01', 'Islam', 'Jl. Sudirman No. 10',
+             'S1', 'Pendidikan Matematika', 'Universitas Negeri Jakarta', '2004',
+             '2005-01-01', '2010-07-01', '081234567890'],
+            ['CONTOH - Siti Aminah, S.E', '0987654321', '', 'P', 'Bandung', '1985-05-15', 'Islam', 'Jl. Melati No. 5',
+             'S1', 'Akuntansi', 'Universitas Padjadjaran', '2007',
+             '2008-01-01', '2015-07-01', '081298765432'],
         ];
     }
 
     public function columnWidths(): array
     {
         return [
-            'A' => 24, 'B' => 14, 'C' => 16, 'D' => 18, 'E' => 16, 'F' => 26,
-            'G' => 14, 'H' => 18, 'I' => 32, 'J' => 20, 'K' => 18, 'L' => 18,
-            'M' => 20, 'N' => 18, 'O' => 18, 'P' => 24, 'Q' => 12,
+            'A' => 28, 'B' => 20, 'C' => 22, 'D' => 18, 'E' => 16, 'F' => 26,
+            'G' => 14, 'H' => 32, 'I' => 14, 'J' => 24, 'K' => 28, 'L' => 14,
+            'M' => 26, 'N' => 24, 'O' => 18,
         ];
     }
 
     public function styles(Worksheet $sheet)
     {
         // Baris contoh dibuat italic abu-abu
-        $sheet->getStyle('A2:Q3')->getFont()->setItalic(true)->getColor()->setRGB('94A3B8');
+        $sheet->getStyle('A2:O3')->getFont()->setItalic(true)->getColor()->setRGB('94A3B8');
         return [];
     }
 
@@ -69,7 +69,7 @@ class SiswaTemplateExport implements FromArray, WithHeadings, WithStyles, WithCo
         return [
             AfterSheet::class => function (AfterSheet $event) {
                 $sheet = $event->sheet->getDelegate();
-                $lastCol = 'Q';
+                $lastCol = 'O';
 
                 // ===== Header style (baris 1) =====
                 $sheet->getStyle("A1:{$lastCol}1")->applyFromArray([

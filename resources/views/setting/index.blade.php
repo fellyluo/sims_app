@@ -255,6 +255,31 @@
             <button type="submit" class="btn-primary px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> Simpan</button>
         </form>
 
+        {{-- Link Kiosk Absensi --}}
+        <div class="card p-6 space-y-3" x-data="{ copied:false, url:'{{ $settings['kiosk_token'] ?? '' ? url('/kiosk-absensi/'.$settings['kiosk_token']) : '' }}',
+            copy(){ navigator.clipboard.writeText(this.url); this.copied=true; setTimeout(()=>this.copied=false,1800); } }">
+            <div>
+                <h2 class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2"><i data-lucide="monitor-smartphone" class="w-4 h-4 text-primary"></i> Link Kiosk Absensi</h2>
+                <p class="text-xs text-slate-400 mt-1 leading-relaxed">Link rahasia tanpa perlu login — buka langsung Scan Wajah/QR sesuai metode aktif di atas. Jadikan shortcut di komputer meja piket supaya guru bisa langsung absen sendiri.</p>
+            </div>
+            @if($settings['kiosk_token'] ?? null)
+            <div class="flex flex-wrap items-center gap-2">
+                <input type="text" readonly :value="url" onclick="this.select()" class="form-input flex-1 min-w-64 font-mono text-xs">
+                <button type="button" @click="copy()" class="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">
+                    <i data-lucide="copy" class="w-4 h-4" x-show="!copied"></i>
+                    <i data-lucide="check" class="w-4 h-4 text-emerald-500" x-show="copied" x-cloak></i>
+                    <span x-text="copied ? 'Tersalin' : 'Salin Link'"></span>
+                </button>
+            </div>
+            @endif
+            <form method="POST" action="{{ route('setting.kioskToken.regenerate') }}" onsubmit="return confirmAction(this, '{{ ($settings['kiosk_token'] ?? null) ? 'Buat ulang link kiosk? Link lama tidak akan berlaku lagi.' : 'Buat link kiosk absensi?' }}', 'orange')">
+                @csrf
+                <button class="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold border border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:hover:bg-amber-900/30">
+                    <i data-lucide="refresh-cw" class="w-4 h-4"></i> {{ ($settings['kiosk_token'] ?? null) ? 'Buat Ulang Link' : 'Buat Link Kiosk' }}
+                </button>
+            </form>
+        </div>
+
         {{-- Wajib isi agenda sebelum absen pulang --}}
         <form method="POST" action="{{ route('setting.agendaWajibPulang') }}" class="card p-6"
               x-data="{ on: {{ ($settings['agenda_wajib_pulang'] ?? '1')=='1' ? 'true' : 'false' }} }">

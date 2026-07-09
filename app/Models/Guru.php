@@ -43,6 +43,11 @@ class Guru extends Model
         return $this->hasMany(Ngajar::class, 'id_guru', 'uuid');
     }
 
+    public function perangkatUploads()
+    {
+        return $this->hasMany(PerangkatAjarGuru::class, 'id_guru', 'uuid');
+    }
+
     public function getNamaLoginAttribute(): string
     {
         return $this->user?->username ?? '-';

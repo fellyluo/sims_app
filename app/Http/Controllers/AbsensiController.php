@@ -7,16 +7,52 @@ use App\Models\Kelas;
 use App\Models\Siswa;
 use App\Models\Guru;
 use App\Models\PresensiGuru;
+use App\Models\RolePermission;
 use App\Models\Setting;
+use App\Models\User;
+use App\Support\AbsensiGuru;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class AbsensiController extends Controller
 {
+    /** Username tetap akun perangkat kiosk (bukan orang sungguhan, dibuat lazy saat link pertama dipakai). */
+    private const KIOSK_USERNAME = '__kiosk_absensi__';
+
     /** Kelas homeroom guru saat ini bila BUKAN admin (null berarti admin = boleh semua kelas). */
     private function walikelasKelasId(): ?string
     {
         return auth()->user()->canAccess('manage_absensi') ? null : auth()->user()->guru?->walikelas?->id_kelas;
+    }
+
+    /**
+     * Masuk mode kiosk publik via link rahasia (tanpa login manual) — dipakai sbg shortcut
+     * di komputer meja piket, supaya guru bisa langsung scan tanpa minta admin login-kan.
+     * Login sbg akun perangkat khusus (role 'kiosk', hanya diberi izin manage_absensi),
+     * lalu diarahkan ke halaman scan wajah/QR sesuai metode aktif sekolah.
+     */
+    public function kioskEnter(string $token)
+    {
+        $real = Setting::get('kiosk_token');
+        abort_unless($real && hash_equals((string) $real, $token), 404);
+
+        $kiosk = User::firstOrCreate(
+            ['username' => self::KIOSK_USERNAME],
+            [
+                'access'               => 'kiosk',
+                'password'             => Str::random(40),
+                'must_change_password' => false,
+            ]
+        );
+        RolePermission::firstOrCreate(['role' => 'kiosk', 'permission' => 'manage_absensi']);
+
+        Auth::login($kiosk);
+        // Tandai seluruh sesi ini "kiosk" → layout (sidebar/header/ticker) disembunyikan, lihat layouts/app.blade.php.
+        session(['kiosk_chrome' => true]);
+
+        return AbsensiGuru::bolehQr() ? redirect()->route('qr.absensi') : redirect()->route('absensi.scan');
     }
 
     public function index(Request $request)
