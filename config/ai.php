@@ -36,6 +36,31 @@ return [
     'max_input_chars'   => (int) env('AI_MAX_INPUT_CHARS', 8000),
     'max_output_tokens' => (int) env('AI_MAX_OUTPUT_TOKENS', 1024),
 
+    /*
+    | Grounding Google Search — AI boleh mencari di web untuk pertanyaan yang
+    | butuh info terkini/faktual, lalu menautkan sumber. Hanya didukung model
+    | Gemini 2.0+ (tool google_search) / 1.5 (google_search_retrieval).
+    | Matikan (AI_GROUNDING=false) bila ingin jawaban murni dari pengetahuan model.
+    */
+    'grounding' => (bool) env('AI_GROUNDING', true),
+
+    /*
+    | Hemat kuota free tier: saat grounding aktif, pencarian web HANYA dipakai
+    | bila pesan mengandung salah satu kata kunci di bawah (sinyal butuh info
+    | terkini/faktual). Pertanyaan biasa (mis. "buatkan soal", "jelaskan materi")
+    | dijawab dari pengetahuan model — gratis, tanpa memakai kuota grounding.
+    | Kosongkan array ini bila ingin SELALU grounding saat aktif.
+    */
+    'grounding_triggers' => [
+        'terbaru', 'terkini', 'terupdate', 'update', 'sekarang', 'saat ini',
+        'hari ini', 'minggu ini', 'bulan ini', 'tahun ini', 'berita', 'kabar',
+        'harga', 'kurs', 'nilai tukar', 'saham', 'crypto', 'bitcoin',
+        'cuaca', 'ramalan', 'skor', 'hasil pertandingan', 'klasemen', 'juara',
+        'pemenang', 'rilis', 'launching', 'viral', 'trending', 'tren',
+        'di internet', 'menurut google', 'cari di internet', 'browsing',
+        '2024', '2025', '2026', '2027', '2028',
+    ],
+
     // Kreativitas default. 0.0 = deterministik, 1.0 = kreatif.
     'temperature' => (float) env('AI_TEMPERATURE', 0.7),
 
@@ -114,12 +139,17 @@ return [
     'chat' => [
         'history_limit' => (int) env('AI_CHAT_HISTORY', 10),
         'faq' => env('AI_CHAT_FAQ', <<<'TXT'
-            Konteks aplikasi: SIMS adalah Sistem Informasi Manajemen Sekolah tempat
-            pengguna (siswa, orang tua, guru, wali kelas, dan staf) mengakses jadwal,
-            nilai/rapor, absensi, keuangan/SPP, agenda, forum, dan pengumuman.
+            Konteks aplikasi: kamu hidup di dalam SIMS (Sistem Informasi Manajemen
+            Sekolah) yang dipakai siswa, orang tua, guru, wali kelas, dan staf. Namun
+            kamu adalah asisten SERBA BISA, bukan sekadar bot sekolah.
 
             Perilakumu sebagai chatbot:
-            - Bantu pertanyaan umum sekolah dan cara memakai fitur aplikasi SIMS.
+            - Jawab APAPUN yang pengguna tanyakan dengan sebaik mungkin: materi pelajaran,
+              contoh soal & latihan beserta pembahasan, tugas, penjelasan konsep, menulis,
+              menerjemahkan, coding, ide, maupun pertanyaan umum di luar sekolah.
+            - Bila pengguna minta "cari soal" atau latihan, susun soal yang relevan
+              dengan topik/jenjang yang diminta, lalu sertakan kunci jawaban/pembahasan
+              singkat kecuali diminta lain.
             - Kamu BOLEH dan SEHARUSNYA menggunakan informasi yang pengguna sampaikan
               sendiri di dalam percakapan ini (mis. nama, kelas, atau hal yang tadi
               ia sebutkan) untuk menjawab secara natural dan berkesinambungan.
@@ -127,8 +157,6 @@ return [
               nominal tagihan SPP, data absensi, atau jadwal individu — yang TIDAK ada
               di percakapan. Untuk itu, arahkan pengguna membuka menu terkait di SIMS
               atau menghubungi pihak sekolah/admin, jangan menebak angkanya.
-            - Bila info sekolah (jam operasional, kontak, prosedur) tidak tersedia,
-              katakan kamu belum punya datanya, jangan mengarang.
             TXT),
     ],
 
@@ -138,13 +166,18 @@ return [
     | Menekankan kejujuran: AI tak boleh mengarang data sekolah yang tak diberikan.
     */
     'system_prompt' => env('AI_SYSTEM_PROMPT', <<<'TXT'
-        Kamu adalah AsistenAI, asisten cerdas di dalam aplikasi sekolah SIMS.
-        Jawab dalam Bahasa Indonesia yang jelas, sopan, dan ringkas.
-        Jangan pernah mengarang data sekolah (nilai, absensi, keuangan, jadwal)
-        yang tidak diberikan secara eksplisit di dalam prompt. Bila kamu tidak
-        yakin atau datanya tidak tersedia, katakan terus terang dan sarankan
-        pengguna menghubungi pihak sekolah. Jangan memberi nasihat medis, hukum,
-        atau finansial yang mengikat.
+        Kamu adalah AsistenAI, asisten cerdas serba bisa yang tersedia di dalam
+        aplikasi sekolah SIMS. Kamu BOLEH membantu segala macam topik — bukan hanya
+        seputar sekolah. Contohnya: menjelaskan materi & konsep, membuat atau mencari
+        contoh soal/latihan beserta pembahasannya, membantu tugas, menulis, menerjemahkan,
+        berhitung, memberi ide, sampai pertanyaan pengetahuan umum sehari-hari.
+        Jawab dalam Bahasa Indonesia yang jelas, sopan, dan ringkas (kecuali diminta lain).
+        Satu-satunya batasan keras: JANGAN pernah mengarang DATA RESMI SEKOLAH milik
+        pengguna — nilai/rapor, nominal SPP/keuangan, absensi, atau jadwal individu —
+        yang tidak diberikan secara eksplisit di dalam prompt. Untuk data seperti itu,
+        arahkan pengguna membuka menu terkait di SIMS atau menghubungi pihak sekolah.
+        Untuk topik sensitif (medis, hukum, finansial), boleh memberi penjelasan umum
+        dan edukatif, tetapi ingatkan agar keputusan penting dikonsultasikan ke ahli.
         TXT),
 
 ];

@@ -66,10 +66,7 @@ class AiChatController extends Controller
         ]);
 
         try {
-            $result = $this->gemini->generate($message, [
-                'system'  => config('ai.chat.faq'),
-                'history' => $history,
-            ]);
+            $result = $this->generateChat($message, config('ai.chat.faq'), $history);
         } catch (RuntimeException $e) {
             $this->logAiUsage($userId, 'chat', config('ai.model'), 0, 0, 'error');
 
@@ -80,9 +77,12 @@ class AiChatController extends Controller
             ], 502);
         }
 
+        // Tempelkan daftar sumber (bila jawaban di-grounding ke Google Search).
+        $answer = $this->appendSources($result['text'], $result['sources'] ?? []);
+
         $conversation->messages()->create([
             'role'           => 'assistant',
-            'content'        => $result['text'],
+            'content'        => $answer,
             'token_estimate' => $result['completion_tokens'],
         ]);
         $conversation->touch(); // dorong ke atas daftar riwayat
@@ -100,8 +100,73 @@ class AiChatController extends Controller
             'ok'              => true,
             'conversation_id' => $conversation->uuid,
             'title'           => $conversation->title,
-            'answer'          => $result['text'],
+            'answer'          => $answer,
         ]);
+    }
+
+    /**
+     * Panggil Gemini untuk chat dengan grounding Google Search bila diaktifkan.
+     * Free-tier safe: bila panggilan ber-grounding gagal (mis. grounding tidak
+     * tersedia / kuota harian free tier habis), otomatis diulang TANPA grounding
+     * agar pengguna tetap dapat jawaban tanpa perlu paket berbayar.
+     */
+    private function generateChat(string $message, string $system, array $history): array
+    {
+        $base = ['system' => $system, 'history' => $history];
+
+        if (! config('ai.grounding') || ! $this->shouldGround($message)) {
+            return $this->gemini->generate($message, $base);
+        }
+
+        try {
+            return $this->gemini->generate($message, $base + ['grounding' => true]);
+        } catch (RuntimeException $e) {
+            report($e); // catat penyebabnya, lalu jatuh ke jawaban tanpa grounding
+            return $this->gemini->generate($message, $base);
+        }
+    }
+
+    /**
+     * Heuristik hemat kuota: grounding hanya untuk pesan yang mengandung sinyal
+     * butuh info terkini/faktual dari web (lihat config ai.grounding_triggers).
+     * Bila daftar trigger kosong → selalu true (grounding untuk semua pesan).
+     */
+    private function shouldGround(string $message): bool
+    {
+        $triggers = (array) config('ai.grounding_triggers', []);
+        if ($triggers === []) {
+            return true;
+        }
+
+        $haystack = mb_strtolower($message);
+        foreach ($triggers as $trigger) {
+            $trigger = mb_strtolower(trim((string) $trigger));
+            if ($trigger !== '' && str_contains($haystack, $trigger)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Tambahkan blok "Sumber" berisi tautan hasil Google Search (grounding)
+     * ke akhir jawaban. Aman bila kosong (mengembalikan teks apa adanya).
+     *
+     * @param  array<int,array{title:string,uri:string}>  $sources
+     */
+    private function appendSources(string $text, array $sources): string
+    {
+        if ($sources === []) {
+            return $text;
+        }
+
+        $lines = ["\n\nSumber:"];
+        foreach ($sources as $i => $s) {
+            $lines[] = ($i + 1).'. '.$s['title'].' — '.$s['uri'];
+        }
+
+        return $text.implode("\n", $lines);
     }
 
     /** GET /ai/chat/history — daftar percakapan user (untuk riwayat). */

@@ -50,6 +50,11 @@ class GeminiService
             ],
         ];
 
+        // Grounding Google Search: biarkan model mencari di web & menautkan sumber.
+        if (!empty($options['grounding'])) {
+            $body['tools'] = [$this->groundingTool($model)];
+        }
+
         $url = rtrim(config('ai.base_url'), '/')."/models/{$model}:generateContent";
 
         try {
@@ -153,7 +158,47 @@ class GeminiService
             'model'             => $model,
             'prompt_tokens'     => (int) ($usage['promptTokenCount'] ?? 0),
             'completion_tokens' => (int) ($usage['candidatesTokenCount'] ?? 0),
+            'sources'           => $this->extractSources($candidate),
         ];
+    }
+
+    /**
+     * Tool grounding sesuai versi model: Gemini 2.0+ pakai `google_search`,
+     * Gemini 1.5/1.0 memakai `google_search_retrieval`. Objek kosong (stdClass)
+     * agar ter-encode `{}` bukan `[]` di JSON.
+     */
+    private function groundingTool(string $model): array
+    {
+        if (str_contains($model, '1.5') || str_contains($model, '1.0')) {
+            return ['google_search_retrieval' => new \stdClass()];
+        }
+
+        return ['google_search' => new \stdClass()];
+    }
+
+    /**
+     * Ambil daftar sumber (judul + URL) dari groundingMetadata bila model
+     * memakai hasil pencarian. Ter-dedup per URL. Kosong bila tak ada grounding.
+     *
+     * @return array<int,array{title:string,uri:string}>
+     */
+    private function extractSources(?array $candidate): array
+    {
+        $chunks = $candidate['groundingMetadata']['groundingChunks'] ?? [];
+        $sources = [];
+
+        foreach ($chunks as $chunk) {
+            $uri = $chunk['web']['uri'] ?? null;
+            if (!$uri || isset($sources[$uri])) {
+                continue;
+            }
+            $sources[$uri] = [
+                'title' => (string) ($chunk['web']['title'] ?? $uri),
+                'uri'   => $uri,
+            ];
+        }
+
+        return array_values($sources);
     }
 
     /** Terjemahkan status HTTP Gemini jadi pesan Bahasa Indonesia yang aman. */
