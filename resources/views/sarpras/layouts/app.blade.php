@@ -1,13 +1,13 @@
 {{--
-    Layout modul Sarpras — terintegrasi ke shell SIMS.
+    Layout modul Sarpras - terintegrasi ke shell SIMS.
     Memakai layout utama SIMS (sidebar, topbar, tema, font, Tailwind CDN).
 
     Slot yang bisa diisi view:
-      @section('title')            → judul tab browser (dipakai layouts.app)
-      @section('sarpras_title')    → judul besar header (default "Sarana & Prasarana")
-      @section('sarpras_subtitle') → subjudul header
-      @section('sarpras_actions')  → tombol aksi kanan header
-      @section('sarpras_body')     → konten halaman
+      @section('title')            -> judul tab browser (dipakai layouts.app)
+      @section('sarpras_title')    -> judul besar header (default "Sarana & Prasarana")
+      @section('sarpras_subtitle') -> subjudul header
+      @section('sarpras_actions')  -> tombol aksi kanan header
+      @section('sarpras_body')     -> konten halaman
 --}}
 @extends('layouts.app')
 
@@ -47,6 +47,39 @@
 .dark .sarpras-scope .hover\:bg-gray-50:hover,
 .dark .sarpras-scope .hover\:bg-gray-100:hover { background-color:#334155 !important; }
 
+/* Tabel Sarpras: teks panjang harus membungkus, bukan keluar dari kartu. */
+.sarpras-scope { max-width:100%; overflow-wrap:anywhere; }
+.sarpras-scope .card,
+.sarpras-scope .table-responsive,
+.sarpras-scope .dataTables_wrapper,
+.sarpras-scope .dataTables_scroll,
+.sarpras-scope .dataTables_scrollHead,
+.sarpras-scope .dataTables_scrollBody { max-width:100%; }
+.sarpras-scope .dataTables_wrapper { overflow-x:auto; }
+.sarpras-scope table:not(.ttd) { max-width:100%; }
+.sarpras-scope table:not(.ttd) th,
+.sarpras-scope table:not(.ttd) td,
+.sarpras-scope table.dataTable.nowrap th,
+.sarpras-scope table.dataTable.nowrap td,
+.sarpras-scope .data-table th,
+.sarpras-scope .data-table td {
+    white-space:normal !important;
+    overflow-wrap:anywhere;
+    word-break:break-word;
+    vertical-align:top;
+}
+.sarpras-scope td .badge,
+.sarpras-scope th .badge,
+.sarpras-scope td a,
+.sarpras-scope th a { max-width:100%; }
+.sarpras-scope td .badge,
+.sarpras-scope th .badge { white-space:normal; text-align:center; }
+.sarpras-scope td form,
+.sarpras-scope td .inline-flex,
+.sarpras-scope td .flex { flex-wrap:wrap; }
+.sarpras-scope .dt-nowrap,
+.sarpras-scope .whitespace-nowrap:not(.sarpras-keep-nowrap) { white-space:normal !important; }
+
 /* Tab nav sarpras */
 .sarpras-tabs::-webkit-scrollbar { height:4px; }
 .sarpras-tabs::-webkit-scrollbar-thumb { background:rgb(203 213 225 / .6); border-radius:9999px; }
@@ -78,8 +111,36 @@
         </div>
     </div>
 
-
-
+    {{-- Navigasi struktur modul Sarpras --}}
+    @php
+        $sarprasNav = [
+            ['label' => 'Dashboard', 'icon' => 'layout-dashboard', 'route' => 'sarpras.dashboard', 'active' => ['sarpras.dashboard'], 'can' => 'sarpras.dashboard.lihat'],
+            ['label' => 'Kerusakan', 'icon' => 'triangle-alert', 'route' => 'sarpras.kerusakan.index', 'active' => ['sarpras.kerusakan.*'], 'can' => 'sarpras.kerusakan.lihat'],
+            ['label' => 'Inventaris', 'icon' => 'package', 'route' => 'sarpras.aset.index', 'active' => ['sarpras.aset.*'], 'can' => 'sarpras.aset.lihat'],
+            ['label' => 'Denah Sekolah', 'icon' => 'map', 'route' => 'sarpras.denah.index', 'active' => ['sarpras.denah.*', 'sarpras.ruangan.*'], 'can' => 'sarpras.denah.lihat'],
+            ['label' => 'Booking', 'icon' => 'calendar-check', 'route' => 'sarpras.booking.index', 'active' => ['sarpras.booking.*'], 'can' => 'sarpras.peminjaman.lihat'],
+            ['label' => 'Peminjaman', 'icon' => 'hand-helping', 'route' => 'sarpras.peminjaman.index', 'active' => ['sarpras.peminjaman.*'], 'can' => 'sarpras.peminjaman.lihat'],
+            ['label' => 'Pengadaan', 'icon' => 'shopping-cart', 'route' => 'sarpras.pengadaan.index', 'active' => ['sarpras.pengadaan.*'], 'can' => 'sarpras.pengadaan.lihat'],
+            ['label' => 'Perawatan', 'icon' => 'wrench', 'route' => 'sarpras.perbaikan.index', 'active' => ['sarpras.perbaikan.*', 'sarpras.teknisi.*', 'sarpras.jadwal.*'], 'can' => 'sarpras.perbaikan.lihat'],
+            ['label' => 'Mutasi/Hapus', 'icon' => 'replace', 'route' => 'sarpras.mutasi.index', 'active' => ['sarpras.mutasi.*', 'sarpras.penghapusan.*'], 'can' => 'sarpras.mutasi.kelola'],
+            ['label' => 'Laporan', 'icon' => 'file-bar-chart', 'route' => 'sarpras.laporan.index', 'active' => ['sarpras.laporan.*'], 'can' => 'sarpras.laporan.lihat'],
+            ['label' => 'Master Data', 'icon' => 'settings-2', 'route' => 'sarpras.kategori.index', 'active' => ['sarpras.kategori.*', 'sarpras.supplier.*'], 'can' => 'sarpras.pengaturan.kelola'],
+        ];
+    @endphp
+    <div class="card !rounded-2xl p-2 overflow-x-auto sarpras-tabs">
+        <div class="flex items-center gap-1 min-w-max">
+            @foreach($sarprasNav as $item)
+                @can($item['can'])
+                    @php $active = request()->routeIs($item['active']); @endphp
+                    <a href="{{ route($item['route']) }}"
+                       class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition {{ $active ? 'bg-primary text-white shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800' }}">
+                        <i data-lucide="{{ $item['icon'] }}" class="w-4 h-4"></i>
+                        <span>{{ $item['label'] }}</span>
+                    </a>
+                @endcan
+            @endforeach
+        </div>
+    </div>
     {{-- Konten halaman modul --}}
     @yield('sarpras_body')
 </div>
@@ -87,7 +148,7 @@
 @push('scripts')
 <script>
 // === KONFIRMASI HAPUS (jQuery-confirm wrapper) ===
-// confirmAction(form, pesan, type) — dipakai oleh onsubmit form hapus di modul Sarpras.
+// confirmAction(form, pesan, type) - dipakai oleh onsubmit form hapus di modul Sarpras.
 // Mengembalikan false untuk mencegah submit langsung; form disubmit lewat dialog.
 window.confirmAction = function (form, pesan, type) {
     type = type || 'red';
@@ -108,7 +169,7 @@ window.confirmAction = function (form, pesan, type) {
     return false; // cegah submit langsung
 };
 
-// confirmDelete(form) — versi sederhana tanpa parameter type.
+// confirmDelete(form) - versi sederhana tanpa parameter type.
 window.confirmDelete = function (form) {
     return window.confirmAction(form, 'Hapus item ini? Tindakan tidak dapat dibatalkan.', 'red');
 };

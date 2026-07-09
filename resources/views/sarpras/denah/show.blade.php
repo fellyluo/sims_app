@@ -1,29 +1,38 @@
 @extends('sarpras.layouts.app')
-@section('title', 'Denah: ' . $denah->nama)
+@section('title', 'Denah Sekolah: ' . $denah->nama)
+@section('sarpras_title', 'Denah Sekolah: ' . $denah->nama)
+@section('sarpras_subtitle', 'Peta interaktif ruangan, status pemakaian, aset, booking, dan titik maintenance per lantai.')
 
 @section('sarpras_body')
-<div class="flex justify-between items-center mb-4">
-    <div>
-        <h2 class="text-lg font-semibold text-gray-800">{{ $denah->nama }}</h2>
-        <p class="text-sm text-gray-500">{{ $denah->gedung }} {{ $denah->lantai ? '· Lantai '.$denah->lantai : '' }}</p>
+<div class="flex justify-between items-start gap-3 flex-wrap mb-4">
+    <div class="min-w-0">
+        <h2 class="text-lg font-semibold text-gray-800 dark:text-slate-100 break-words">{{ $denah->nama }}</h2>
+        <p class="text-sm text-gray-500 dark:text-slate-400 break-words">{{ $denah->gedung }} {{ $denah->lantai ? '- Lantai '.$denah->lantai : '' }}</p>
     </div>
-    <div class="flex items-center gap-2">
-        <a href="{{ route('sarpras.denah.index') }}" class="bg-slate-600 text-white px-3 py-1.5 rounded text-xs hover:bg-slate-700">← Daftar</a>
+    <div class="flex items-center gap-2 flex-wrap">
+        <a href="{{ route('sarpras.denah.index') }}" class="inline-flex items-center gap-1.5 bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-700">
+            <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> Daftar
+        </a>
         @can('sarpras.denah.kelola')
             @include('sarpras.denah.partials.import-button', ['denah' => $denah])
             @if ($denah->gambar_path)
                 <form method="POST" action="{{ route('sarpras.denah.gambar.hapus', $denah) }}"
                       onsubmit="return confirmAction(this, 'Hapus gambar denah ini? Blok ruangan tetap tersimpan dan Anda bisa import / menggambar ulang.', 'red')">
                     @csrf @method('DELETE')
-                    <button type="submit" class="inline-flex items-center gap-1 border border-red-300 text-red-600 px-3 py-1.5 rounded text-xs hover:bg-red-50">🗑️ Hapus Gambar</button>
+                    <button type="submit" class="inline-flex items-center gap-1.5 border border-red-300 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-50">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Hapus Gambar
+                    </button>
                 </form>
             @endif
-            <a href="{{ route('sarpras.denah.gambar', $denah) }}" class="bg-indigo-600 text-white px-3 py-1.5 rounded text-xs hover:bg-indigo-700">✏️ Gambar Denah</a>
-            <a href="{{ route('sarpras.denah.hotspot', $denah) }}" class="bg-emerald-600 text-white px-3 py-1.5 rounded text-xs hover:bg-emerald-700">Atur Blok Ruangan</a>
+            <a href="{{ route('sarpras.denah.gambar', $denah) }}" class="inline-flex items-center gap-1.5 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700">
+                <i data-lucide="pencil" class="w-3.5 h-3.5"></i> Gambar Denah
+            </a>
+            <a href="{{ route('sarpras.denah.hotspot', $denah) }}" class="inline-flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700">
+                <i data-lucide="grid-2x2" class="w-3.5 h-3.5"></i> Atur Blok Ruangan
+            </a>
         @endcan
     </div>
 </div>
-
 {{-- Pemilih lantai pada gedung yang sama --}}
 @if ($denah->gedung)
     <div class="flex flex-wrap items-center gap-2 mb-4">
@@ -44,7 +53,7 @@
 <p class="text-sm text-gray-500 mb-2">Klik ruangan (mis. <b>7A</b>) untuk melihat detail.</p>
 
 {{--
-    DENAH INTERAKTIF.
+    DENAH SEKOLAH INTERAKTIF.
     Container position:relative & responsif (lebar mengikuti layar, TANPA pixel hardcoded).
     Hotspot position:absolute pakai KOORDINAT PERSEN (pos_x/pos_y) + translate(-50%,-50%)
     sehingga presisi & tidak bergeser di ukuran layar berbeda.
@@ -125,7 +134,7 @@
                     @endphp
                     {{-- Blok ruangan berlabel (kotak persen). Warna bisa ganti via toggle Mode Warna. --}}
                     <a href="{{ route('sarpras.ruangan.show', $r) }}"
-                       title="{{ $r->kode }} — {{ $r->nama }}{{ $kr > 0 ? ' · '.$kr.' kerusakan' : ($dipinjam ? ' · sedang dipinjam' : '') }}"
+                       title="{{ $r->kode }} - {{ $r->nama }}{{ $kr > 0 ? ' - '.$kr.' kerusakan' : ($dipinjam ? ' - sedang dipinjam' : '') }}"
                        data-blok
                        data-warna="{{ $r->warna_hex }}"
                        data-warna-teks="{{ $r->warna_teks }}"
@@ -259,7 +268,7 @@
                    class="flex-1 flex items-center gap-2 px-3.5 py-2.5 min-w-0">
                     <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background: {{ $statusWarna }}" title="Status"></span>
                     <span class="flex-1 min-w-0 truncate text-slate-700 dark:text-slate-200">
-                        <span class="font-semibold text-slate-900 dark:text-white">{{ $r->kode }}</span> — {{ $r->nama }}
+                        <span class="font-semibold text-slate-900 dark:text-white">{{ $r->kode }}</span> - {{ $r->nama }}
                     </span>
                     @if ($kr > 0)
                         <span class="shrink-0 text-[10px] font-bold text-red-700 bg-red-100 rounded px-1.5 py-0.5">{{ $kr }}⚠</span>
@@ -340,7 +349,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
-// === Zoom live + export denah (JPEG/PDF) — semua di sisi klien ===
+// === Zoom live + export denah (JPEG/PDF) - semua di sisi klien ===
 (function () {
     const zoom = document.getElementById('denah-zoom');
     const range = document.getElementById('zoom-range');

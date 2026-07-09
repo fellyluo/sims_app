@@ -125,7 +125,7 @@
             // Auto initialize datatables for sarpras tables
             if (window.location.pathname.includes('/sarpras')) {
                 // Initialize on generic tables (except .ttd which is for signatures, or explicit .no-dt)
-                $('table:not(.ttd, .no-dt)').addClass('display nowrap w-full').DataTable({
+                $('table:not(.ttd, .no-dt)').addClass('display w-full').DataTable({
                     scrollX: true,
                     pageLength: 15,
                     language: {
@@ -563,7 +563,7 @@
                 if ($bolehKelolaSarpras) {
                     $groups['sarpras'] = ['Sarana & Prasarana', 'building-2', [
                         ['sarpras.dashboard',        ['sarpras.dashboard'],                          'layout-dashboard', 'Dashboard Sarpras'],
-                        ['sarpras.denah.index',      ['sarpras.denah.*','sarpras.ruangan.*'],        'map',              'Denah Interaktif'],
+                        ['sarpras.denah.index',      ['sarpras.denah.*','sarpras.ruangan.*'],        'map',              'Denah Sekolah'],
                         ['sarpras.kerusakan.index',  ['sarpras.kerusakan.*'],                        'triangle-alert',   'Maintenance Lapor'],
                         ['sarpras.aset.index',       ['sarpras.aset.*','sarpras.kategori.*'],        'package',          'Inventaris Barang'],
                         ['sarpras.pengadaan.index',  ['sarpras.pengadaan.*'],                        'shopping-cart',    'Pengadaan Aset'],
@@ -575,7 +575,7 @@
                     ]];
                 } elseif (auth()->user()?->guru || auth()->user()?->siswa || in_array($access, ['kepala','kurikulum','kesiswaan','sekretaris'])) {
                     $groups['sarpras'] = ['Sarana & Prasarana', 'building-2', [
-                        ['sarpras.denah.index',      ['sarpras.denah.*','sarpras.ruangan.*'],        'map',              'Denah Interaktif'],
+                        ['sarpras.denah.index',      ['sarpras.denah.*','sarpras.ruangan.*'],        'map',              'Denah Sekolah'],
                         ['sarpras.kerusakan.index',  ['sarpras.kerusakan.*'],                        'triangle-alert',   'Maintenance Lapor'],
                         ['sarpras.peminjaman.index', ['sarpras.peminjaman.*'],                       'hand-helping',     'Peminjaman Aset'],
                     ]];
