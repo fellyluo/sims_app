@@ -17,6 +17,7 @@ use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EkskulController;
 use App\Http\Controllers\FaceController;
+use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\GuruController;
 use App\Http\Controllers\JadwalController;
 use App\Http\Controllers\KelasController;
@@ -83,6 +84,14 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
     Route::get('/home', [LoginController::class, 'home'])->name('auth.home');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::post('/dashboard/tata-letak', [DashboardController::class, 'saveLayout'])->name('dashboard.layout');
+
+    Route::controller(FeedbackController::class)->prefix('masukan')->name('feedback.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/buat', 'create')->name('create');
+        Route::post('/', 'store')->middleware('throttle:10,1')->name('store');
+        Route::get('/{feedback}', 'show')->name('show');
+        Route::post('/{feedback}/respon', 'respond')->middleware('permission:manage_feedback')->name('respond');
+    });
 
     // ─── AsistenAI (Gateway Gemini — Fase 1) ────────────────────────────────────
     // Gateway generik; dibatasi superadmin. Fitur per-role menyusul di fase berikut.

@@ -5,6 +5,7 @@ namespace App\Sarpras\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Sarpras\Models\Aset;
 use App\Sarpras\Models\BookingRuangan;
+use App\Sarpras\Models\Denah;
 use App\Sarpras\Models\DenahRuangan;
 use App\Sarpras\Models\JadwalPemeliharaan;
 use App\Sarpras\Models\LaporanKerusakan;
@@ -45,21 +46,21 @@ class DashboardController extends Controller
             ->groupBy('status')
             ->pluck('jml', 'status');
 
-        $nilaiTotal = '0';
+        // Nilai total & biaya perbaikan: jumlahkan di SQL (1 query, tanpa load semua row).
+        $nilaiTotal = (string) (Aset::sum('nilai_perolehan') ?: 0);
+
+        // Nilai buku tetap dihitung per-baris di PHP (logika penyusutan ada di model Aset),
+        // tapi hanya memuat 3 kolom yang dibutuhkan — bukan seluruh model terhidrasi.
         $nilaiBuku = '0';
         foreach (Aset::query()->get(['nilai_perolehan', 'tgl_perolehan', 'masa_manfaat_tahun']) as $aset) {
-            $nilaiTotal = Rupiah::add($nilaiTotal, (int) $aset->nilai_perolehan);
             $nilaiBuku = Rupiah::add($nilaiBuku, $aset->nilaiBuku($today));
         }
 
-        $biayaPerbaikanBulanIni = '0';
-        foreach (Perbaikan::query()
+        $biayaPerbaikanBulanIni = (string) (Perbaikan::query()
             ->where('status', 'selesai')
             ->whereMonth('tgl_selesai', $today->month)
             ->whereYear('tgl_selesai', $today->year)
-            ->pluck('biaya') as $biaya) {
-            $biayaPerbaikanBulanIni = Rupiah::add($biayaPerbaikanBulanIni, (int) $biaya);
-        }
+            ->sum('biaya') ?: 0);
 
         $kerusakanTerbukaQuery = LaporanKerusakan::query()
             ->whereIn('status', ['dilaporkan', 'diterima']);
@@ -168,6 +169,20 @@ class DashboardController extends Controller
                 ->latest()
                 ->limit(5)
                 ->get(['id', 'kode', 'judul', 'status', 'total_estimasi', 'diajukan_oleh', 'created_at']),
+            // Mini-map denah: ambil denah dengan gambar, group per gedung, hitung kerusakan terbuka per denah.
+            'denahPeta' => Denah::withCount('ruangan')
+                ->orderBy('gedung')
+                ->orderBy('lantai')
+                ->orderBy('nama')
+                ->limit(8)
+                ->get(['id', 'nama', 'gedung', 'lantai', 'gambar_path']),
+            // Jumlah kerusakan terbuka (status dilaporkan/diterima) per denah_id, via relasi ruangan.
+            'kerusakanPerDenah' => LaporanKerusakan::query()
+                ->whereIn('sarpras_laporan_kerusakan.status', ['dilaporkan', 'diterima'])
+                ->join('sarpras_denah_ruangan', 'sarpras_laporan_kerusakan.ruangan_id', '=', 'sarpras_denah_ruangan.id')
+                ->selectRaw('sarpras_denah_ruangan.denah_id, count(*) as jml')
+                ->groupBy('sarpras_denah_ruangan.denah_id')
+                ->pluck('jml', 'denah_id'),
         ];
 
         return view('sarpras.dashboard', $data);

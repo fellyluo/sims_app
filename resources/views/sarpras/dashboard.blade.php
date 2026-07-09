@@ -67,6 +67,66 @@
         @endforeach
     </div>
 
+    {{-- ===== Mini-map Peta Sekolah: thumbnail denah per lantai + badge kerusakan ===== --}}
+    @if($denahPeta->isNotEmpty())
+    <section class="card p-5" data-drag-container="sarpras_peta">
+        <div class="flex items-start justify-between gap-3 flex-wrap mb-4">
+            <div>
+                <h2 class="font-extrabold text-slate-800 dark:text-slate-100">Peta Sekolah — Ringkasan Denah</h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Klik denah untuk melihat ruangan, status pemakaian, dan titik kerusakan secara interaktif.</p>
+            </div>
+            <a href="{{ route('sarpras.denah.index') }}" class="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:underline">
+                <i data-lucide="map" class="w-4 h-4"></i> Semua denah
+            </a>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            @foreach($denahPeta as $d)
+                @php
+                    $kr = (int) ($kerusakanPerDenah[$d->id] ?? 0);
+                    $hasGambar = !empty($d->gambar_path);
+                @endphp
+                <a href="{{ route('sarpras.denah.show', $d) }}" class="group relative rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden hover:border-primary/40 hover:shadow-md transition-all duration-200">
+                    {{-- Thumbnail --}}
+                    <div class="relative aspect-[3/2] bg-slate-100 dark:bg-slate-800">
+                        @if($hasGambar)
+                            <img loading="lazy" src="{{ \Illuminate\Support\Facades\Storage::url($d->gambar_path) }}" alt="{{ $d->nama }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                        @else
+                            <div class="absolute inset-0 grid place-items-center text-slate-400 dark:text-slate-500">
+                                <i data-lucide="image-off" class="w-7 h-7 mb-1"></i>
+                                <span class="text-[10px] font-bold">Belum ada gambar</span>
+                            </div>
+                        @endif
+                        {{-- Badge lantai --}}
+                        <span class="absolute top-2 left-2 bg-slate-900/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-lg backdrop-blur-sm">
+                            {{ $d->lantai ? 'Lt. ' . $d->lantai : ($d->gedung ?: 'Denah') }}
+                        </span>
+                        {{-- Badge kerusakan (merah, berkedip) --}}
+                        @if($kr > 0)
+                            <span class="absolute top-2 right-2 inline-flex items-center gap-1 bg-rose-500 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-lg shadow-sm">
+                                <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                                {{ $kr }} kerusakan
+                            </span>
+                        @endif
+                    </div>
+                    {{-- Info --}}
+                    <div class="p-3">
+                        <p class="text-sm font-bold text-slate-800 dark:text-slate-100 truncate group-hover:text-primary transition-colors">{{ $d->nama }}</p>
+                        <div class="flex items-center justify-between mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                            <span class="inline-flex items-center gap-1"><i data-lucide="door-open" class="w-3 h-3"></i> {{ $d->ruangan_count }} ruang</span>
+                            @if($d->gedung)
+                                <span class="truncate ml-2">{{ $d->gedung }}</span>
+                            @endif
+                        </div>
+                    </div>
+                </a>
+            @endforeach
+        </div>
+        @if($denahPeta->count() === 8)
+            <p class="text-center text-xs text-slate-400 dark:text-slate-500 mt-3">Menampilkan 8 denah pertama. <a href="{{ route('sarpras.denah.index') }}" class="font-bold text-primary hover:underline">Lihat semua &rarr;</a></p>
+        @endif
+    </section>
+    @endif
+
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <section class="card p-5 xl:col-span-2" data-drag-container="sarpras_command">
             <div class="flex items-start justify-between gap-3 mb-4">
