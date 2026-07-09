@@ -23,6 +23,7 @@ use App\Http\Controllers\KelasController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\NilaiController;
 use App\Http\Controllers\PelajaranController;
+use App\Http\Controllers\PanduanController;
 use App\Http\Controllers\PerangkatAjarController;
 use App\Http\Controllers\PresensiGuruController;
 use App\Http\Controllers\ProfileController;
@@ -71,6 +72,9 @@ WebAuthnRoutes::register('webauthn');
 //     meja piket supaya guru bisa langsung scan tanpa minta admin buka/login-kan dulu.
 //     Token di URL didapat dari Pengaturan → Absensi (admin-only, lihat setting.kioskToken.regenerate). ───
 Route::get('/kiosk-absensi/{token}', [AbsensiController::class, 'kioskEnter'])->name('absensi.kioskEnter');
+
+// Panduan SIMS: sengaja hanya auth, tidak melewati gate wajah, agar user baru tetap bisa membaca tutorial awal.
+Route::middleware('auth')->get('/panduan-sims', [PanduanController::class, 'index'])->name('panduan.index');
 
 // ─── Authenticated ────────────────────────────────────────────────────────────
 // Gate EnsureFaceRegistered: siswa & guru wajib daftar wajah dulu sebelum lanjut
