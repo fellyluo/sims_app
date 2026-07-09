@@ -631,6 +631,10 @@
                 <i data-lucide="layout-dashboard" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
                 <span x-show="!mini" class="text-sm truncate">Dashboard</span>
             </a>
+            <a href="{{ route('panduan.index') }}" data-tip="Panduan SIMS" class="nav-link flex items-center px-3 py-2.5 {{ request()->routeIs('panduan.*') ? 'active' : '' }}" :class="mini ? 'justify-center' : 'gap-3'">
+                <i data-lucide="book-open-check" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
+                <span x-show="!mini" class="text-sm truncate">Panduan SIMS</span>
+            </a>
             @if(auth()->user()?->siswa || auth()->user()?->guru)
             <a href="{{ route('absen.qr') }}" data-tip="Absen QR" class="nav-link flex items-center px-3 py-2.5 {{ request()->routeIs('absen.qr') ? 'active' : '' }}" :class="mini ? 'justify-center' : 'gap-3'">
                 <i data-lucide="qr-code" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
