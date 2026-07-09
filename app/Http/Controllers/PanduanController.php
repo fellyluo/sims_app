@@ -70,6 +70,43 @@ class PanduanController extends Controller
 
         $introMarkdown = trim(preg_replace('/^#\s+.+\n?/m', '', $introMarkdown, 1) ?? $introMarkdown);
 
+        $user = auth()->user();
+        $isAdmin = $user->isAdmin();
+        // Wali kelas = punya penugasan homeroom (tabel walikelas), BUKAN literal access==='walikelas' —
+        // seorang guru dgn access lain (mis. kesiswaan) tetap bisa jadi wali kelas satu kelas.
+        $isWali  = (bool) $user->guru?->walikelas;
+        $isGuru  = (bool) $user->guru;
+        $isSiswa = $user->access === 'siswa' || $user->siswa;
+        $isOrtu  = $user->access === 'orangtua';
+
+        // Visibilitas tiap bagian panduan mengikuti izin RBAC yang SAMA dgn yang menggerbang
+        // menu/fitur aslinya (lihat layouts/app.blade.php & routes/web.php), bukan daftar role
+        // hardcode — supaya kalau admin mengubah RolePermission lewat Pengaturan > Hak Akses,
+        // panduan yang tampil ikut menyesuaikan otomatis.
+        $sections = array_values(array_filter($sections, function($section) use ($user, $isAdmin, $isGuru, $isWali, $isSiswa, $isOrtu) {
+            $title = strtolower($section['title']);
+
+            if (str_contains($title, 'data master')) return $user->canAccess('manage_users');
+            if (str_contains($title, 'sistem dan pengaturan')) return $user->canAccess('manage_settings');
+            if (str_contains($title, 'operasional harian')) return $isAdmin;
+            if (str_contains($title, 'checklist agar tidak terlewat')) return $isAdmin;
+            if (str_contains($title, 'catatan tinjauan teknis')) return $isAdmin;
+
+            // manage_absensi = boleh kelola absensi semua kelas; wali kelas boleh kelola kelasnya
+            // sendiri; siswa/ortu boleh lihat riwayat absensi diri sendiri — ketiganya perlu tetap
+            // melihat panduan ini walau bukan pemegang izin manage_absensi.
+            if (str_contains($title, 'absensi dan presensi')) return $user->canAccess('manage_absensi') || $isWali || $isSiswa || $isOrtu;
+            if (str_contains($title, 'agenda guru')) return $user->canAccess('manage_agenda') || $isGuru;
+            if (str_contains($title, 'wali kelas')) return $isAdmin || $isWali;
+            if (str_contains($title, 'sarana dan prasarana')) return $user->canAccess('manage_sarpras');
+            if (str_contains($title, 'keuangan spp')) return $user->canAccess('manage_keuangan') || $isSiswa || $isOrtu;
+            // Cetak Data route-nya admin-only (role:admin di routes/web.php), tidak ada RBAC lain.
+            if (str_contains($title, 'cetak data')) return $isAdmin;
+            if (str_contains($title, 'kartu pelajar digital')) return $isAdmin || $isSiswa || $isOrtu;
+
+            return true;
+        }));
+
         return [
             'title' => $title,
             'introHtml' => $introMarkdown !== '' ? $this->markdownToHtml($introMarkdown, []) : '',
