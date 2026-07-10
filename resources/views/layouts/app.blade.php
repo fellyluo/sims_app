@@ -735,8 +735,8 @@
             </div>
             @endforeach
 
-            {{-- Bantuan: panduan pemakaian dan kanal feedback pengguna — ditempatkan di bawah --}}
-            <div x-show="!mini" class="pt-1">
+            {{-- Bantuan: panduan pemakaian dan kanal feedback pengguna --}}
+            <div x-show="!mini" class="mt-2 pt-2 border-t border-black/10 dark:border-white/10">
                 <button type="button" @click="toggleGroup('bantuan')"
                         class="nav-group w-full flex items-center gap-3 px-3 py-2.5 {{ $activeGroup==='bantuan' ? 'has-active' : '' }}">
                     <i data-lucide="life-buoy" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
@@ -764,7 +764,7 @@
                     </a>
                 </div>
             </div>
-            <div x-show="mini" x-cloak class="space-y-0.5 pt-1">
+            <div x-show="mini" x-cloak class="mt-2 pt-2 border-t border-black/10 dark:border-white/10 space-y-0.5">
                 <a href="{{ route('panduan.index') }}" data-tip="Panduan SIMS" class="nav-link flex items-center justify-center px-3 py-2.5 {{ request()->routeIs('panduan.*') ? 'active' : '' }}">
                     <i data-lucide="book-open-check" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
                 </a>
