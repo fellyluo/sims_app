@@ -6,7 +6,7 @@
     $breadcrumbs = [['label' => 'Panduan SIMS', 'url' => route('panduan.index')]];
 @endphp
 
-<div class="max-w-7xl mx-auto" x-data="panduanPage()">
+<div class="max-w-7xl mx-auto" x-data="panduanPage()" @click="if ($event.target.matches('.panduan-prose img')) zoomSrc = $event.target.src">
     <div class="flex items-start justify-between flex-wrap gap-3 mb-6">
         <div>
             <nav class="text-xs text-slate-400 mb-1">Beranda <span class="mx-1">/</span> Panduan SIMS</nav>
@@ -20,7 +20,7 @@
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-5 items-start">
-        <aside class="lg:sticky lg:top-24 space-y-4">
+        <aside class="lg:sticky lg:top-6 space-y-4">
             <div class="card p-4">
                 <label for="panduanSearch" class="form-label">Cari di panduan</label>
                 <div class="relative">
@@ -81,6 +81,12 @@
             </div>
         </main>
     </div>
+
+    {{-- Lightbox: klik screenshot di panduan utk lihat ukuran penuh --}}
+    <div x-show="zoomSrc" x-cloak @click="zoomSrc=null" @keydown.escape.window="zoomSrc=null" class="fixed inset-0 z-[10000] flex items-center justify-center p-6" style="background:rgba(15,12,10,.82); backdrop-filter:blur(6px)">
+        <img :src="zoomSrc" class="max-h-[90vh] max-w-[94vw] rounded-2xl shadow-2xl ring-4 ring-white/10" @click.stop>
+        <button @click="zoomSrc=null" class="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white grid place-items-center"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
 </div>
 
 <style>
@@ -105,12 +111,15 @@
     .dark .panduan-prose th, .dark .panduan-prose td { border-color: #334155; }
     .panduan-prose th { background: #f8fafc; font-weight: 800; }
     .dark .panduan-prose th { background: #0f172a; }
+    .panduan-prose img { display: block; max-width: 100%; height: auto; margin: 1rem auto; border-radius: 1rem; border: 1px solid color-mix(in srgb, var(--cp) 14%, #e2e8f0); box-shadow: 0 10px 30px -12px rgba(15,23,42,.18); cursor: zoom-in; }
+    .dark .panduan-prose img { border-color: #334155; box-shadow: 0 10px 30px -12px rgba(0,0,0,.4); }
 </style>
 
 <script>
     function panduanPage() {
         return {
             q: '',
+            zoomSrc: null,
             matches(el) {
                 const query = this.q.trim().toLowerCase();
                 if (!query) return true;
