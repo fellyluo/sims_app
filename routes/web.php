@@ -114,6 +114,7 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
     Route::middleware('role:guru,walikelas')->prefix('ai/teacher')->name('ai.teacher.')->controller(AiTeacherController::class)->group(function () {
         Route::get('/', 'index')->name('index');
         Route::post('/quiz', 'quiz')->name('quiz');
+        Route::post('/quiz/export-word', 'exportQuizWord')->name('quiz.export-word');
         Route::post('/summary', 'summary')->name('summary');
         Route::post('/feedback', 'feedback')->name('feedback');
     });
