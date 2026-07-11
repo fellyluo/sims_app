@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -20,68 +23,206 @@ class GeminiService
     /** AI aktif hanya bila GEMINI_API_KEY terisi. */
     public function enabled(): bool
     {
-        return !empty(config('ai.api_key'));
+        return ! empty(config('ai.api_key'));
     }
 
     /**
      * Hasilkan teks dari Gemini.
      *
-     * @param  string  $prompt   Pesan/konteks dari pengguna (sudah dibangun controller).
-     * @param  array   $options  system, model, temperature, max_output_tokens, history
+     * @param  string  $prompt  Pesan/konteks dari pengguna (sudah dibangun controller).
+     * @param  array  $options  system, model, temperature, max_output_tokens, history
      * @return array{text:string,model:string,prompt_tokens:int,completion_tokens:int}
      */
     public function generate(string $prompt, array $options = []): array
     {
-        if (!$this->enabled()) {
+        if (! $this->enabled()) {
             throw new RuntimeException('Fitur AI belum dikonfigurasi (GEMINI_API_KEY kosong).');
         }
 
-        $model  = $options['model'] ?? config('ai.model');
-        $system = trim(($options['system'] ?? '')."\n\n".config('ai.system_prompt')."\n\n".config('ai.answer_style'));
+        // answer_style bisa dikosongkan per-request: keluaran dokumen (RPM/LKPD) harus
+        // teks polos, sedangkan gaya global justru menyuruh model memakai Markdown.
+        $answerStyle = $options['answer_style'] ?? config('ai.answer_style');
+        $system = trim(($options['system'] ?? '')."\n\n".config('ai.system_prompt')."\n\n".$answerStyle);
+        $contents = $this->buildContents($prompt, $options['history'] ?? []);
+        $modelChain = $this->modelChain($options);
 
-        $body = [
-            'systemInstruction' => [
-                'parts' => [['text' => $system]],
-            ],
-            'contents' => $this->buildContents($prompt, $options['history'] ?? []),
-            'generationConfig' => [
-                'temperature'     => $options['temperature'] ?? config('ai.temperature'),
-                'maxOutputTokens' => $options['max_output_tokens'] ?? config('ai.max_output_tokens'),
-            ],
-        ];
+        $this->ensureFreeTierQuotaIsOpen($modelChain);
 
-        // Grounding Google Search: biarkan model mencari di web & menautkan sumber.
-        if (!empty($options['grounding'])) {
-            $body['tools'] = [$this->groundingTool($model)];
-        }
+        $lastQuotaError = null;
+        $allModelsHitDailyQuota = true;
 
-        $url = rtrim(config('ai.base_url'), '/')."/models/{$model}:generateContent";
+        // Kuota free tier Gemini dihitung PER MODEL PER HARI (mis. gemini-3.5-flash hanya
+        // 20 request/hari). Bila model utama habis, pindah ke model cadangan yang punya
+        // jatah sendiri — jauh lebih baik daripada melempar "kuota penuh" ke guru.
+        foreach ($modelChain as $model) {
+            $body = [
+                'systemInstruction' => ['parts' => [['text' => $system]]],
+                'contents' => $contents,
+                'generationConfig' => [
+                    'temperature' => $options['temperature'] ?? config('ai.temperature'),
+                    'maxOutputTokens' => $options['max_output_tokens'] ?? config('ai.max_output_tokens'),
+                ],
+            ];
 
-        try {
-            $response = Http::timeout(config('ai.timeout'))
-                ->retry(config('ai.retries'), config('ai.retry_delay'), throw: false)
-                ->withQueryParameters(['key' => config('ai.api_key')])
-                ->acceptJson()
-                ->post($url, $body);
-        } catch (\Throwable $e) {
-            throw new RuntimeException('Gagal menghubungi layanan AI. Coba lagi beberapa saat.');
-        }
+            if (! empty($options['thinking_level'])) {
+                $body['generationConfig']['thinkingConfig'] = $this->thinkingConfig($model, $options['thinking_level']);
+            }
 
-        if ($response->failed()) {
+            // Grounding Google Search: biarkan model mencari di web & menautkan sumber.
+            if (! empty($options['grounding'])) {
+                $body['tools'] = [$this->groundingTool($model)];
+            }
+
+            try {
+                $response = Http::timeout($options['timeout'] ?? config('ai.timeout'))
+                    // `when`: JANGAN ulangi permintaan yang ditolak (429/4xx) — tiap percobaan
+                    // memotong kuota harian, jadi retry justru mempercepat kuota habis.
+                    // Yang layak diulang hanya kegagalan transien: koneksi putus & error 5xx.
+                    ->retry(
+                        $options['retries'] ?? config('ai.retries'),
+                        config('ai.retry_delay'),
+                        fn (\Throwable $e) => $this->isTransient($e),
+                        throw: false,
+                    )
+                    ->withQueryParameters(['key' => config('ai.api_key')])
+                    ->acceptJson()
+                    ->post(rtrim(config('ai.base_url'), '/')."/models/{$model}:generateContent", $body);
+            } catch (\Throwable $e) {
+                throw new RuntimeException('Gagal menghubungi layanan AI. Coba lagi beberapa saat.');
+            }
+
+            if ($response->successful()) {
+                return $this->parse($response->json(), $model);
+            }
+
+            // Kuota model ini habis: coba model berikutnya. Jangan retry model yang sama.
+            if ($response->status() === 429) {
+                $json = $response->json();
+                $lastQuotaError = $this->normalizeError(429, $json);
+                $allModelsHitDailyQuota = $allModelsHitDailyQuota && $this->isDailyQuotaError($json);
+
+                continue;
+            }
+
             throw new RuntimeException($this->normalizeError($response->status(), $response->json()));
         }
 
-        return $this->parse($response->json(), $model);
+        if ($this->freeTierOnly() && $lastQuotaError !== null && $allModelsHitDailyQuota) {
+            $this->rememberFreeTierQuotaExhausted($modelChain);
+
+            throw new RuntimeException($this->freeTierQuotaMessage());
+        }
+
+        throw new RuntimeException($lastQuotaError ?? 'Terjadi kesalahan saat memproses permintaan AI.');
+    }
+
+    /**
+     * Urutan model yang dicoba: model utama lalu cadangan. Cadangan punya kuota harian
+     * sendiri, jadi rantai ini yang membuat fitur tetap hidup setelah kuota model utama habis.
+     *
+     * @return string[]
+     */
+    private function modelChain(array $options): array
+    {
+        $chain = [$options['model'] ?? config('ai.model')];
+
+        // Override model per-request berarti pemanggil sengaja memilih model itu — hormati.
+        if (! isset($options['model'])) {
+            $chain = array_merge($chain, (array) config('ai.fallback_models', []));
+        }
+
+        return array_values(array_unique(array_filter(array_map('trim', $chain))));
+    }
+
+    /**
+     * Penekan porsi "berpikir" berbeda antar keluarga model: Gemini 3.x memakai
+     * `thinkingLevel`, sedangkan 2.5 ke bawah memakai `thinkingBudget` (angka token).
+     * Mengirim kunci yang salah membuat Gemini menolak permintaan dengan 400.
+     */
+    private function thinkingConfig(string $model, string $level): array
+    {
+        if (preg_match('/gemini-3/', $model)) {
+            return ['thinkingLevel' => $level];
+        }
+
+        return ['thinkingBudget' => $level === 'low' ? 0 : -1];
+    }
+
+    private function freeTierOnly(): bool
+    {
+        return (bool) config('ai.free_tier_only', true);
+    }
+
+    /** @param string[] $modelChain */
+    private function ensureFreeTierQuotaIsOpen(array $modelChain): void
+    {
+        if (! $this->freeTierOnly()) {
+            return;
+        }
+
+        $resetAt = Cache::get($this->freeTierQuotaCacheKey($modelChain));
+        if (! $resetAt) {
+            return;
+        }
+
+        throw new RuntimeException($this->freeTierQuotaMessage((string) $resetAt));
+    }
+
+    /** @param string[] $modelChain */
+    private function rememberFreeTierQuotaExhausted(array $modelChain): void
+    {
+        $resetAt = $this->nextFreeTierResetAt();
+
+        Cache::put(
+            $this->freeTierQuotaCacheKey($modelChain),
+            $resetAt->toIso8601String(),
+            $resetAt,
+        );
+    }
+
+    /** @param string[] $modelChain */
+    private function freeTierQuotaCacheKey(array $modelChain): string
+    {
+        return 'ai:gemini:free-tier-quota-exhausted:'.sha1((string) config('ai.api_key').'|'.implode('|', $modelChain));
+    }
+
+    private function nextFreeTierResetAt(): \Illuminate\Support\Carbon
+    {
+        // Google menyebut RPD reset tengah malam Pacific time.
+        return now('America/Los_Angeles')->addDay()->startOfDay();
+    }
+
+    private function freeTierQuotaMessage(?string $resetAt = null): string
+    {
+        $displayReset = '';
+        if ($resetAt) {
+            $displayReset = ' Perkiraan reset: '.\Illuminate\Support\Carbon::parse($resetAt)
+                ->setTimezone(config('app.timezone', 'Asia/Jakarta'))
+                ->format('d/m/Y H:i T').'.';
+        }
+
+        return 'Kuota gratis Google AI Studio sudah habis untuk semua model yang dikonfigurasi. '
+            .'Sistem tidak akan mencoba Gemini lagi sampai kuota free tier reset agar tidak memakai API berbayar.'
+            .$displayReset;
+    }
+    /** Layak diulang hanya bila gangguan sesaat (koneksi/5xx), bukan penolakan (4xx). */
+    private function isTransient(\Throwable $e): bool
+    {
+        if ($e instanceof ConnectionException) {
+            return true;
+        }
+
+        return $e instanceof RequestException && $e->response->serverError();
     }
 
     /**
      * Hasilkan vektor embedding untuk satu teks (FASE 5 — RAG).
      *
-     * @return float[]  Vektor embedding.
+     * @return float[] Vektor embedding.
      */
     public function embed(string $text): array
     {
-        if (!$this->enabled()) {
+        if (! $this->enabled()) {
             throw new RuntimeException('Fitur AI belum dikonfigurasi (GEMINI_API_KEY kosong).');
         }
 
@@ -94,7 +235,7 @@ class GeminiService
                 ->withQueryParameters(['key' => config('ai.api_key')])
                 ->acceptJson()
                 ->post($url, [
-                    'model'   => "models/{$model}",
+                    'model' => "models/{$model}",
                     'content' => ['parts' => [['text' => $text]]],
                 ]);
         } catch (\Throwable $e) {
@@ -106,7 +247,7 @@ class GeminiService
         }
 
         $values = $response->json('embedding.values');
-        if (!is_array($values) || $values === []) {
+        if (! is_array($values) || $values === []) {
             throw new RuntimeException('Layanan embedding tidak mengembalikan vektor.');
         }
 
@@ -134,15 +275,19 @@ class GeminiService
     /** Ambil teks + hitungan token dari respons; deteksi jawaban yang diblokir. */
     private function parse(array $json, string $model): array
     {
-        $candidate    = $json['candidates'][0] ?? null;
+        $candidate = $json['candidates'][0] ?? null;
         $finishReason = $candidate['finishReason'] ?? null;
 
         if ($finishReason === 'SAFETY' || $finishReason === 'PROHIBITED_CONTENT') {
             throw new RuntimeException('Permintaan diblokir oleh filter keamanan AI. Ubah pertanyaanmu.');
         }
 
+        // Part ber-flag `thought` = catatan berpikir internal model, bukan jawaban.
         $text = '';
         foreach ($candidate['content']['parts'] ?? [] as $part) {
+            if (($part['thought'] ?? false) === true) {
+                continue;
+            }
             $text .= $part['text'] ?? '';
         }
 
@@ -151,14 +296,20 @@ class GeminiService
             throw new RuntimeException('AI tidak mengembalikan jawaban. Coba lagi.');
         }
 
+        // Jawaban terpotong karena kehabisan jatah token: lebih baik gagal terang-terangan
+        // daripada mengembalikan dokumen setengah jadi yang tampak benar.
+        if ($finishReason === 'MAX_TOKENS') {
+            throw new RuntimeException('Jawaban AI terpotong karena terlalu panjang. Persempit topik atau coba lagi.');
+        }
+
         $usage = $json['usageMetadata'] ?? [];
 
         return [
-            'text'              => $text,
-            'model'             => $model,
-            'prompt_tokens'     => (int) ($usage['promptTokenCount'] ?? 0),
+            'text' => $text,
+            'model' => $model,
+            'prompt_tokens' => (int) ($usage['promptTokenCount'] ?? 0),
             'completion_tokens' => (int) ($usage['candidatesTokenCount'] ?? 0),
-            'sources'           => $this->extractSources($candidate),
+            'sources' => $this->extractSources($candidate),
         ];
     }
 
@@ -170,10 +321,10 @@ class GeminiService
     private function groundingTool(string $model): array
     {
         if (str_contains($model, '1.5') || str_contains($model, '1.0')) {
-            return ['google_search_retrieval' => new \stdClass()];
+            return ['google_search_retrieval' => new \stdClass];
         }
 
-        return ['google_search' => new \stdClass()];
+        return ['google_search' => new \stdClass];
     }
 
     /**
@@ -189,16 +340,35 @@ class GeminiService
 
         foreach ($chunks as $chunk) {
             $uri = $chunk['web']['uri'] ?? null;
-            if (!$uri || isset($sources[$uri])) {
+            if (! $uri || isset($sources[$uri])) {
                 continue;
             }
             $sources[$uri] = [
                 'title' => (string) ($chunk['web']['title'] ?? $uri),
-                'uri'   => $uri,
+                'uri' => $uri,
             ];
         }
 
         return array_values($sources);
+    }
+
+    private function isDailyQuotaError(?array $json): bool
+    {
+        return str_contains($this->quotaId($json), 'PerDay');
+    }
+
+    /** Ambil quotaId dari error 429 Gemini (mis. "GenerateRequestsPerDayPerProjectPerModel-FreeTier"). */
+    private function quotaId(?array $json): string
+    {
+        foreach ($json['error']['details'] ?? [] as $detail) {
+            foreach ($detail['violations'] ?? [] as $violation) {
+                if (! empty($violation['quotaId'])) {
+                    return (string) $violation['quotaId'];
+                }
+            }
+        }
+
+        return '';
     }
 
     /** Terjemahkan status HTTP Gemini jadi pesan Bahasa Indonesia yang aman. */
@@ -206,13 +376,20 @@ class GeminiService
     {
         $detail = $json['error']['message'] ?? '';
 
+        // Bedakan batas HARIAN (habis sampai reset tengah malam waktu Pasifik) dari batas
+        // per-menit, supaya guru tak menunggu sia-sia menekan tombol yang pasti gagal seharian.
+        // Jenis kuota hanya ada di error.details[].violations[].quotaId, bukan di message.
+        $isDaily = str_contains($this->quotaId($json), 'PerDay');
+
         return match (true) {
-            $status === 429             => 'Kuota AI sedang penuh. Coba lagi sebentar lagi.',
-            $status === 400             => 'Permintaan ke AI tidak valid.'.($detail ? " ({$detail})" : ''),
+            $status === 429 && $isDaily => 'Kuota AI harian sudah habis untuk semua model gratis. '
+                .'Coba lagi besok, atau aktifkan billing di Google AI Studio untuk kuota lebih besar.',
+            $status === 429 => 'Permintaan AI terlalu sering. Tunggu sebentar lalu coba lagi.',
+            $status === 400 => 'Permintaan ke AI tidak valid.'.($detail ? " ({$detail})" : ''),
             $status === 401,
-            $status === 403             => 'Konfigurasi AI bermasalah (kredensial ditolak).',
-            $status >= 500              => 'Layanan AI sedang gangguan. Coba lagi nanti.',
-            default                     => 'Terjadi kesalahan saat memproses permintaan AI.',
+            $status === 403 => 'Konfigurasi AI bermasalah (kredensial ditolak).',
+            $status >= 500 => 'Layanan AI sedang gangguan. Coba lagi nanti.',
+            default => 'Terjadi kesalahan saat memproses permintaan AI.',
         };
     }
 }

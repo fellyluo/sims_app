@@ -469,9 +469,9 @@
                     $akademik[] = ['perangkat.self', ['perangkat.self', 'perangkat.show'], 'folder-check', 'Perangkat Ajar Saya'];
                 }
 
-                // Asisten AI untuk guru & wali kelas (Fase 3)
+                // Asisten Guru untuk guru & wali kelas (Fase 3)
                 if (in_array($access, ['guru', 'walikelas'])) {
-                    $akademik[] = ['ai.teacher.index', ['ai.teacher.*'], 'sparkles', 'Asisten AI'];
+                    $akademik[] = ['ai.teacher.index', ['ai.teacher.*'], 'sparkles', 'Asisten Guru'];
                 }
                 if (auth()->user()?->siswa || $access === 'orangtua') {
                     $akademik[] = ['nilai.self', ['nilai.self'], 'chart-column', 'Nilai Saya'];
@@ -617,6 +617,10 @@
                         ['setting.index', ['setting.index', 'setting.kopRapor', 'setting.penjabaran', 'setting.tpRange'], 'settings-2', 'Pengaturan'],
                         ['setting.roles', ['setting.roles'], 'shield-check', 'Hak Akses (RBAC)'],
                     ]];
+                    // Langganan (lisensi) — hanya superadmin (titik integrasi 1, PRD langganan).
+                    if ($access === 'superadmin') {
+                        $groups['sistem'][2][] = ['langganan.index', ['langganan.*'], 'badge-check', 'Langganan'];
+                    }
                 }
                 // (Akun Saya dipindah ke dropdown profil di navbar)
 
@@ -929,6 +933,7 @@
         @endunless
 
         <main class="flex-1 overflow-y-auto px-5 md:px-7 py-4 flex flex-col">
+            @include('partials.langganan-banner')
             <div class="anim-fade flex-1">@yield('content')</div>
             {{-- Footer — selalu menempel di bawah berkat mt-auto (konten flex-1 mendorongnya turun) --}}
             <footer class="mt-auto pt-4 border-t border-slate-200/70 dark:border-slate-700/60 text-center text-xs text-slate-400">
@@ -1160,7 +1165,7 @@
 @if(in_array($access, ['siswa', 'orangtua']) && !$kioskChrome)
 {{-- ─── Floating Asisten Sekolah ─────────────────────────────────────────────
      Bola mengambang khusus SISWA & ORANG TUA untuk menghubungi admin manusia
-     (handoff). Staf & admin memakai widget AsistenAI, bukan ini — agar tiap
+     (handoff). Staf & admin memakai widget Asisten Guru, bukan ini — agar tiap
      pengguna hanya melihat SATU bola sesuai kebutuhannya. Klik membuka panel
      chat yang meng-embed /chatbot via iframe; panel mengirim 'chatfab:close'
      lewat postMessage saat tombol tutup di dalam widget ditekan. --}}
@@ -1235,7 +1240,7 @@
 </script>
 @endif
 
-{{-- Widget AsistenAI (Fase 2) — STAF & ADMIN saja. Siswa & orang tua tidak
+{{-- Widget Asisten Guru (Fase 2) — STAF & ADMIN saja. Siswa & orang tua tidak
      mendapat AI generatif; mereka memakai chatbot handoff ke admin di atas. --}}
 @unless(in_array($access, ['siswa', 'orangtua']))
 @include('partials.ai-assistant')

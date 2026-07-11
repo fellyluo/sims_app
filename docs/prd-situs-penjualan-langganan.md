@@ -80,7 +80,7 @@ Proyek berdiri sendiri di folder baru. Stack konsisten dengan keahlian tim: **La
 
 | ID | Halaman / Endpoint | Requirement |
 |---|---|---|
-| FR-1 | `GET /` (landing) | Hero (value proposition + CTA "Minta Demo" & "Masuk ke Aplikasi" → `https://app.<domain>/login`), trust bar, showcase fitur (§8), blok "Cara Kerja", highlight AsistenAI, testimoni *placeholder*, ringkasan harga (tier × durasi), FAQ, CTA akhir + form demo ringkas. |
+| FR-1 | `GET /` (landing) | Hero (value proposition + CTA "Minta Demo" & "Masuk ke Aplikasi" → `https://app.<domain>/login`), trust bar, showcase fitur (§8), blok "Cara Kerja", highlight Asisten Guru, testimoni *placeholder*, ringkasan harga (tier × durasi), FAQ, CTA akhir + form demo ringkas. |
 | FR-2 | `GET /fitur` | Rincian seluruh modul nyata dikelompokkan (Akademik, Kehadiran, Keuangan, Sarpras, AI, Pendukung). |
 | FR-3 | `GET /harga` | 3 kartu tier **Dasar / Pro / Enterprise** + toggle durasi **3 / 6 / 12 bulan** yang mengubah harga; 12 bulan bertanda "paling hemat"; Enterprise = "Hubungi Kami". Harga Rupiah + **rincian PPN** (§6.4). Tabel perbandingan fitur per tier (§6.3). FAQ harga. |
 | FR-4 | `GET /kontak` | Form demo/kontak + info kontak (email, WA, alamat). |
@@ -109,7 +109,7 @@ Proyek berdiri sendiri di folder baru. Stack konsisten dengan keahlian tim: **La
 | Kartu Pelajar, Chatbot Helpdesk | — | ✅ | ✅ |
 | Notifikasi Push Android (FCM) + App Android | — | ✅ | ✅ |
 | Sarpras lengkap (aset, denah, booking, dll.) | — | — | ✅ |
-| AsistenAI (Gemini): chatbot, asisten guru, RAG, narasi data | — | — | ✅ |
+| Asisten Guru (Gemini): chatbot, asisten guru, RAG, narasi data | — | — | ✅ |
 | Login WebAuthn (sidik jari / Face ID) | — | — | ✅ |
 | Dukungan prioritas & kustomisasi | — | — | ✅ |
 
@@ -157,7 +157,7 @@ Modul **baru & terisolasi**. Menyentuh app hanya lewat 3 titik integrasi (§10).
 7. **Sarpras** — inventaris aset, kategori, denah ruangan interaktif, booking ruangan,
    peminjaman, lapor kerusakan, perbaikan & teknisi, jadwal pemeliharaan, mutasi,
    pengadaan, penghapusan, supplier, laporan.
-8. **AsistenAI (Google Gemini)** — chatbot semua peran, asisten guru (buat soal/kuis +
+8. **Asisten Guru (Google Gemini)** — chatbot semua peran, asisten guru (buat soal/kuis +
    ekspor Word, rangkum, feedback), narasi data, tanya-jawab dokumen (RAG) + sitasi,
    grounding web.
 9. **Kedisiplinan** — poin siswa & pencatatan pelanggaran (P3).
@@ -291,7 +291,7 @@ Dua jalur (**Track A: Marketing** di folder baru, **Track B: Langganan** di
 
 #### Fase A2 — Landing & Halaman Fitur
 - **Deliverable:** isi landing `/` (hero, trust bar, showcase fitur, cara kerja,
-  highlight AsistenAI, testimoni placeholder, FAQ, CTA) + `/fitur`.
+  highlight Asisten Guru, testimoni placeholder, FAQ, CTA) + `/fitur`.
 - **Done:** copy hanya dari §8; responsif & dark mode OK; SEO meta terisi; tombol
   "Masuk" menuju `app.<domain>/login`.
 

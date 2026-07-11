@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Asisten AI Guru')
+@section('title', 'Asisten Guru')
 
 @section('content')
 <div class="space-y-5" x-data="teacherAi()">
@@ -7,10 +7,50 @@
     {{-- Header --}}
     <div class="flex items-center justify-between flex-wrap gap-3">
         <div>
-            <h1 class="page-title flex items-center gap-2"><i data-lucide="sparkles" class="w-6 h-6 text-primary"></i> Asisten AI Guru</h1>
-            <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Percepat menyusun soal, merangkum materi, dan menulis umpan balik siswa.</p>
+            <h1 class="page-title flex items-center gap-2"><i data-lucide="sparkles" class="w-6 h-6 text-primary"></i> Asisten Guru</h1>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Percepat menyusun soal, RPM / LKPD / Modul Ajar, ringkasan materi, dan umpan balik siswa.</p>
         </div>
     </div>
+    {{-- Penggunaan free tier --}}
+    <div class="card p-4" x-show="quota" x-cloak>
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2"><i data-lucide="gauge" class="w-4 h-4 text-primary"></i> Estimasi free tier hari ini</h2>
+                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                          :class="quota.status === 'locked' || quota.status === 'exhausted' ? 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-200' : (quota.status === 'warning' ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-200' : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200')"
+                          x-text="quota.status_label"></span>
+                </div>
+                <p class="mt-1 text-sm text-slate-600 dark:text-slate-300" x-text="quota.message"></p>
+                <p class="mt-1 text-xs text-slate-400" x-text="quota.notice"></p>
+            </div>
+            <div class="shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300">
+                <div class="font-semibold text-slate-700 dark:text-slate-100" x-text="quota.total && quota.total.limit ? quota.total.used + ' / ' + quota.total.limit + ' request' : (quota.total ? quota.total.used + ' request hari ini' : '0 request hari ini')"></div>
+                <div>Reset: <span x-text="quota.reset_at_human"></span></div>
+            </div>
+        </div>
+
+        <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <template x-for="item in quota.models" :key="item.model">
+                <div class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/40">
+                    <div class="flex items-center justify-between gap-2 text-xs">
+                        <span class="truncate font-semibold text-slate-700 dark:text-slate-100" x-text="item.model"></span>
+                        <span class="shrink-0 text-slate-400" x-text="item.limit ? item.used + '/' + item.limit : item.used + 'x'"></span>
+                    </div>
+                    <div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                        <div class="h-full rounded-full transition-all"
+                             :class="item.status === 'exhausted' ? 'bg-rose-500' : (item.status === 'warning' ? 'bg-amber-500' : 'bg-primary')"
+                             :style="'width: ' + (item.limit ? item.percent : Math.min(100, item.used * 4)) + '%'"></div>
+                    </div>
+                    <div class="mt-2 flex items-center justify-between gap-2 text-[11px] text-slate-400">
+                        <span x-text="item.limit ? Math.max(0, item.remaining) + ' tersisa' : 'batas lihat AI Studio'"></span>
+                        <span x-text="item.prompt_tokens + item.completion_tokens + ' token'"></span>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
 
     {{-- Tab --}}
     <div class="flex flex-wrap gap-2">
@@ -23,7 +63,7 @@
         </template>
     </div>
 
-    <div class="grid gap-5 lg:grid-cols-2">
+    <div class="grid gap-5 lg:grid-cols-2 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.15fr)_minmax(280px,0.75fr)]">
         {{-- Form --}}
         <div class="card p-5">
             {{-- Generator Soal --}}
@@ -83,6 +123,39 @@
                 </button>
             </div>
 
+            {{-- RPM / LKPD / Modul Ajar Learning --}}
+            <div x-show="tab === 'learning'" class="space-y-4" x-cloak>
+                <div>
+                    <label class="form-label">Pilih Tools <span class="text-rose-500">*</span></label>
+                    <select x-model="learning.tool" class="form-input">
+                        <option value="rpp">RPM Learning</option>
+                        <option value="lkpd">LKPD Learning</option>
+                        <option value="modul_ajar">Modul Ajar Deep Learning</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">Topik <span class="text-rose-500">*</span></label>
+                    <input type="text" x-model="learning.topik" placeholder="mis. Ekosistem, Persamaan Linear, Teks Prosedur..." class="form-input">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="form-label">Mata Pelajaran</label>
+                        <input type="text" x-model="learning.mapel" placeholder="mis. IPAS" class="form-input">
+                    </div>
+                    <div>
+                        <label class="form-label">Jenjang / Kelas</label>
+                        <input type="text" x-model="learning.jenjang" placeholder="mis. Kelas 5 SD" class="form-input">
+                    </div>
+                </div>
+                <div>
+                    <label class="form-label">Alokasi Waktu</label>
+                    <input type="text" x-model="learning.durasi" placeholder="mis. 2 x 40 menit" class="form-input">
+                    <p class="text-[11px] text-slate-400 mt-1">Output memakai 8 komponen: Identitas Pembelajaran, DPL, Tujuan, 4 Pilar PM, Kegiatan, Asesmen, Refleksi, Lampiran/Sumber. Modul Ajar diarahkan ke Kurikulum Mendalam / Deep Learning.</p>
+                </div>
+                <button type="button" @click="submit('learning')" :disabled="loading || learning.topik.trim() === ''" class="btn-primary w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40">
+                    <i data-lucide="clipboard-list" class="w-4 h-4"></i> Buat RPM / LKPD / Modul Ajar
+                </button>
+            </div>
             {{-- Perangkum Materi --}}
             <div x-show="tab === 'summary'" class="space-y-4" x-cloak>
                 <div>
@@ -122,6 +195,12 @@
                     <button type="button" x-show="tab === 'quiz'" @click="exportWord()" :disabled="exportingWord" class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-slate-500 transition hover:bg-slate-100 hover:text-primary disabled:opacity-50 dark:text-slate-300 dark:hover:bg-slate-800">
                         <i :data-lucide="exportingWord ? 'loader-circle' : 'file-down'" class="w-4 h-4" :class="exportingWord ? 'animate-spin' : ''"></i><span x-text="exportingWord ? 'Export...' : 'Word'"></span>
                     </button>
+                    <button type="button" x-show="tab === 'learning'" @click="exportLearning('word')" :disabled="exportingWord" class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-slate-500 transition hover:bg-slate-100 hover:text-primary disabled:opacity-50 dark:text-slate-300 dark:hover:bg-slate-800">
+                        <i :data-lucide="exportingWord ? 'loader-circle' : 'file-down'" class="w-4 h-4" :class="exportingWord ? 'animate-spin' : ''"></i><span x-text="exportingWord ? 'Export...' : 'Word'"></span>
+                    </button>
+                    <button type="button" x-show="tab === 'learning'" @click="exportLearning('pdf')" :disabled="exportingPdf" class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-slate-500 transition hover:bg-slate-100 hover:text-primary disabled:opacity-50 dark:text-slate-300 dark:hover:bg-slate-800">
+                        <i :data-lucide="exportingPdf ? 'loader-circle' : 'file-type'" class="w-4 h-4" :class="exportingPdf ? 'animate-spin' : ''"></i><span x-text="exportingPdf ? 'Export...' : 'PDF'"></span>
+                    </button>
                     <button type="button" @click="copy()" class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-slate-500 transition hover:bg-slate-100 hover:text-primary dark:text-slate-300 dark:hover:bg-slate-800">
                         <i :data-lucide="copied ? 'check' : 'copy'" class="w-4 h-4"></i><span x-text="copied ? 'Tersalin' : 'Salin'"></span>
                     </button>
@@ -135,7 +214,7 @@
             <div x-show="loading" x-cloak class="flex-1 grid place-items-center text-slate-400">
                 <div class="text-center">
                     <i data-lucide="loader-circle" class="w-8 h-8 mx-auto animate-spin"></i>
-                    <p class="text-sm mt-2">AsistenAI sedang menyusun...</p>
+                    <p class="text-sm mt-2">Asisten Guru sedang menyusun...</p>
                 </div>
             </div>
 
@@ -152,7 +231,40 @@
 
             {{-- Result --}}
             <textarea x-show="result && !loading && editing" x-cloak x-model="result" rows="16" class="form-input flex-1 min-h-[260px] resize-y text-sm leading-relaxed"></textarea>
-            <div x-show="result && !loading && !editing" x-cloak class="ai-answer flex-1 overflow-auto break-words text-sm text-slate-800 dark:text-slate-100" x-html="renderAiMarkdown(result)"></div>
+
+            {{-- Pratinjau dokumen berformat (tab RPM Â· LKPD Â· Modul): sama persis dengan hasil export --}}
+            <div x-show="result && !loading && !editing && previewHtml" x-cloak class="flex-1 overflow-auto" x-html="previewHtml"></div>
+
+            {{-- Teks biasa: tab lain, atau bila pratinjau gagal/konten tak berformat RPM --}}
+            <div x-show="result && !loading && !editing && !previewHtml" x-cloak class="ai-answer flex-1 overflow-auto break-words text-sm text-slate-800 dark:text-slate-100" x-html="renderAiMarkdown(result)"></div>
+        </div>
+
+        {{-- History generate --}}
+        <div class="card p-5 flex flex-col min-h-[300px] lg:col-span-2 xl:col-span-1">
+            <div class="flex items-center justify-between gap-3 mb-3">
+                <h2 class="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2"><i data-lucide="history" class="w-4 h-4"></i> History Generate</h2>
+                <span class="text-[11px] text-slate-400" x-text="histories.length ? histories.length + ' item' : ''"></span>
+            </div>
+
+            <div x-show="histories.length === 0" x-cloak class="flex-1 grid place-items-center text-slate-300 dark:text-slate-600">
+                <div class="text-center">
+                    <i data-lucide="clock-3" class="w-10 h-10 mx-auto opacity-40"></i>
+                    <p class="text-sm mt-2">History generate akan muncul di sini.</p>
+                </div>
+            </div>
+
+            <div x-show="histories.length > 0" x-cloak class="space-y-2 overflow-auto pr-1 max-h-[560px]">
+                <template x-for="item in histories" :key="item.uuid">
+                    <button type="button" @click="openHistory(item)" class="w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-primary hover:bg-primary/5 dark:border-slate-700 dark:bg-slate-900/40 dark:hover:border-primary/70">
+                        <div class="flex items-start justify-between gap-2">
+                            <span class="inline-flex items-center rounded-full bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary" x-text="item.type_label"></span>
+                            <span class="shrink-0 text-[11px] text-slate-400" x-text="item.created_at_human || ''"></span>
+                        </div>
+                        <div class="mt-2 line-clamp-2 text-sm font-semibold text-slate-700 dark:text-slate-100" x-text="item.title"></div>
+                        <p class="mt-1 line-clamp-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400" x-text="item.excerpt"></p>
+                    </button>
+                </template>
+            </div>
         </div>
     </div>
 </div>
@@ -165,23 +277,34 @@
             tab: 'quiz',
             loading: false,
             exportingWord: false,
+            exportingPdf: false,
             result: '',
             error: '',
             copied: false,
             editing: false,
+            previewHtml: '',      // dokumen RPM berformat tabel (tab learning)
+            previewLoading: false,
+            histories: @js($histories ?? []),
+            quota: @js($quotaUsage ?? null),
             tabs: [
                 { key: 'quiz',     label: 'Generator Soal',  icon: 'file-question' },
+                { key: 'learning', label: 'RPM / LKPD / Modul', icon: 'clipboard-list' },
                 { key: 'summary',  label: 'Perangkum Materi', icon: 'list-collapse' },
                 { key: 'feedback', label: 'Draft Feedback',   icon: 'message-square-heart' },
             ],
             quiz:     { topik: '', jumlah: 5, jenis: 'pg', tingkat: 'sedang', jenjang: '', file: null, fileName: '' },
+            learning: { tool: 'rpp', topik: '', mapel: '', jenjang: '', durasi: '' },
             summary:  { materi: '' },
             feedback: { nama: '', konteks: '' },
             urls: {
                 quiz:     '{{ route('ai.teacher.quiz') }}',
+                learning: '{{ route('ai.teacher.learning') }}',
                 summary:  '{{ route('ai.teacher.summary') }}',
                 feedback: '{{ route('ai.teacher.feedback') }}',
                 quizWord: '{{ route('ai.teacher.quiz.export-word') }}',
+                learningPreview: '{{ route('ai.teacher.learning.preview') }}',
+                learningWord: '{{ route('ai.teacher.learning.export-word') }}',
+                learningPdf: '{{ route('ai.teacher.learning.export-pdf') }}',
             },
 
             selectTab(key) {
@@ -250,8 +373,11 @@
                         body: payload.body,
                     });
                     const d = await r.json();
+                    this.updateQuota(d.quota);
                     if (r.ok && d.ok) {
                         this.result = d.answer;
+                        if (d.history) this.addHistory(d.history);
+                        if (tool === 'learning') await this.refreshPreview();
                     } else if (r.status === 422) {
                         this.error = d.message || 'Periksa isian form: ' + Object.values(d.errors || {}).flat().join(' ');
                     } else {
@@ -278,7 +404,7 @@
                             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
                         },
                         body: JSON.stringify({
-                            title: this.quiz.topik ? 'Soal - ' + this.quiz.topik : 'Soal dari Asisten AI',
+                            title: this.quiz.topik ? 'Soal - ' + this.quiz.topik : 'Soal dari Asisten Guru',
                             content: this.result,
                         }),
                     });
@@ -305,13 +431,128 @@
                     this.$nextTick(() => window.lucide && lucide.createIcons());
                 }
             },
+            /**
+             * Ambil pratinjau dokumen berformat dari server (parser + template yang sama
+             * dengan export), jadi tampilan di layar persis seperti hasil unduhannya.
+             */
+            async refreshPreview() {
+                if (this.tab !== 'learning' || !this.result) {
+                    this.previewHtml = '';
+                    return;
+                }
+                this.previewLoading = true;
+                try {
+                    const r = await fetch(this.urls.learningPreview, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        },
+                        body: JSON.stringify({ tool: this.learning.tool, content: this.result }),
+                    });
+                    const d = await r.json();
+                    // Gagal pratinjau bukan kegagalan fatal: teks hasil tetap tampil apa adanya.
+                    this.previewHtml = (r.ok && d.ok) ? d.html : '';
+                } catch (_) {
+                    this.previewHtml = '';
+                } finally {
+                    this.previewLoading = false;
+                    this.$nextTick(() => window.lucide && lucide.createIcons());
+                }
+            },
+            updateQuota(quota) {
+                if (quota) this.quota = quota;
+            },
+
+            addHistory(item) {
+                this.histories = [item, ...this.histories.filter((history) => history.uuid !== item.uuid)].slice(0, 20);
+            },
+
+            openHistory(item) {
+                const learningTypes = ['rpp', 'lkpd', 'modul_ajar'];
+                this.tab = learningTypes.includes(item.type) ? 'learning' : item.type;
+                if (learningTypes.includes(item.type)) this.learning.tool = item.type;
+                this.result = item.answer || '';
+                this.error = '';
+                this.copied = false;
+                this.editing = false;
+                this.previewHtml = '';
+                if (this.tab === 'learning') this.refreshPreview();
+                this.$nextTick(() => window.lucide && lucide.createIcons());
+            },
+
+            learningToolLabel() {
+                const labels = {
+                    rpp: 'RPM Learning',
+                    lkpd: 'LKPD Learning',
+                    modul_ajar: 'Modul Ajar Deep Learning',
+                };
+
+                return labels[this.learning.tool] || 'RPM Learning';
+            },
+            async exportLearning(format) {
+                if (!this.result) return;
+                const isPdf = format === 'pdf';
+                if ((isPdf && this.exportingPdf) || (!isPdf && this.exportingWord)) return;
+                if (isPdf) this.exportingPdf = true; else this.exportingWord = true;
+                this.error = '';
+                try {
+                    const toolLabel = this.learningToolLabel();
+                    const title = this.learning.topik ? toolLabel + ' - ' + this.learning.topik : toolLabel;
+                    const r = await fetch(isPdf ? this.urls.learningPdf : this.urls.learningWord, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': isPdf ? 'application/pdf,application/json' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        },
+                        body: JSON.stringify({
+                            tool: this.learning.tool,
+                            title,
+                            content: this.result,
+                        }),
+                    });
+
+                    if (!r.ok) {
+                        const d = await r.json().catch(() => ({}));
+                        this.error = d.message || 'Export gagal. Coba lagi.';
+                        return;
+                    }
+
+                    const blob = await r.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = this.slugify(title || 'perangkat-ajar-learning') + (isPdf ? '.pdf' : '.docx');
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    URL.revokeObjectURL(url);
+                } catch (_) {
+                    this.error = 'Export gagal. Periksa koneksi lalu coba lagi.';
+                } finally {
+                    if (isPdf) this.exportingPdf = false; else this.exportingWord = false;
+                    this.$nextTick(() => window.lucide && lucide.createIcons());
+                }
+            },
+
+            slugify(value) {
+                return (value || 'dokumen')
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/^-|-$/g, '') || 'dokumen';
+            },
             toggleEdit() {
                 this.editing = !this.editing;
+                // Keluar dari mode edit: susun ulang pratinjau agar ikut suntingan guru.
+                if (!this.editing) this.refreshPreview();
                 this.$nextTick(() => window.lucide && lucide.createIcons());
             },
 
             clearResult() {
                 this.result = '';
+                this.previewHtml = '';
                 this.copied = false;
                 this.editing = false;
                 this.$nextTick(() => window.lucide && lucide.createIcons());
