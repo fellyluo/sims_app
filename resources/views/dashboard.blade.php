@@ -88,12 +88,12 @@
         background: linear-gradient(180deg, #4285F4, #34A853);
     }
     .google-quote-heading {
-        display: inline-flex; flex-direction: column; align-items: flex-start; gap: .08rem;
+        display: inline-flex; flex-direction: row; align-items: center; gap: .35rem;
         font-family: "Segoe Script", "Lucida Handwriting", "Brush Script MT", cursive; font-style: italic; font-size: clamp(1rem, 1.35vw, 1.2rem); line-height: 1.05; letter-spacing: 0;
         color: #334155;
     }
     .google-quote-heading span:last-child {
-        padding-left: 1.1rem; color: #4285F4;
+        color: #4285F4;
     }
     .google-quote-body {
         margin-top: .75rem;

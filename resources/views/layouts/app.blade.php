@@ -28,9 +28,13 @@
         $access  = auth()->user()?->access;
         $isAdmin = in_array($access, ['superadmin','admin']);
         $canManageFeedback = auth()->user()?->canAccess('manage_feedback') ?? false;
-        $feedbackUnreadCount = $canManageFeedback
-            ? \App\Models\UserFeedback::where('status', 'baru')->count()
-            : 0;
+        // Badge kosmetik — JANGAN sampai menjatuhkan seluruh halaman kalau tabelnya belum
+        // dimigrasikan (mis. baru deploy, migration belum jalan → tampil blank di production).
+        $feedbackUnreadCount = 0;
+        if ($canManageFeedback) {
+            try { $feedbackUnreadCount = \App\Models\UserFeedback::where('status', 'baru')->count(); }
+            catch (\Throwable $e) { $feedbackUnreadCount = 0; }
+        }
         $fontMap = ['sm' => ['11px','13px','15px'], 'md' => ['12px','14px','16px'], 'lg' => ['13px','15px','17px']];
         $fonts = $fontMap[$pref->font_size ?? 'md'];
 
@@ -383,8 +387,12 @@
 
 @php $myFace = auth()->user()?->siswa?->face_photo_url ?? auth()->user()?->guru?->face_photo_url; @endphp
 
-<div class="h-screen flex flex-col relative z-10" :class="{ 'mob-open': mobileOpen }">
-    <div class="flex-1 flex relative overflow-hidden">
+{{-- h-screen (100vh) TIDAK cocok di mobile: address bar yang muncul/hilang bikin 100vh
+     ≠ tinggi layar terlihat → konten terpotong & muncul area putih saat scroll. h-[100dvh]
+     (dynamic viewport height) mengikuti tinggi layar sebenarnya; h-screen jadi fallback
+     utk browser lama yang belum dukung dvh. --}}
+<div class="h-screen h-[100dvh] flex flex-col relative z-10 min-h-0" :class="{ 'mob-open': mobileOpen }">
+    <div class="flex-1 flex relative overflow-hidden min-h-0">
         <div class="sidebar-overlay lg:hidden" @click="mobileOpen=false"></div>
 
     {{-- ============ SIDEBAR (disembunyikan di mode kiosk) ============ --}}
@@ -790,7 +798,7 @@
     @endunless
 
     {{-- ============ MAIN ============ --}}
-    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden min-h-0">
 
         @unless($kioskChrome)
         <header class="h-16 flex items-center justify-between px-5 md:px-7 flex-shrink-0 gap-4 z-30">
