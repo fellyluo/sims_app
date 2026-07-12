@@ -693,7 +693,7 @@ Berikut adalah panduan langkah demi langkah untuk menggunakannya:
 
 Menu admin: `Akademik > Perangkat Ajar`.
 
-Menu guru: `Akademik > Perangkat Ajar Saya`.
+Menu guru: `Akademik > Perangkat Ajar`.
 
 Fitur ini menyediakan beberapa fungsi utama, di antaranya:
 
@@ -713,7 +713,7 @@ Cara admin:
 
 Langkah-langkah khusus untuk Guru:
 
-1. Silakan navigasikan ke menu `Perangkat Ajar Saya`.
+1. Silakan navigasikan ke menu `Perangkat Ajar`.
 2. Pilih jenis dokumen.
 3. Unggah berkas.
 4. Preview atau unduh untuk cek.
@@ -888,11 +888,11 @@ Berikut adalah panduan langkah demi langkah untuk menggunakannya:
 2. Pilih siswa yang menjadi sekretaris.
 3. Simpan.
 
-### Absensi Kelas Saya
+### Absensi Kelas
 
 Berikut adalah panduan langkah demi langkah untuk menggunakannya:
 
-1. Silakan navigasikan ke menu `Absensi Kelas Saya`.
+1. Silakan navigasikan ke menu `Absensi Kelas`.
 2. Pilih tanggal.
 3. Isi status kehadiran siswa.
 4. Terakhir, klik tombol "Simpan" untuk menerapkan perubahan.

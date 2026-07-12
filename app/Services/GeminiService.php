@@ -2,10 +2,14 @@
 
 namespace App\Services;
 
+use App\Exceptions\AiProviderUnavailableException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /*
@@ -20,18 +24,42 @@ use RuntimeException;
 */
 class GeminiService
 {
-    /** AI aktif bila key provider teks utama terisi. */
+    private const SUPPORTED_PROVIDERS = ['gemini', 'openrouter'];
+
+    /** AI aktif bila ada minimal satu provider (utama atau cadangan) yang punya key. */
     public function enabled(): bool
     {
-        return match ($this->provider()) {
-            'openrouter' => ! empty(config('ai.openrouter.api_key')),
-            default => ! empty(config('ai.api_key')),
-        };
+        return $this->providerChain() !== [];
     }
 
     private function provider(): string
     {
         return strtolower(trim((string) config('ai.provider', 'gemini')));
+    }
+
+    /**
+     * Urutan provider yang dicoba: provider utama lebih dulu, lalu cadangan dari
+     * ai.fallback_providers. Provider tanpa API key dibuang di sini supaya router
+     * tidak membuang waktu pada provider yang memang belum dikonfigurasi.
+     *
+     * @return string[]
+     */
+    private function providerChain(): array
+    {
+        $chain = array_merge([$this->provider()], (array) config('ai.fallback_providers', []));
+        $chain = array_map(fn ($provider) => strtolower(trim((string) $provider)), $chain);
+        $chain = array_values(array_unique(array_filter($chain)));
+
+        return array_values(array_filter($chain, fn (string $provider) => $this->providerConfigured($provider)));
+    }
+
+    private function providerConfigured(string $provider): bool
+    {
+        return match ($provider) {
+            'gemini' => ! empty(config('ai.api_key')),
+            'openrouter' => ! empty(config('ai.openrouter.api_key')),
+            default => false,
+        };
     }
 
     private function missingConfigurationMessage(): string
@@ -50,18 +78,66 @@ class GeminiService
      */
     public function generate(string $prompt, array $options = []): array
     {
-        if (! $this->enabled()) {
-            throw new RuntimeException($this->missingConfigurationMessage());
-        }
-
-        if ($this->provider() === 'openrouter') {
-            return $this->generateOpenRouter($prompt, $options);
-        }
-
-        if ($this->provider() !== 'gemini') {
+        if (! in_array($this->provider(), self::SUPPORTED_PROVIDERS, true)) {
             throw new RuntimeException('Provider AI tidak dikenali. Gunakan gemini atau openrouter.');
         }
 
+        $chain = $this->providerChain();
+
+        if ($chain === []) {
+            throw new RuntimeException($this->missingConfigurationMessage());
+        }
+
+        $failures = [];
+
+        // Router provider: bila provider utama kehabisan kuota / sedang down, pindah ke
+        // provider cadangan alih-alih menampilkan error ke guru. Kegagalan lain (mis.
+        // konfigurasi salah, prompt ditolak) tidak di-failover — biar cepat ketahuan.
+        foreach ($chain as $index => $provider) {
+            // Opsi `model` milik provider sebelumnya (mis. nama model Gemini) tidak
+            // berlaku di provider cadangan — biarkan cadangan memakai model defaultnya.
+            $providerOptions = $index === 0 ? $options : Arr::except($options, ['model']);
+
+            try {
+                return match ($provider) {
+                    'openrouter' => $this->generateOpenRouter($prompt, $providerOptions),
+                    default => $this->generateGemini($prompt, $providerOptions),
+                };
+            } catch (AiProviderUnavailableException $e) {
+                $failures[$provider] = $e->getMessage();
+
+                Log::warning('Provider AI tidak tersedia, mencoba cadangan berikutnya.', [
+                    'provider' => $provider,
+                    'next' => $chain[$index + 1] ?? null,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        throw new AiProviderUnavailableException($this->routerFailureMessage($failures));
+    }
+
+    /** Gabungkan kegagalan tiap provider jadi satu pesan yang jujur untuk guru. */
+    private function routerFailureMessage(array $failures): string
+    {
+        $primary = (string) array_key_first($failures);
+        $message = (string) $failures[$primary];
+        unset($failures[$primary]);
+
+        foreach ($failures as $provider => $failure) {
+            $message .= " Provider cadangan {$provider} juga gagal: {$failure}";
+        }
+
+        return $message;
+    }
+
+    /**
+     * Hasilkan teks via Gemini REST.
+     *
+     * @return array{text:string,model:string,prompt_tokens:int,completion_tokens:int}
+     */
+    private function generateGemini(string $prompt, array $options = []): array
+    {
         // answer_style bisa dikosongkan per-request: keluaran dokumen (RPM/LKPD) harus
         // teks polos, sedangkan gaya global justru menyuruh model memakai Markdown.
         $answerStyle = $options['answer_style'] ?? config('ai.answer_style');
@@ -96,6 +172,8 @@ class GeminiService
                 $body['tools'] = [$this->groundingTool($model)];
             }
 
+            $this->extendExecutionTime($options);
+
             try {
                 $response = Http::timeout($options['timeout'] ?? config('ai.timeout'))
                     // `when`: JANGAN ulangi permintaan yang ditolak (429/4xx) — tiap percobaan
@@ -111,7 +189,7 @@ class GeminiService
                     ->acceptJson()
                     ->post(rtrim(config('ai.base_url'), '/')."/models/{$model}:generateContent", $body);
             } catch (\Throwable $e) {
-                throw new RuntimeException('Gagal menghubungi layanan AI. Coba lagi beberapa saat.');
+                throw new AiProviderUnavailableException('Gagal menghubungi layanan AI. Coba lagi beberapa saat.');
             }
 
             if ($response->successful()) {
@@ -127,16 +205,21 @@ class GeminiService
                 continue;
             }
 
+            // Layanan sedang bermasalah (5xx) — layak dialihkan ke provider cadangan.
+            if ($response->status() >= 500) {
+                throw new AiProviderUnavailableException($this->normalizeError($response->status(), $response->json()));
+            }
+
             throw new RuntimeException($this->normalizeError($response->status(), $response->json()));
         }
 
         if ($this->freeTierOnly() && $lastQuotaError !== null && $allModelsHitDailyQuota) {
             $this->rememberFreeTierQuotaExhausted($modelChain);
 
-            throw new RuntimeException($this->freeTierQuotaMessage());
+            throw new AiProviderUnavailableException($this->freeTierQuotaMessage());
         }
 
-        throw new RuntimeException($lastQuotaError ?? 'Terjadi kesalahan saat memproses permintaan AI.');
+        throw new AiProviderUnavailableException($lastQuotaError ?? 'Terjadi kesalahan saat memproses permintaan AI.');
     }
 
     /**
@@ -165,6 +248,8 @@ class GeminiService
                 'max_tokens' => $options['max_output_tokens'] ?? config('ai.max_output_tokens'),
             ];
 
+            $this->extendExecutionTime($options);
+
             try {
                 $response = Http::timeout($options['timeout'] ?? config('ai.timeout'))
                     ->retry(
@@ -178,7 +263,7 @@ class GeminiService
                     ->acceptJson()
                     ->post(rtrim((string) config('ai.openrouter.base_url'), '/').'/chat/completions', $body);
             } catch (\Throwable $e) {
-                throw new RuntimeException('Gagal menghubungi layanan OpenRouter. Coba lagi beberapa saat.');
+                throw new AiProviderUnavailableException('Gagal menghubungi layanan OpenRouter. Coba lagi beberapa saat.');
             }
 
             if ($response->successful()) {
@@ -187,7 +272,12 @@ class GeminiService
 
             if ($response->status() === 429) {
                 $lastQuotaError = $this->normalizeOpenRouterError(429, $response->json());
+
                 continue;
+            }
+
+            if ($response->status() >= 500) {
+                throw new AiProviderUnavailableException($this->normalizeOpenRouterError($response->status(), $response->json()));
             }
 
             throw new RuntimeException($this->normalizeOpenRouterError($response->status(), $response->json()));
@@ -196,10 +286,25 @@ class GeminiService
         if ($this->openRouterFreeOnly() && $lastQuotaError !== null) {
             $this->rememberOpenRouterQuotaExhausted($modelChain);
 
-            throw new RuntimeException($this->openRouterFreeQuotaMessage());
+            throw new AiProviderUnavailableException($this->openRouterFreeQuotaMessage());
         }
 
-        throw new RuntimeException($lastQuotaError ?? 'Terjadi kesalahan saat memproses permintaan OpenRouter.');
+        throw new AiProviderUnavailableException($lastQuotaError ?? 'Terjadi kesalahan saat memproses permintaan OpenRouter.');
+    }
+
+    /**
+     * Cegah fatal "Maximum execution time exceeded": batas waktu PHP (mis. 60 detik)
+     * bisa lebih pendek daripada total waktu tunggu AI (timeout x retry x rantai model
+     * x rantai provider). Timer PHP di-reset sebelum setiap percobaan, jadi anggaran
+     * waktunya cukup untuk satu percobaan, bukan seluruh rantai.
+     */
+    private function extendExecutionTime(array $options): void
+    {
+        $timeout = (int) ($options['timeout'] ?? config('ai.timeout'));
+        $retries = (int) ($options['retries'] ?? config('ai.retries'));
+        $budget = $timeout * max(1, $retries) + 30;
+
+        @set_time_limit($budget);
     }
 
     /** @return string[] */
@@ -252,7 +357,7 @@ class GeminiService
             return;
         }
 
-        throw new RuntimeException($this->openRouterFreeQuotaMessage((string) $resetAt));
+        throw new AiProviderUnavailableException($this->openRouterFreeQuotaMessage((string) $resetAt));
     }
 
     /** @param string[] $modelChain */
@@ -277,7 +382,7 @@ class GeminiService
     {
         $displayReset = '';
         if ($resetAt) {
-            $displayReset = ' Perkiraan reset: '.\Illuminate\Support\Carbon::parse($resetAt)
+            $displayReset = ' Perkiraan reset: '.Carbon::parse($resetAt)
                 ->setTimezone(config('app.timezone', 'Asia/Jakarta'))
                 ->format('d/m/Y H:i T').'.';
         }
@@ -367,6 +472,7 @@ class GeminiService
             default => 'Terjadi kesalahan saat memproses permintaan OpenRouter.',
         };
     }
+
     /**
      * Urutan model yang dicoba: model utama lalu cadangan. Cadangan punya kuota harian
      * sendiri, jadi rantai ini yang membuat fitur tetap hidup setelah kuota model utama habis.
@@ -416,7 +522,7 @@ class GeminiService
             return;
         }
 
-        throw new RuntimeException($this->freeTierQuotaMessage((string) $resetAt));
+        throw new AiProviderUnavailableException($this->freeTierQuotaMessage((string) $resetAt));
     }
 
     /** @param string[] $modelChain */
@@ -437,7 +543,7 @@ class GeminiService
         return 'ai:gemini:free-tier-quota-exhausted:'.sha1((string) config('ai.api_key').'|'.implode('|', $modelChain));
     }
 
-    private function nextFreeTierResetAt(): \Illuminate\Support\Carbon
+    private function nextFreeTierResetAt(): Carbon
     {
         // Google menyebut RPD reset tengah malam Pacific time.
         return now('America/Los_Angeles')->addDay()->startOfDay();
@@ -447,7 +553,7 @@ class GeminiService
     {
         $displayReset = '';
         if ($resetAt) {
-            $displayReset = ' Perkiraan reset: '.\Illuminate\Support\Carbon::parse($resetAt)
+            $displayReset = ' Perkiraan reset: '.Carbon::parse($resetAt)
                 ->setTimezone(config('app.timezone', 'Asia/Jakarta'))
                 ->format('d/m/Y H:i T').'.';
         }
@@ -456,6 +562,7 @@ class GeminiService
             .'Sistem tidak akan mencoba Gemini lagi sampai kuota free tier reset agar tidak memakai API berbayar.'
             .$displayReset;
     }
+
     /** Layak diulang hanya bila gangguan sesaat (koneksi/5xx), bukan penolakan (4xx). */
     private function isTransient(\Throwable $e): bool
     {

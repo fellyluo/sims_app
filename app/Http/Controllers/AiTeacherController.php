@@ -7,6 +7,8 @@ use App\Models\AiTeacherHistory;
 use App\Services\GeminiService;
 use App\Support\LearningDocument;
 use App\Support\LearningDocxBuilder;
+use App\Support\QuizDocument;
+use App\Support\QuizDocxBuilder;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -48,6 +50,17 @@ class AiTeacherController extends Controller
         ]);
     }
 
+    /** DELETE /ai/teacher/history/{history} - hapus satu item history milik guru sendiri. */
+    public function destroyHistory(AiTeacherHistory $history): JsonResponse
+    {
+        // History bersifat pribadi: guru lain (atau wali kelas) tak boleh menghapus milik orang.
+        abort_unless($history->user_uuid === auth()->id(), 403);
+
+        $history->delete();
+
+        return response()->json(['ok' => true]);
+    }
+
     /** POST /ai/teacher/quiz - generator soal/kuis. */
     public function quiz(Request $request): JsonResponse
     {
@@ -82,6 +95,8 @@ class AiTeacherController extends Controller
         $topik = trim((string) ($data['topik'] ?? ''));
         $jenjang = ! empty($data['jenjang']) ? "untuk jenjang {$data['jenjang']}" : '';
 
+        $formatInstruction = $this->quizFormatInstruction((int) $data['jumlah'], $data['jenis'], $data['tingkat'], $data['jenjang'] ?? null, $topik);
+
         if ($documentText !== '') {
             $maxChars = (int) config('ai.max_input_chars');
             $material = mb_substr($documentText, 0, $maxChars);
@@ -91,14 +106,16 @@ class AiTeacherController extends Controller
                 ."{$data['tingkat']} {$jenjang} berdasarkan materi dari file berikut.\n"
                 .$topicLine
                 ."MATERI FILE:\n{$material}\n\n"
-                .'Sertakan kunci jawaban.';
+                .$formatInstruction;
         } else {
             $prompt = "Buat {$data['jumlah']} soal {$jenis} dengan tingkat kesulitan "
-                ."{$data['tingkat']} tentang topik: \"{$topik}\" {$jenjang}. "
-                .'Sertakan kunci jawaban.';
+                ."{$data['tingkat']} tentang topik: \"{$topik}\" {$jenjang}.\n\n"
+                .$formatInstruction;
         }
 
-        return $this->respond($request, 'teacher_quiz', config('ai.teacher.quiz'), $prompt, 2048, [], [
+        return $this->respond($request, 'teacher_quiz', config('ai.teacher.quiz'), $prompt, 4096, [
+            'answer_style' => 'Tulis sebagai dokumen soal teks polos siap cetak sesuai format yang diminta. JANGAN memakai Markdown, heading #, atau bullet dekoratif.',
+        ], [
             'type' => 'quiz',
             'type_label' => 'Generator Soal',
             'title' => $topik !== '' ? $topik : 'Soal dari file '.$request->file('file')?->getClientOriginalName(),
@@ -112,20 +129,47 @@ class AiTeacherController extends Controller
         ]);
     }
 
+    /**
+     * POST /ai/teacher/quiz/preview - render hasil soal jadi dokumen berformat.
+     * Memakai parser + markup yang sama dengan export Word, jadi yang dilihat guru
+     * = yang tercetak. Murni parsing lokal (tanpa panggil AI), maka tak kena rate limit.
+     */
+    public function previewQuiz(Request $request): JsonResponse
+    {
+        $data = $this->validatedQuizExport($request);
+        $doc = QuizDocument::parse($data['content']);
+
+        return response()->json([
+            'ok' => true,
+            'parsed' => $doc['parsed'],
+            'html' => view('ai.teacher-quiz-preview', [
+                'doc' => $doc,
+                'content' => $doc['text'],
+            ])->render(),
+        ]);
+    }
+
     /** POST /ai/teacher/quiz/export-word - export hasil soal yang sudah bisa diedit guru. */
     public function exportQuizWord(Request $request)
     {
-        $data = $request->validate([
-            'content' => ['required', 'string', 'max:50000'],
-            'title' => ['nullable', 'string', 'max:120'],
-        ]);
+        $data = $this->validatedQuizExport($request);
 
         $title = trim((string) ($data['title'] ?? '')) ?: 'Soal dari Asisten Guru';
         $safeName = Str::slug($title) ?: 'soal-asisten-ai';
         $fileName = $safeName.'-'.now()->format('Ymd-His').'.docx';
         $path = tempnam(sys_get_temp_dir(), 'ai-quiz-word-');
 
-        if (! $path || ! $this->writeDocx($path, $title, $data['content'])) {
+        if (! $path) {
+            abort(500, 'Gagal membuat file Word.');
+        }
+
+        // Dokumen soal berformat dirender sebagai dokumen Word formal; selain itu paragraf polos.
+        $doc = QuizDocument::parse($data['content']);
+        $written = $doc['parsed']
+            ? QuizDocxBuilder::write($path, $doc)
+            : $this->writeDocx($path, $title, $doc['text'], false, false);
+
+        if (! $written) {
             abort(500, 'Gagal membuat file Word.');
         }
 
@@ -134,18 +178,55 @@ class AiTeacherController extends Controller
         ])->deleteFileAfterSend(true);
     }
 
+    /** POST /ai/teacher/quiz/export-pdf - export hasil soal ke PDF siap cetak. */
+    public function exportQuizPdf(Request $request)
+    {
+        $data = $this->validatedQuizExport($request);
+
+        $title = trim((string) ($data['title'] ?? '')) ?: 'Soal dari Asisten Guru';
+        $fileName = (Str::slug($title) ?: 'soal-asisten-ai').'-'.now()->format('Ymd-His').'.pdf';
+
+        // Konten berformat dirender lewat partial yang sama dengan pratinjau & Word;
+        // konten bebas jatuh ke render teks polos.
+        $doc = QuizDocument::parse($data['content']);
+
+        $pdf = Pdf::loadView('ai.teacher-quiz-pdf', [
+            'title' => $title,
+            'content' => $doc['text'],
+            'doc' => $doc,
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download($fileName);
+    }
+
     /** POST /ai/teacher/learning - generator RPM Learning. */
     public function learning(Request $request): JsonResponse
     {
         $data = $request->validate([
             'tool' => ['required', 'in:rpp'],
-            'topik' => ['required', 'string', 'max:500'],
+            'topik' => ['nullable', 'required_without:file', 'string', 'max:500'],
             'mapel' => ['nullable', 'string', 'max:100'],
             'jenjang' => ['nullable', 'string', 'max:100'],
             'durasi' => ['nullable', 'string', 'max:100'],
+            'file' => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:10240'],
         ]);
 
+        $documentText = '';
+        if ($request->hasFile('file')) {
+            $file = $request->file('file');
+            $documentText = $this->extractQuizDocumentText($file->getRealPath(), $file->getClientOriginalExtension());
+
+            if ($documentText === '') {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'Teks tidak dapat diekstrak dari file. Pastikan PDF bukan hasil scan/gambar dan file Word berisi teks.',
+                ], 422);
+            }
+        }
+
         $toolLabel = $this->learningToolLabel($data['tool']);
+        $topik = trim((string) ($data['topik'] ?? ''));
+        $title = $topik !== '' ? $topik : 'RPM dari file '.$request->file('file')?->getClientOriginalName();
         $details = array_filter([
             ! empty($data['mapel']) ? "Mata pelajaran: {$data['mapel']}" : null,
             ! empty($data['jenjang']) ? "Jenjang/kelas: {$data['jenjang']}" : null,
@@ -153,11 +234,24 @@ class AiTeacherController extends Controller
         ]);
         $detailText = $details ? implode("\n", $details)."\n" : '';
 
-        $prompt = "Buat {$toolLabel} siap pakai untuk guru dengan topik: \"{$data['topik']}\".\n"
-            .$detailText
-            ."Gunakan Bahasa Indonesia baku, praktis, dan langsung bisa direview guru.\n\n"
-            .$this->learningFormatInstruction($data['tool']);
+        if ($documentText !== '') {
+            $maxChars = (int) config('ai.max_input_chars');
+            $material = mb_substr($documentText, 0, $maxChars);
+            $topicLine = $topik !== '' ? "Fokus/topik RPM: \"{$topik}\".\n" : '';
 
+            $prompt = "Buat {$toolLabel} siap pakai untuk guru berdasarkan materi dari file berikut.\n"
+                .$topicLine
+                .$detailText
+                ."Gunakan Bahasa Indonesia baku, praktis, dan langsung bisa direview guru.\n"
+                ."JANGAN keluar dari cakupan MATERI FILE. Jika ada informasi yang belum ada di file, gunakan placeholder yang jelas, bukan mengarang.\n\n"
+                ."MATERI FILE:\n{$material}\n\n"
+                .$this->learningFormatInstruction($data['tool']);
+        } else {
+            $prompt = "Buat {$toolLabel} siap pakai untuk guru dengan topik: \"{$topik}\".\n"
+                .$detailText
+                ."Gunakan Bahasa Indonesia baku, praktis, dan langsung bisa direview guru.\n\n"
+                .$this->learningFormatInstruction($data['tool']);
+        }
         // Dokumen RPM utuh (+3 lampiran) butuh ~3.500 token dan ~45 detik. Jatah token
         // dibagi dengan token "berpikir" model, jadi porsi berpikir ditekan agar dokumen
         // tidak terpotong di tengah; batas eksekusi PHP dinaikkan agar tak fatal duluan.
@@ -172,11 +266,12 @@ class AiTeacherController extends Controller
         ], [
             'type' => $data['tool'],
             'type_label' => $toolLabel,
-            'title' => $data['topik'],
+            'title' => $title,
             'metadata' => [
                 'mapel' => $data['mapel'] ?? null,
                 'jenjang' => $data['jenjang'] ?? null,
                 'durasi' => $data['durasi'] ?? null,
+                'file' => $request->file('file')?->getClientOriginalName(),
             ],
         ]);
     }
@@ -377,6 +472,7 @@ class AiTeacherController extends Controller
             'can_view_usage' => false,
         ];
     }
+
     private function storeHistory(string $userId, array $data, string $answer): array
     {
         $history = AiTeacherHistory::create([
@@ -415,6 +511,14 @@ class AiTeacherController extends Controller
         return trim((string) $text);
     }
 
+    private function validatedQuizExport(Request $request): array
+    {
+        return $request->validate([
+            'content' => ['required', 'string', 'max:50000'],
+            'title' => ['nullable', 'string', 'max:120'],
+        ]);
+    }
+
     private function validatedLearningExport(Request $request): array
     {
         return $request->validate([
@@ -429,6 +533,75 @@ class AiTeacherController extends Controller
         $title = trim((string) ($data['title'] ?? ''));
 
         return $title !== '' ? $title : $this->learningToolLabel($data['tool']);
+    }
+
+    private function quizFormatInstruction(int $jumlah, string $jenis, string $tingkat, ?string $jenjang, string $topik): string
+    {
+        $kelas = trim((string) $jenjang) !== '' ? trim((string) $jenjang) : '[KELAS / SEMESTER]';
+        $topikJudul = trim($topik) !== '' ? mb_strtoupper($topik) : '[TOPIK]';
+        $tingkatLabel = Str::title($tingkat);
+        $jenisLine = match ($jenis) {
+            'pg' => 'Buat Bagian A saja untuk pilihan ganda, lalu Kunci Jawaban pilihan ganda.',
+            'esai' => 'Buat Bagian B saja untuk esai, lalu Esai - Poin Jawaban Ideal dan Rubrik Penilaian Esai.',
+            default => 'Bagi jumlah soal menjadi pilihan ganda dan esai seperti contoh: Bagian A lalu Bagian B, kemudian kunci jawaban dan pedoman penilaian.',
+        };
+
+        return <<<TXT
+FORMAT WAJIB mengikuti contoh file soal-agama-buddha.docx. Tulis teks polos dengan urutan ini, tanpa Markdown:
+
+YAYASAN BUMI MAITRI
+SMP MAITREYAWIRA TANJUNGPINANG
+TERAKREDITASI A
+Jl. Prof. Ir. Sutami No. 38  Telp (0771) 4505723  Email smpmai.tpi@gmail.com
+SOAL EVALUASI [MATA PELAJARAN / TOPIK]
+{$kelas} - Tingkat Kesulitan {$tingkatLabel}
+
+Mata Pelajaran : [isi mata pelajaran/topik: {$topikJudul}]
+Kelas / Semester : {$kelas}
+Nama : ...............................................................
+Nilai : ...............................................................
+
+Petunjuk Pengerjaan
+Kerjakan soal pilihan ganda dengan memberi tanda silang (X) pada jawaban yang benar.
+Jawablah soal esai secara jelas, terstruktur, dan menggunakan bahasa yang baik.
+
+Bagian A - Pilihan Ganda
+1. [soal]
+A. [opsi]
+B. [opsi]
+C. [opsi]
+D. [opsi]
+
+Bagian B - Esai
+Jawablah setiap pertanyaan berikut dengan uraian sekitar 150-200 kata.
+[nomor lanjutan]. [soal esai]
+_______________________________________________________________________
+
+Kunci Jawaban & Pedoman Penilaian
+(Untuk Guru)
+
+Pilihan Ganda
+1. A
+2. B
+
+Esai - Poin Jawaban Ideal
+Soal [nomor]
+[poin jawaban ideal dalam paragraf pendek]
+
+Rubrik Penilaian Esai (masing-masing 4 poin)
+Pemahaman konsep (2 poin): memaparkan ide utama dengan benar.
+Contoh konkret (1 poin): menyertakan contoh yang relevan dari materi/topik.
+Bahasa & struktur (1 poin): jawaban terorganisir, tata bahasa baik, dan ringkas.
+Skor maksimum bagian esai: [jumlah soal esai x 4] poin.
+
+ATURAN:
+- {$jenisLine}
+- Total soal harus {$jumlah} nomor.
+- Nomor soal berurutan dari Bagian A ke Bagian B.
+- Opsi pilihan ganda selalu A-D dan hanya satu jawaban benar.
+- Jika data mata pelajaran/kelas/semester tidak tersedia, gunakan placeholder jelas, jangan mengarang data sekolah selain kop contoh.
+- Jangan menulis pengantar atau catatan di luar dokumen soal.
+TXT;
     }
 
     private function learningFormatInstruction(string $tool): string

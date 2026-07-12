@@ -11,7 +11,7 @@
             </a>
             @endif
             <div class="min-w-0">
-                <h1 class="page-title truncate">Perangkat Ajar {{ $isSelf ? 'Saya' : '— ' . $guru->nama }}</h1>
+                <h1 class="page-title truncate">Perangkat Ajar{{ $isSelf ? '' : ' — ' . $guru->nama }}</h1>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Unggah dokumen RPP, Modul Ajar, dan perangkat mengajar lainnya (PDF, maks 20MB).</p>
             </div>
         </div>

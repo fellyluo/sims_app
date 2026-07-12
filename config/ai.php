@@ -14,6 +14,20 @@ return [
     // Provider teks utama: gemini atau openrouter.
     'provider' => env('AI_PROVIDER', 'gemini'),
 
+    /*
+    | Router provider: provider cadangan yang dicoba bila provider utama kehabisan
+    | kuota/limit atau sedang down (429, koneksi putus, 5xx). Kegagalan lain — mis.
+    | konfigurasi salah atau prompt ditolak — TIDAK dialihkan supaya cepat ketahuan.
+    |
+    | Provider tanpa API key otomatis dilewati, jadi baris ini aman dibiarkan meski
+    | OPENROUTER_API_KEY belum diisi. Kosongkan (AI_FALLBACK_PROVIDERS=) untuk mematikan
+    | router dan memakai satu provider saja.
+    */
+    'fallback_providers' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('AI_FALLBACK_PROVIDERS', 'openrouter')),
+    ))),
+
     // Kredensial — HANYA di server. Bila kosong, GeminiService->enabled() = false
     // dan seluruh fitur AI dilewati diam-diam (tak error keras).
     'api_key' => env('GEMINI_API_KEY'),
@@ -38,7 +52,6 @@ return [
         'trim',
         explode(',', (string) env('AI_FALLBACK_MODELS', 'gemini-3.1-flash-lite,gemini-2.5-flash,gemini-2.5-flash-lite')),
     ))),
-
 
     // Mode aman biaya: bila semua model free-tier kena limit harian, hentikan panggilan
     // Gemini sampai reset RPD berikutnya. Jangan aktifkan billing otomatis dari aplikasi.

@@ -128,13 +128,16 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
     Route::middleware('role:guru,walikelas')->prefix('ai/teacher')->name('ai.teacher.')->controller(AiTeacherController::class)->group(function () {
         Route::get('/', 'index')->name('index');
         Route::post('/quiz', 'quiz')->name('quiz');
+        Route::post('/quiz/preview', 'previewQuiz')->name('quiz.preview');
         Route::post('/quiz/export-word', 'exportQuizWord')->name('quiz.export-word');
+        Route::post('/quiz/export-pdf', 'exportQuizPdf')->name('quiz.export-pdf');
         Route::post('/learning', 'learning')->name('learning');
         Route::post('/learning/preview', 'previewLearning')->name('learning.preview');
         Route::post('/learning/export-word', 'exportLearningWord')->name('learning.export-word');
         Route::post('/learning/export-pdf', 'exportLearningPdf')->name('learning.export-pdf');
         Route::post('/summary', 'summary')->name('summary');
         Route::post('/feedback', 'feedback')->name('feedback');
+        Route::delete('/history/{history}', 'destroyHistory')->name('history.destroy');
     });
 
     // ─── Asisten Guru Narasi Data (Fase 4) ─────────────────────────────────────────

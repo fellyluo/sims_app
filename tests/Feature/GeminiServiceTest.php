@@ -19,6 +19,9 @@ class GeminiServiceTest extends TestCase
         config()->set('ai.api_key', 'test-key');
         config()->set('ai.model', 'gemini-test');
         config()->set('ai.fallback_models', []);
+        // Router provider dimatikan secara default agar tiap skenario menguji satu provider;
+        // perilaku failover diuji terpisah di test router di bawah.
+        config()->set('ai.fallback_providers', []);
         config()->set('ai.free_tier_only', true);
         config()->set('ai.openrouter.api_key', 'openrouter-test-key');
         config()->set('ai.openrouter.base_url', 'https://openrouter.ai/api/v1');
@@ -134,7 +137,6 @@ class GeminiServiceTest extends TestCase
         });
     }
 
-
     public function test_openrouter_free_model_menggunakan_endpoint_chat_completion(): void
     {
         config()->set('ai.provider', 'openrouter');
@@ -207,6 +209,91 @@ class GeminiServiceTest extends TestCase
         });
 
         $this->assertSame(['qwen/qwen3-coder:free', 'openrouter/free'], $models);
+    }
+
+    /**
+     * Router provider: saat kuota Gemini habis, guru tidak boleh melihat error —
+     * permintaan dialihkan ke provider cadangan yang punya jatah sendiri.
+     */
+    public function test_kuota_provider_utama_habis_dialihkan_ke_provider_cadangan(): void
+    {
+        config()->set('ai.fallback_providers', ['openrouter']);
+
+        Http::fake([
+            'https://generativelanguage.googleapis.com/*' => Http::response($this->kuotaHarianHabis(), 429),
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response($this->jawabanOpenRouterSukses('Jawaban dari cadangan')),
+        ]);
+
+        $result = app(GeminiService::class)->generate('Buat soal');
+
+        $this->assertSame('Jawaban dari cadangan', $result['text']);
+        $this->assertSame('openrouter/free', $result['model']);
+    }
+
+    /** Provider utama down (5xx) juga layak dialihkan, bukan dilempar ke guru. */
+    public function test_provider_utama_error_server_dialihkan_ke_provider_cadangan(): void
+    {
+        config()->set('ai.fallback_providers', ['openrouter']);
+
+        Http::fake([
+            'https://generativelanguage.googleapis.com/*' => Http::response(['error' => ['message' => 'Service unavailable']], 503),
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response($this->jawabanOpenRouterSukses('Jawaban dari cadangan')),
+        ]);
+
+        $this->assertSame('Jawaban dari cadangan', app(GeminiService::class)->generate('Buat soal')['text']);
+    }
+
+    /** Kesalahan permintaan (4xx selain 429) bukan urusan kuota — jangan buang kuota cadangan. */
+    public function test_kesalahan_permintaan_tidak_dialihkan_ke_provider_cadangan(): void
+    {
+        config()->set('ai.fallback_providers', ['openrouter']);
+
+        Http::fake([
+            'https://generativelanguage.googleapis.com/*' => Http::response(['error' => ['message' => 'Invalid argument']], 400),
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response($this->jawabanOpenRouterSukses('Tidak boleh terpakai')),
+        ]);
+
+        try {
+            app(GeminiService::class)->generate('Buat soal');
+            $this->fail('Kesalahan permintaan seharusnya dilempar, bukan dialihkan.');
+        } catch (RuntimeException) {
+            Http::assertNotSent(fn ($request) => str_contains($request->url(), 'openrouter.ai'));
+        }
+    }
+
+    /** Provider cadangan tanpa API key dilewati, bukan dicoba lalu gagal. */
+    public function test_provider_cadangan_tanpa_api_key_dilewati(): void
+    {
+        config()->set('ai.fallback_providers', ['openrouter']);
+        config()->set('ai.openrouter.api_key', null);
+
+        Http::fake(['*' => Http::response($this->kuotaHarianHabis(), 429)]);
+
+        $this->expectException(RuntimeException::class);
+
+        try {
+            app(GeminiService::class)->generate('Buat soal');
+        } finally {
+            Http::assertNotSent(fn ($request) => str_contains($request->url(), 'openrouter.ai'));
+        }
+    }
+
+    /** Bila semua provider gagal, pesan harus menyebut kegagalan cadangan juga. */
+    public function test_semua_provider_gagal_pesannya_menyebut_cadangan(): void
+    {
+        config()->set('ai.fallback_providers', ['openrouter']);
+
+        Http::fake([
+            'https://generativelanguage.googleapis.com/*' => Http::response($this->kuotaHarianHabis(), 429),
+            'https://openrouter.ai/api/v1/chat/completions' => Http::response(['error' => ['message' => 'Rate limit exceeded']], 429),
+        ]);
+
+        try {
+            app(GeminiService::class)->generate('Buat soal');
+            $this->fail('Semua provider gagal seharusnya melempar exception.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('Provider cadangan openrouter juga gagal', $e->getMessage());
+        }
     }
 
     private function jawabanOpenRouterSukses(string $teks): array

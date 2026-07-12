@@ -275,17 +275,30 @@ final class LearningDocument
      * (**tebal**, heading #, bullet * / -) dan kalimat basa-basi pembuka meski diminta
      * tidak. Tanpa ini, heading seperti "**IDENTIFIKASI**" tak dikenali sebagai bagian.
      *
+     * Dipakai juga oleh QuizDocument yang mengolah keluaran generator lain. Dokumen soal
+     * memakai baris garis bawah sebagai ruang jawaban esai, jadi ia meminta baris tersebut
+     * dipertahankan lewat $keepUnderline.
+     *
      * @return string[]
      */
-    private static function sanitize(string $content): array
+    public static function sanitize(string $content, bool $keepUnderline = false): array
     {
         $lines = [];
+        $rule = $keepUnderline ? '/^([-*]\s*){3,}$/u' : '/^([-*_]\s*){3,}$/u';
 
         foreach (preg_split('/\R/u', trim($content)) ?: [] as $line) {
             $line = trim($line);
 
             // Pagar blok kode dan garis pemisah horizontal.
-            if (str_starts_with($line, '```') || preg_match('/^([-*_]\s*){3,}$/u', $line)) {
+            if (str_starts_with($line, '```') || preg_match($rule, $line)) {
+                continue;
+            }
+
+            // "__" adalah penanda tebal Markdown, tapi baris garis jawaban esai murni
+            // garis bawah — jangan diutak-atik.
+            if ($keepUnderline && preg_match('/^_{3,}$/u', $line)) {
+                $lines[] = $line;
+
                 continue;
             }
 

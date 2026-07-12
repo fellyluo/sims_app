@@ -36,7 +36,11 @@ class AiTeacherControllerTest extends TestCase
 
                     return str_contains($prompt, 'Siklus air terdiri dari evaporasi')
                         && str_contains($prompt, 'Fokus topik: "Daur air"')
-                        && ($options['max_output_tokens'] ?? null) === 2048;
+                        && str_contains($prompt, 'SOAL EVALUASI [MATA PELAJARAN / TOPIK]')
+                        && str_contains($prompt, 'Petunjuk Pengerjaan')
+                        && str_contains($prompt, 'Kunci Jawaban & Pedoman Penilaian')
+                        && ($options['max_output_tokens'] ?? null) === 4096
+                        && str_contains((string) ($options['answer_style'] ?? ''), 'dokumen soal teks polos');
                 })
                 ->andReturn([
                     'text' => "1. Contoh soal\n\nKUNCI JAWABAN: A",
@@ -254,9 +258,34 @@ class AiTeacherControllerTest extends TestCase
             'access' => 'guru',
         ]);
 
+        $content = implode("\n", [
+            'YAYASAN BUMI MAITRI',
+            'SMP MAITREYAWIRA TANJUNGPINANG',
+            'TERAKREDITASI A',
+            'Jl. Prof. Ir. Sutami No. 38  Telp (0771) 4505723  Email smpmai.tpi@gmail.com',
+            'SOAL EVALUASI IPA',
+            'Kelas 5 SD - Tingkat Kesulitan Sedang',
+            'Mata Pelajaran : IPA',
+            'Kelas / Semester : Kelas 5 SD',
+            'Nama : ...............................................................',
+            'Nilai : ...............................................................',
+            'Petunjuk Pengerjaan',
+            'Kerjakan soal pilihan ganda dengan memberi tanda silang (X) pada jawaban yang benar.',
+            'Bagian A - Pilihan Ganda',
+            '1. Apa itu evaporasi?',
+            'A. Penguapan air',
+            'B. Pembekuan air',
+            'C. Pengendapan air',
+            'D. Peresapan air',
+            'Kunci Jawaban & Pedoman Penilaian',
+            '(Untuk Guru)',
+            'Pilihan Ganda',
+            '1. A',
+        ]);
+
         $response = $this->actingAs($user)->postJson(route('ai.teacher.quiz.export-word'), [
             'title' => 'Soal IPA Air',
-            'content' => "1. Apa itu evaporasi?\nA. Penguapan air\n\nKunci Jawaban: A",
+            'content' => $content,
         ]);
 
         $response->assertOk();
@@ -271,9 +300,12 @@ class AiTeacherControllerTest extends TestCase
         $zip->close();
 
         $this->assertIsString($xml);
-        $this->assertStringContainsString('Soal IPA Air', $xml);
+        $this->assertStringContainsString('YAYASAN BUMI MAITRI', $xml);
+        $this->assertStringContainsString('SOAL EVALUASI IPA', $xml);
+        $this->assertStringContainsString('Petunjuk Pengerjaan', $xml);
         $this->assertStringContainsString('Apa itu evaporasi?', $xml);
-        $this->assertStringContainsString('Kunci Jawaban: A', $xml);
+        $this->assertStringContainsString('Kunci Jawaban &amp; Pedoman Penilaian', $xml);
+        $this->assertStringNotContainsString('Dibuat dari Asisten Guru', $xml);
     }
 
     public function test_perangkum_materi_tetap_memakai_prompt_summary(): void
@@ -393,6 +425,67 @@ class AiTeacherControllerTest extends TestCase
             ]);
 
         $this->assertStringContainsString('Mata pelajaran: IPAS', $capturedPrompt);
+        $this->assertDatabaseHas('ai_usage_logs', [
+            'user_uuid' => $user->uuid,
+            'feature' => 'teacher_learning_rpp',
+            'status' => 'success',
+        ]);
+    }
+
+    public function test_generator_rpm_learning_bisa_memakai_materi_dari_file_docx(): void
+    {
+        $user = User::create([
+            'username' => 'guru-learning-file',
+            'password' => 'password',
+            'access' => 'guru',
+        ]);
+
+        $filePath = tempnam(sys_get_temp_dir(), 'learning-docx');
+        $this->makeDocx($filePath, 'Materi energi terbarukan membahas panel surya, turbin angin, biomassa, dan penghematan listrik.');
+
+        $capturedPrompt = '';
+        $this->mock(GeminiService::class, function (MockInterface $mock) use (&$capturedPrompt) {
+            $mock->shouldReceive('generate')
+                ->once()
+                ->withArgs(function (string $prompt, array $options) use (&$capturedPrompt) {
+                    $capturedPrompt = $prompt;
+
+                    return str_contains($prompt, 'Buat RPM Learning siap pakai untuk guru berdasarkan materi dari file')
+                        && str_contains($prompt, 'Fokus/topik RPM: "Energi Terbarukan"')
+                        && str_contains($prompt, 'MATERI FILE:')
+                        && str_contains($prompt, 'panel surya, turbin angin, biomassa')
+                        && str_contains($prompt, 'JANGAN keluar dari cakupan MATERI FILE')
+                        && ($options['max_output_tokens'] ?? null) === 8192
+                        && ($options['thinking_level'] ?? null) === 'low';
+                })
+                ->andReturn([
+                    'text' => 'Dokumen RPM energi terbarukan.',
+                    'model' => 'gemini-test',
+                    'prompt_tokens' => 20,
+                    'completion_tokens' => 30,
+                ]);
+        });
+
+        $response = $this->actingAs($user)->postJson(route('ai.teacher.learning'), [
+            'tool' => 'rpp',
+            'topik' => 'Energi Terbarukan',
+            'mapel' => 'IPAS',
+            'jenjang' => 'Kelas 6 SD',
+            'durasi' => '2 x 35 menit',
+            'file' => new UploadedFile(
+                $filePath,
+                'materi-energi-terbarukan.docx',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                null,
+                true,
+            ),
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('history.type', 'rpp')
+            ->assertJsonPath('history.metadata.file', 'materi-energi-terbarukan.docx');
+
+        $this->assertStringContainsString('MATERI FILE:', $capturedPrompt);
         $this->assertDatabaseHas('ai_usage_logs', [
             'user_uuid' => $user->uuid,
             'feature' => 'teacher_learning_rpp',
@@ -652,6 +745,174 @@ class AiTeacherControllerTest extends TestCase
         $this->assertStringStartsWith('%PDF', $response->getContent());
     }
 
+    public function test_hasil_generator_soal_bisa_dieksport_ke_pdf(): void
+    {
+        $user = User::create([
+            'username' => 'guru-quiz-pdf',
+            'password' => 'password',
+            'access' => 'guru',
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('ai.teacher.quiz.export-pdf'), [
+            'title' => 'Soal IPA Air',
+            'content' => $this->strukturSoal(),
+        ]);
+
+        $response->assertOk();
+        $response->assertHeader('content-type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF', $response->getContent());
+    }
+
+    public function test_export_pdf_soal_tak_berformat_tetap_valid(): void
+    {
+        $user = User::create([
+            'username' => 'guru-quiz-pdf-bebas',
+            'password' => 'password',
+            'access' => 'guru',
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('ai.teacher.quiz.export-pdf'), [
+            'content' => "Catatan bebas guru.\nBukan format soal evaluasi.",
+        ]);
+
+        $response->assertOk();
+        $this->assertStringStartsWith('%PDF', $response->getContent());
+    }
+
+    public function test_guru_bisa_menghapus_history_generate_miliknya(): void
+    {
+        $user = User::create([
+            'username' => 'guru-hapus-history',
+            'password' => 'password',
+            'access' => 'guru',
+        ]);
+
+        $history = AiTeacherHistory::create([
+            'user_uuid' => $user->uuid,
+            'type' => 'quiz',
+            'type_label' => 'Generator Soal',
+            'title' => 'Soal Ekosistem',
+            'excerpt' => 'Ringkasan soal',
+            'metadata' => [],
+            'answer' => 'Soal ekosistem.',
+        ]);
+
+        $this->actingAs($user)
+            ->deleteJson(route('ai.teacher.history.destroy', $history))
+            ->assertOk()
+            ->assertJson(['ok' => true]);
+
+        $this->assertDatabaseMissing('ai_teacher_histories', ['uuid' => $history->uuid]);
+    }
+
+    public function test_guru_tidak_bisa_menghapus_history_milik_guru_lain(): void
+    {
+        $pemilik = User::create([
+            'username' => 'guru-pemilik-history',
+            'password' => 'password',
+            'access' => 'guru',
+        ]);
+        $penyusup = User::create([
+            'username' => 'guru-penyusup-history',
+            'password' => 'password',
+            'access' => 'guru',
+        ]);
+
+        $history = AiTeacherHistory::create([
+            'user_uuid' => $pemilik->uuid,
+            'type' => 'quiz',
+            'type_label' => 'Generator Soal',
+            'title' => 'Soal Ekosistem',
+            'excerpt' => 'Ringkasan soal',
+            'metadata' => [],
+            'answer' => 'Soal ekosistem.',
+        ]);
+
+        $this->actingAs($penyusup)
+            ->deleteJson(route('ai.teacher.history.destroy', $history))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('ai_teacher_histories', ['uuid' => $history->uuid]);
+    }
+
+    public function test_pratinjau_generator_soal_merender_dokumen_berformat(): void
+    {
+        $user = User::create([
+            'username' => 'guru-quiz-preview',
+            'password' => 'password',
+            'access' => 'guru',
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('ai.teacher.quiz.preview'), [
+            'content' => $this->strukturSoal(),
+        ]);
+
+        $response->assertOk()->assertJson(['ok' => true, 'parsed' => true]);
+
+        $html = $response->json('html');
+        $this->assertStringContainsString('quiz-doc', $html);
+        $this->assertStringContainsString('YAYASAN BUMI MAITRI', $html);
+        $this->assertStringContainsString('SOAL EVALUASI IPA', $html);
+        $this->assertStringContainsString('<table class="identitas">', $html);
+        $this->assertStringContainsString('Bagian A - Pilihan Ganda', $html);
+        $this->assertStringContainsString('Apa itu evaporasi?', $html);
+        $this->assertStringContainsString('<table class="kunci-pg">', $html);
+    }
+
+    public function test_pratinjau_generator_soal_lolos_untuk_konten_tak_berformat(): void
+    {
+        $user = User::create([
+            'username' => 'guru-quiz-preview-bebas',
+            'password' => 'password',
+            'access' => 'guru',
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('ai.teacher.quiz.preview'), [
+            'content' => "Catatan bebas guru.\nBukan format soal evaluasi.",
+        ]);
+
+        $response->assertOk()->assertJson(['ok' => true, 'parsed' => false]);
+        $this->assertStringContainsString('Catatan bebas guru.', $response->json('html'));
+    }
+
+    /** Konten soal ringkas berformat acuan (kop, identitas, petunjuk, bagian, kunci). */
+    private function strukturSoal(): string
+    {
+        return implode("\n", [
+            'YAYASAN BUMI MAITRI',
+            'SMP MAITREYAWIRA TANJUNGPINANG',
+            'TERAKREDITASI A',
+            'Jl. Prof. Ir. Sutami No. 38  Telp (0771) 4505723  Email smpmai.tpi@gmail.com',
+            'SOAL EVALUASI IPA',
+            'Kelas 5 SD - Tingkat Kesulitan Sedang',
+            'Mata Pelajaran : IPA',
+            'Kelas / Semester : Kelas 5 SD',
+            'Nama : ...............................................................',
+            'Nilai : ...............................................................',
+            'Petunjuk Pengerjaan',
+            'Kerjakan soal pilihan ganda dengan memberi tanda silang (X) pada jawaban yang benar.',
+            'Bagian A - Pilihan Ganda',
+            '1. Apa itu evaporasi?',
+            'A. Penguapan air',
+            'B. Pembekuan air',
+            'C. Pengendapan air',
+            'D. Peresapan air',
+            'Bagian B - Esai',
+            'Jawablah setiap pertanyaan berikut dengan uraian singkat.',
+            '2. Jelaskan siklus air secara singkat.',
+            '_______________________________________________________________________',
+            'Kunci Jawaban & Pedoman Penilaian',
+            '(Untuk Guru)',
+            'Pilihan Ganda',
+            '1. A',
+            'Esai - Poin Jawaban Ideal',
+            'Soal 2',
+            'Air menguap, mengembun, lalu turun sebagai hujan.',
+            'Rubrik Penilaian Esai (masing-masing 4 poin)',
+            'Pemahaman konsep (2 poin): memaparkan ide utama dengan benar.',
+        ]);
+    }
+
     /** Konten RPM ringkas berformat lengkap (kop, tabel, DPL, tanda tangan, lampiran). */
     private function strukturRpm(): string
     {
@@ -700,6 +961,7 @@ class AiTeacherControllerTest extends TestCase
             'Menjelaskan ekosistem | 1 cara | 2 cara | 3 cara | Semua',
         ]);
     }
+
     private function makeDocx(string $path, string $body): void
     {
         $zip = new ZipArchive;

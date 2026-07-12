@@ -67,18 +67,30 @@
             {{-- Generator Soal --}}
             <div x-show="tab === 'quiz'" class="space-y-4">
                 <div>
-                    <label class="form-label">Topik / Fokus Materi <span class="text-rose-500" x-show="!quiz.file" x-cloak>*</span></label>
+                    <label class="form-label">Topik / Fokus Materi <span class="text-rose-500" x-show="quiz.source === 'ai'" x-cloak>*</span></label>
                     <input type="text" x-model="quiz.topik" placeholder="mis. Fotosintesis, Perang Diponegoro, Pecahan..." class="form-input">
-                    <p class="text-[11px] text-slate-400 mt-1">Boleh dikosongkan jika soal dibuat langsung dari file.</p>
+                    <p class="text-[11px] text-slate-400 mt-1">Jika upload materi, topik boleh dipakai sebagai fokus soal.</p>
                 </div>
 
                 <div>
-                    <label class="form-label">File Materi <span class="text-slate-400 font-normal">(opsional)</span></label>
+                    <label class="form-label">Sumber Materi <span class="text-rose-500">*</span></label>
+                    <div class="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+                        <button type="button" @click="quiz.source = 'ai'"
+                                :class="quiz.source === 'ai' ? 'bg-white text-primary shadow-sm dark:bg-slate-900' : 'text-slate-500 dark:text-slate-300'"
+                                class="rounded-lg px-3 py-2 text-xs font-semibold transition">Generate dari topik</button>
+                        <button type="button" @click="quiz.source = 'file'"
+                                :class="quiz.source === 'file' ? 'bg-white text-primary shadow-sm dark:bg-slate-900' : 'text-slate-500 dark:text-slate-300'"
+                                class="rounded-lg px-3 py-2 text-xs font-semibold transition">Upload materi</button>
+                    </div>
+                </div>
+
+                <div x-show="quiz.source === 'file'" x-cloak>
+                    <label class="form-label">File Materi Soal <span class="text-rose-500">*</span></label>
                     <label class="flex min-h-[104px] cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-center transition hover:border-primary hover:bg-primary/5 dark:border-slate-700 dark:bg-slate-900/40 dark:hover:border-primary/70">
                         <input x-ref="quizFile" type="file" class="sr-only" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" @change="setQuizFile($event)">
                         <i data-lucide="upload-cloud" class="w-7 h-7 text-slate-400"></i>
                         <span class="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-200" x-text="quiz.fileName || 'Unggah PDF atau Word'"></span>
-                        <span class="mt-1 text-[11px] text-slate-400">PDF, DOC, DOCX maks. 10 MB</span>
+                        <span class="mt-1 text-[11px] text-slate-400">AI menyusun soal berdasarkan isi file agar tidak melenceng. Maks. 10 MB.</span>
                     </label>
                     <div x-show="quiz.file" x-cloak class="mt-2 flex items-center justify-between gap-3 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                         <span class="truncate" x-text="quiz.fileName"></span>
@@ -116,7 +128,7 @@
                         </select>
                     </div>
                 </div>
-                <button type="button" @click="submit('quiz')" :disabled="loading || (!quiz.topik.trim() && !quiz.file)" class="btn-primary w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40">
+                <button type="button" @click="submit('quiz')" :disabled="loading || (quiz.source === 'file' ? !quiz.file : quiz.topik.trim() === '')" class="btn-primary w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40">
                     <i data-lucide="wand-2" class="w-4 h-4"></i> Buat Soal
                 </button>
             </div>
@@ -125,8 +137,35 @@
             <div x-show="tab === 'learning'" class="space-y-4" x-cloak>
                 <div class="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-sm font-semibold text-primary">RPM Learning</div>
                 <div>
-                    <label class="form-label">Topik <span class="text-rose-500">*</span></label>
+                    <label class="form-label">Topik / Judul RPM <span class="text-rose-500" x-show="learning.source === 'ai'" x-cloak>*</span></label>
                     <input type="text" x-model="learning.topik" placeholder="mis. Ekosistem, Persamaan Linear, Teks Prosedur..." class="form-input">
+                    <p class="text-[11px] text-slate-400 mt-1">Jika upload materi, topik boleh dipakai sebagai fokus/judul RPM.</p>
+                </div>
+                <div>
+                    <label class="form-label">Sumber Materi <span class="text-rose-500">*</span></label>
+                    <div class="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+                        <button type="button" @click="learning.source = 'ai'"
+                                :class="learning.source === 'ai' ? 'bg-white text-primary shadow-sm dark:bg-slate-900' : 'text-slate-500 dark:text-slate-300'"
+                                class="rounded-lg px-3 py-2 text-xs font-semibold transition">Generate dari topik</button>
+                        <button type="button" @click="learning.source = 'file'"
+                                :class="learning.source === 'file' ? 'bg-white text-primary shadow-sm dark:bg-slate-900' : 'text-slate-500 dark:text-slate-300'"
+                                class="rounded-lg px-3 py-2 text-xs font-semibold transition">Upload materi</button>
+                    </div>
+                </div>
+                <div x-show="learning.source === 'file'" x-cloak>
+                    <label class="form-label">File Materi RPM <span class="text-rose-500">*</span></label>
+                    <label class="flex min-h-[104px] cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-center transition hover:border-primary hover:bg-primary/5 dark:border-slate-700 dark:bg-slate-900/40 dark:hover:border-primary/70">
+                        <input x-ref="learningFile" type="file" class="sr-only" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" @change="setLearningFile($event)">
+                        <i data-lucide="upload-cloud" class="w-7 h-7 text-slate-400"></i>
+                        <span class="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-200" x-text="learning.fileName || 'Unggah PDF atau Word'"></span>
+                        <span class="mt-1 text-[11px] text-slate-400">AI akan menyusun RPM berdasarkan isi file agar tidak melenceng. Maks. 10 MB.</span>
+                    </label>
+                    <div x-show="learning.file" x-cloak class="mt-2 flex items-center justify-between gap-3 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                        <span class="truncate" x-text="learning.fileName"></span>
+                        <button type="button" @click="clearLearningFile()" class="inline-flex items-center gap-1 text-rose-600 hover:text-rose-700 dark:text-rose-300">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Hapus
+                        </button>
+                    </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
@@ -143,7 +182,7 @@
                     <input type="text" x-model="learning.durasi" placeholder="mis. 2 x 40 menit" class="form-input">
                     <p class="text-[11px] text-slate-400 mt-1">Output memakai format RPM Learning: identitas, DPL, tujuan, 4 Pilar PM, kegiatan, asesmen, refleksi, lampiran, dan sumber belajar.</p>
                 </div>
-                <button type="button" @click="submit('learning')" :disabled="loading || learning.topik.trim() === ''" class="btn-primary w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40">
+                <button type="button" @click="submit('learning')" :disabled="loading || (learning.source === 'file' ? !learning.file : learning.topik.trim() === '')" class="btn-primary w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40">
                     <i data-lucide="clipboard-list" class="w-4 h-4"></i> Buat RPM Learning
                 </button>
             </div>
@@ -183,8 +222,11 @@
                     <button type="button" @click="toggleEdit()" class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-slate-500 transition hover:bg-slate-100 hover:text-primary dark:text-slate-300 dark:hover:bg-slate-800">
                         <i :data-lucide="editing ? 'check' : 'pencil'" class="w-4 h-4"></i><span x-text="editing ? 'Selesai' : 'Edit'"></span>
                     </button>
-                    <button type="button" x-show="tab === 'quiz'" @click="exportWord()" :disabled="exportingWord" class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-slate-500 transition hover:bg-slate-100 hover:text-primary disabled:opacity-50 dark:text-slate-300 dark:hover:bg-slate-800">
+                    <button type="button" x-show="tab === 'quiz'" @click="exportQuiz('word')" :disabled="exportingWord" class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-slate-500 transition hover:bg-slate-100 hover:text-primary disabled:opacity-50 dark:text-slate-300 dark:hover:bg-slate-800">
                         <i :data-lucide="exportingWord ? 'loader-circle' : 'file-down'" class="w-4 h-4" :class="exportingWord ? 'animate-spin' : ''"></i><span x-text="exportingWord ? 'Export...' : 'Word'"></span>
+                    </button>
+                    <button type="button" x-show="tab === 'quiz'" @click="exportQuiz('pdf')" :disabled="exportingPdf" class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-slate-500 transition hover:bg-slate-100 hover:text-primary disabled:opacity-50 dark:text-slate-300 dark:hover:bg-slate-800">
+                        <i :data-lucide="exportingPdf ? 'loader-circle' : 'file-type'" class="w-4 h-4" :class="exportingPdf ? 'animate-spin' : ''"></i><span x-text="exportingPdf ? 'Export...' : 'PDF'"></span>
                     </button>
                     <button type="button" x-show="tab === 'learning'" @click="exportLearning('word')" :disabled="exportingWord" class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-slate-500 transition hover:bg-slate-100 hover:text-primary disabled:opacity-50 dark:text-slate-300 dark:hover:bg-slate-800">
                         <i :data-lucide="exportingWord ? 'loader-circle' : 'file-down'" class="w-4 h-4" :class="exportingWord ? 'animate-spin' : ''"></i><span x-text="exportingWord ? 'Export...' : 'Word'"></span>
@@ -223,7 +265,7 @@
             {{-- Result --}}
             <textarea x-show="result && !loading && editing" x-cloak x-model="result" rows="16" class="form-input flex-1 min-h-[260px] resize-y text-sm leading-relaxed"></textarea>
 
-            {{-- Pratinjau dokumen berformat RPM: sama persis dengan hasil export --}}
+            {{-- Pratinjau dokumen berformat (soal / RPM): sama persis dengan hasil export --}}
             <div x-show="result && !loading && !editing && previewHtml" x-cloak class="flex-1 overflow-auto" x-html="previewHtml"></div>
 
             {{-- Teks biasa: tab lain, atau bila pratinjau gagal/konten tak berformat RPM --}}
@@ -246,14 +288,24 @@
 
             <div x-show="histories.length > 0" x-cloak class="space-y-2 overflow-auto pr-1 max-h-[560px]">
                 <template x-for="item in histories" :key="item.uuid">
-                    <button type="button" @click="openHistory(item)" class="w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-primary hover:bg-primary/5 dark:border-slate-700 dark:bg-slate-900/40 dark:hover:border-primary/70">
-                        <div class="flex items-start justify-between gap-2">
-                            <span class="inline-flex items-center rounded-full bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary" x-text="item.type_label"></span>
-                            <span class="shrink-0 text-[11px] text-slate-400" x-text="item.created_at_human || ''"></span>
+                    {{-- Kartu berisi dua aksi (buka & hapus), jadi pembungkusnya div: button di dalam button HTML tidak valid. --}}
+                    <div class="rounded-xl border border-slate-200 bg-white transition hover:border-primary hover:bg-primary/5 dark:border-slate-700 dark:bg-slate-900/40 dark:hover:border-primary/70">
+                        <div class="flex items-start gap-1 p-3">
+                            <button type="button" @click="openHistory(item)" class="min-w-0 flex-1 text-left">
+                                <div class="flex items-start justify-between gap-2">
+                                    <span class="inline-flex items-center rounded-full bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary" x-text="item.type_label"></span>
+                                    <span class="shrink-0 text-[11px] text-slate-400" x-text="item.created_at_human || ''"></span>
+                                </div>
+                                <div class="mt-2 line-clamp-2 text-sm font-semibold text-slate-700 dark:text-slate-100" x-text="item.title"></div>
+                                <p class="mt-1 line-clamp-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400" x-text="item.excerpt"></p>
+                            </button>
+                            <button type="button" @click="deleteHistory(item)" :disabled="deletingHistory === item.uuid"
+                                    :title="'Hapus history: ' + item.title"
+                                    class="shrink-0 rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50 dark:hover:bg-rose-900/30 dark:hover:text-rose-300">
+                                <i :data-lucide="deletingHistory === item.uuid ? 'loader-circle' : 'trash-2'" class="w-4 h-4" :class="deletingHistory === item.uuid ? 'animate-spin' : ''"></i>
+                            </button>
                         </div>
-                        <div class="mt-2 line-clamp-2 text-sm font-semibold text-slate-700 dark:text-slate-100" x-text="item.title"></div>
-                        <p class="mt-1 line-clamp-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400" x-text="item.excerpt"></p>
-                    </button>
+                    </div>
                 </template>
             </div>
         </div>
@@ -273,8 +325,9 @@
             error: '',
             copied: false,
             editing: false,
-            previewHtml: '',      // dokumen RPM berformat tabel (tab learning)
+            previewHtml: '',      // dokumen berformat: soal (tab quiz) atau RPM (tab learning)
             previewLoading: false,
+            deletingHistory: '',  // uuid item history yang sedang dihapus
             histories: @js($histories ?? []),
             quota: @js($quotaUsage ?? null),
             tabs: [
@@ -283,8 +336,8 @@
                 { key: 'summary',  label: 'Perangkum Materi', icon: 'list-collapse' },
                 { key: 'feedback', label: 'Draft Feedback',   icon: 'message-square-heart' },
             ],
-            quiz:     { topik: '', jumlah: 5, jenis: 'pg', tingkat: 'sedang', jenjang: '', file: null, fileName: '' },
-            learning: { tool: 'rpp', topik: '', mapel: '', jenjang: '', durasi: '' },
+            quiz:     { topik: '', jumlah: 5, jenis: 'pg', tingkat: 'sedang', jenjang: '', source: 'ai', file: null, fileName: '' },
+            learning: { tool: 'rpp', topik: '', mapel: '', jenjang: '', durasi: '', source: 'ai', file: null, fileName: '' },
             summary:  { materi: '' },
             feedback: { nama: '', konteks: '' },
             urls: {
@@ -292,7 +345,10 @@
                 learning: '{{ route('ai.teacher.learning') }}',
                 summary:  '{{ route('ai.teacher.summary') }}',
                 feedback: '{{ route('ai.teacher.feedback') }}',
+                historyBase: '{{ url('ai/teacher/history') }}',
+                quizPreview: '{{ route('ai.teacher.quiz.preview') }}',
                 quizWord: '{{ route('ai.teacher.quiz.export-word') }}',
+                quizPdf: '{{ route('ai.teacher.quiz.export-pdf') }}',
                 learningPreview: '{{ route('ai.teacher.learning.preview') }}',
                 learningWord: '{{ route('ai.teacher.learning.export-word') }}',
                 learningPdf: '{{ route('ai.teacher.learning.export-pdf') }}',
@@ -320,8 +376,23 @@
                 this.$nextTick(() => window.lucide && lucide.createIcons());
             },
 
+            setLearningFile(event) {
+                const file = event.target.files[0] || null;
+                this.learning.file = file;
+                this.learning.fileName = file ? file.name : '';
+                this.error = '';
+                this.$nextTick(() => window.lucide && lucide.createIcons());
+            },
+
+            clearLearningFile() {
+                this.learning.file = null;
+                this.learning.fileName = '';
+                if (this.$refs.learningFile) this.$refs.learningFile.value = '';
+                this.$nextTick(() => window.lucide && lucide.createIcons());
+            },
+
             payloadFor(tool) {
-                if (tool !== 'quiz') {
+                if (tool === 'summary' || tool === 'feedback') {
                     return {
                         headers: {
                             'Content-Type': 'application/json',
@@ -333,12 +404,21 @@
                 }
 
                 const form = new FormData();
-                form.append('topik', this.quiz.topik || '');
-                form.append('jumlah', this.quiz.jumlah || 1);
-                form.append('jenis', this.quiz.jenis);
-                form.append('tingkat', this.quiz.tingkat);
-                form.append('jenjang', this.quiz.jenjang || '');
-                if (this.quiz.file) form.append('file', this.quiz.file);
+                if (tool === 'learning') {
+                    form.append('tool', this.learning.tool);
+                    form.append('topik', this.learning.topik || '');
+                    form.append('mapel', this.learning.mapel || '');
+                    form.append('jenjang', this.learning.jenjang || '');
+                    form.append('durasi', this.learning.durasi || '');
+                    if (this.learning.source === 'file' && this.learning.file) form.append('file', this.learning.file);
+                } else {
+                    form.append('topik', this.quiz.topik || '');
+                    form.append('jumlah', this.quiz.jumlah || 1);
+                    form.append('jenis', this.quiz.jenis);
+                    form.append('tingkat', this.quiz.tingkat);
+                    form.append('jenjang', this.quiz.jenjang || '');
+                    if (this.quiz.source === 'file' && this.quiz.file) form.append('file', this.quiz.file);
+                }
 
                 return {
                     headers: {
@@ -348,7 +428,6 @@
                     body: form,
                 };
             },
-
             async submit(tool) {
                 if (this.loading) return;
                 this.loading = true;
@@ -368,7 +447,7 @@
                     if (r.ok && d.ok) {
                         this.result = d.answer;
                         if (d.history) this.addHistory(d.history);
-                        if (tool === 'learning') await this.refreshPreview();
+                        if (tool === 'learning' || tool === 'quiz') await this.refreshPreview();
                     } else if (r.status === 422) {
                         this.error = d.message || 'Periksa isian form: ' + Object.values(d.errors || {}).flat().join(' ');
                     } else {
@@ -382,27 +461,27 @@
                 }
             },
 
-            async exportWord() {
-                if (!this.result || this.exportingWord) return;
-                this.exportingWord = true;
+            async exportQuiz(format) {
+                if (!this.result) return;
+                const isPdf = format === 'pdf';
+                if ((isPdf && this.exportingPdf) || (!isPdf && this.exportingWord)) return;
+                if (isPdf) this.exportingPdf = true; else this.exportingWord = true;
                 this.error = '';
                 try {
-                    const r = await fetch(this.urls.quizWord, {
+                    const title = this.quiz.topik ? 'Soal - ' + this.quiz.topik : 'Soal dari Asisten Guru';
+                    const r = await fetch(isPdf ? this.urls.quizPdf : this.urls.quizWord, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Accept': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/json',
+                            'Accept': isPdf ? 'application/pdf,application/json' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/json',
                             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
                         },
-                        body: JSON.stringify({
-                            title: this.quiz.topik ? 'Soal - ' + this.quiz.topik : 'Soal dari Asisten Guru',
-                            content: this.result,
-                        }),
+                        body: JSON.stringify({ title, content: this.result }),
                     });
 
                     if (!r.ok) {
                         const d = await r.json().catch(() => ({}));
-                        this.error = d.message || 'Export Word gagal. Coba lagi.';
+                        this.error = d.message || 'Export gagal. Coba lagi.';
                         return;
                     }
 
@@ -410,37 +489,42 @@
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = this.quiz.topik ? 'soal-' + this.quiz.topik.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.docx' : 'soal-asisten-ai.docx';
+                    a.download = this.slugify(title || 'soal-asisten-ai') + (isPdf ? '.pdf' : '.docx');
                     document.body.appendChild(a);
                     a.click();
                     a.remove();
                     URL.revokeObjectURL(url);
                 } catch (_) {
-                    this.error = 'Export Word gagal. Periksa koneksi lalu coba lagi.';
+                    this.error = 'Export gagal. Periksa koneksi lalu coba lagi.';
                 } finally {
-                    this.exportingWord = false;
+                    if (isPdf) this.exportingPdf = false; else this.exportingWord = false;
                     this.$nextTick(() => window.lucide && lucide.createIcons());
                 }
             },
             /**
              * Ambil pratinjau dokumen berformat dari server (parser + template yang sama
              * dengan export), jadi tampilan di layar persis seperti hasil unduhannya.
+             * Berlaku untuk tab yang punya dokumen berformat: soal dan RPM Learning.
              */
             async refreshPreview() {
-                if (this.tab !== 'learning' || !this.result) {
+                const url = { quiz: this.urls.quizPreview, learning: this.urls.learningPreview }[this.tab];
+                if (!url || !this.result) {
                     this.previewHtml = '';
                     return;
                 }
                 this.previewLoading = true;
                 try {
-                    const r = await fetch(this.urls.learningPreview, {
+                    const body = this.tab === 'learning'
+                        ? { tool: this.learning.tool, content: this.result }
+                        : { content: this.result };
+                    const r = await fetch(url, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                             'Accept': 'application/json',
                             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
                         },
-                        body: JSON.stringify({ tool: this.learning.tool, content: this.result }),
+                        body: JSON.stringify(body),
                     });
                     const d = await r.json();
                     // Gagal pratinjau bukan kegagalan fatal: teks hasil tetap tampil apa adanya.
@@ -460,6 +544,32 @@
                 this.histories = [item, ...this.histories.filter((history) => history.uuid !== item.uuid)].slice(0, 20);
             },
 
+            async deleteHistory(item) {
+                if (this.deletingHistory) return;
+                if (!confirm('Hapus history "' + item.title + '"? Hasil yang sudah diunduh tidak ikut terhapus.')) return;
+
+                this.deletingHistory = item.uuid;
+                try {
+                    const r = await fetch(this.urls.historyBase + '/' + item.uuid, {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        },
+                    });
+                    if (!r.ok) {
+                        this.error = 'Gagal menghapus history. Coba lagi.';
+                        return;
+                    }
+                    this.histories = this.histories.filter((history) => history.uuid !== item.uuid);
+                } catch (_) {
+                    this.error = 'Gagal menghapus history. Periksa koneksi lalu coba lagi.';
+                } finally {
+                    this.deletingHistory = '';
+                    this.$nextTick(() => window.lucide && lucide.createIcons());
+                }
+            },
+
             openHistory(item) {
                 const learningTypes = ['rpp'];
                 this.tab = learningTypes.includes(item.type) ? 'learning' : item.type;
@@ -469,7 +579,7 @@
                 this.copied = false;
                 this.editing = false;
                 this.previewHtml = '';
-                if (this.tab === 'learning') this.refreshPreview();
+                if (this.tab === 'learning' || this.tab === 'quiz') this.refreshPreview();
                 this.$nextTick(() => window.lucide && lucide.createIcons());
             },
 

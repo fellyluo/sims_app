@@ -469,7 +469,7 @@
                 if ($isAdmin || auth()->user()?->canAccess('manage_perangkat')) {
                     $akademik[] = ['perangkat.index', ['perangkat.index', 'perangkat.show'], 'folder-check', 'Perangkat Ajar'];
                 } elseif (auth()->user()?->guru) {
-                    $akademik[] = ['perangkat.self', ['perangkat.self', 'perangkat.show'], 'folder-check', 'Perangkat Ajar Saya'];
+                    $akademik[] = ['perangkat.self', ['perangkat.self', 'perangkat.show'], 'folder-check', 'Perangkat Ajar'];
                 }
 
                 // Asisten Guru untuk guru & wali kelas (Fase 3)
@@ -547,7 +547,7 @@
                     $walikelasItems = [
                         ['walikelas.siswa.index', ['walikelas.siswa.*'], 'users-round', 'Data Siswa Kelas'],
                         ['walikelas.sekretaris.form', ['walikelas.sekretaris.*'], 'user-cog', 'Set Sekretaris'],
-                        ['absensi.index', ['absensi.index', 'absensi.store'], 'clipboard-check', 'Absensi Kelas Saya'],
+                        ['absensi.index', ['absensi.index', 'absensi.store'], 'clipboard-check', 'Absensi Kelas'],
                         ['absensi.rekap', ['absensi.rekap'], 'calendar-check-2', 'Rekap Absensi Kelas'],
                     ];
                     $walikelasItems[] = $jenisAturan === 'poin'
