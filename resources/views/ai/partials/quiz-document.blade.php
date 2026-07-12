@@ -63,7 +63,7 @@
 @endforeach
 
 {{-- Kunci jawaban & pedoman penilaian --}}
-@if($doc['kunci']['heading'] !== '' || $doc['kunci']['pg'] || $doc['kunci']['esai'])
+@if($doc['kunci']['heading'] !== '' || $doc['kunci']['pg'] || $doc['kunci']['lainnya'] || $doc['kunci']['esai'])
     <div class="kunci">
         <div class="bagian">{{ $doc['kunci']['heading'] !== '' ? $doc['kunci']['heading'] : 'Kunci Jawaban & Pedoman Penilaian' }}</div>
         @if($doc['kunci']['subtitle'] !== '')
@@ -88,6 +88,15 @@
                 @endfor
             </table>
         @endif
+
+        @foreach($doc['kunci']['lainnya'] as $kunciLainnya)
+            <div class="subbagian">{{ $kunciLainnya['heading'] }}</div>
+            <ul class="poin">
+                @foreach($kunciLainnya['lines'] as $line)
+                    <li>{{ $line }}</li>
+                @endforeach
+            </ul>
+        @endforeach
 
         @if($doc['kunci']['esai'])
             <div class="subbagian">Esai — Poin Jawaban Ideal</div>

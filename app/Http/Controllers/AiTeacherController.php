@@ -28,6 +28,20 @@ class AiTeacherController extends Controller
 {
     use InteractsWithAi;
 
+    private const QUIZ_TYPES = [
+        'pg_kompleks' => 'Pilihan Ganda Kompleks',
+        'pg' => 'Pilihan Ganda',
+        'benar_salah' => 'Benar/Salah',
+        'mencocokkan' => 'Mencocokkan',
+        'isian' => 'Isian',
+    ];
+
+    private const LEGACY_QUIZ_TYPES = [
+        'pg' => ['pg'],
+        'esai' => ['isian'],
+        'campuran' => ['pg_kompleks', 'pg', 'benar_salah', 'mencocokkan', 'isian'],
+    ];
+
     public function __construct(private GeminiService $gemini) {}
 
     /** GET /ai/teacher - halaman panel Asisten Guru. */
@@ -64,14 +78,24 @@ class AiTeacherController extends Controller
     /** POST /ai/teacher/quiz - generator soal/kuis. */
     public function quiz(Request $request): JsonResponse
     {
+        if (! $request->has('jenis_soal') && $request->filled('jenis')) {
+            $legacyJenis = (string) $request->input('jenis');
+            $request->merge([
+                'jenis_soal' => self::LEGACY_QUIZ_TYPES[$legacyJenis] ?? [$legacyJenis],
+            ]);
+        }
+
+        $allowedQuizTypes = implode(',', array_keys(self::QUIZ_TYPES));
         $data = $request->validate([
             'topik' => ['nullable', 'required_without:file', 'string', 'max:500'],
             'jumlah' => ['required', 'integer', 'min:1', 'max:20'],
-            'jenis' => ['required', 'in:pg,esai,campuran'],
+            'jenis_soal' => ['required', 'array', 'min:1', 'max:5'],
+            'jenis_soal.*' => ['required', 'string', 'distinct', 'in:'.$allowedQuizTypes],
             'tingkat' => ['required', 'in:mudah,sedang,sulit'],
             'jenjang' => ['nullable', 'string', 'max:100'],
             'file' => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:10240'],
         ]);
+        $data['jenis_soal'] = array_values(array_unique($data['jenis_soal']));
 
         $documentText = '';
         if ($request->hasFile('file')) {
@@ -86,29 +110,24 @@ class AiTeacherController extends Controller
             }
         }
 
-        $jenis = [
-            'pg' => 'pilihan ganda (opsi A-D)',
-            'esai' => 'esai/uraian',
-            'campuran' => 'campuran pilihan ganda dan esai',
-        ][$data['jenis']];
-
+        $jenis = $this->quizTypeSummary($data['jenis_soal']);
         $topik = trim((string) ($data['topik'] ?? ''));
         $jenjang = ! empty($data['jenjang']) ? "untuk jenjang {$data['jenjang']}" : '';
 
-        $formatInstruction = $this->quizFormatInstruction((int) $data['jumlah'], $data['jenis'], $data['tingkat'], $data['jenjang'] ?? null, $topik);
+        $formatInstruction = $this->quizFormatInstruction((int) $data['jumlah'], $data['jenis_soal'], $data['tingkat'], $data['jenjang'] ?? null, $topik);
 
         if ($documentText !== '') {
             $maxChars = (int) config('ai.max_input_chars');
             $material = mb_substr($documentText, 0, $maxChars);
             $topicLine = $topik !== '' ? "Fokus topik: \"{$topik}\".\n" : '';
 
-            $prompt = "Buat {$data['jumlah']} soal {$jenis} dengan tingkat kesulitan "
+            $prompt = "Buat {$data['jumlah']} soal ({$jenis}) dengan tingkat kesulitan "
                 ."{$data['tingkat']} {$jenjang} berdasarkan materi dari file berikut.\n"
                 .$topicLine
                 ."MATERI FILE:\n{$material}\n\n"
                 .$formatInstruction;
         } else {
-            $prompt = "Buat {$data['jumlah']} soal {$jenis} dengan tingkat kesulitan "
+            $prompt = "Buat {$data['jumlah']} soal ({$jenis}) dengan tingkat kesulitan "
                 ."{$data['tingkat']} tentang topik: \"{$topik}\" {$jenjang}.\n\n"
                 .$formatInstruction;
         }
@@ -121,7 +140,7 @@ class AiTeacherController extends Controller
             'title' => $topik !== '' ? $topik : 'Soal dari file '.$request->file('file')?->getClientOriginalName(),
             'metadata' => [
                 'jumlah' => $data['jumlah'],
-                'jenis' => $data['jenis'],
+                'jenis_soal' => $data['jenis_soal'],
                 'tingkat' => $data['tingkat'],
                 'jenjang' => $data['jenjang'] ?? null,
                 'file' => $request->file('file')?->getClientOriginalName(),
@@ -479,8 +498,12 @@ class AiTeacherController extends Controller
             'user_uuid' => $userId,
             'type' => $data['type'],
             'type_label' => $data['type_label'],
-            'title' => Str::limit(trim((string) $data['title']) ?: $data['type_label'], 180),
-            'excerpt' => Str::limit($this->plainExcerpt($answer), 500),
+            // Str::limit menambah '...' (3 char) di ujung, jadi batas angkanya dikurangi 3
+            // agar hasil ≤ lebar kolom (title VARCHAR(180), excerpt VARCHAR(500)). Tanpa ini
+            // MySQL strict menolak insert (SQLSTATE 22001 / error 1406); SQLite dev tidak
+            // menegakkan panjang VARCHAR sehingga bug ini lolos di lokal.
+            'title' => Str::limit(trim((string) $data['title']) ?: $data['type_label'], 177),
+            'excerpt' => Str::limit($this->plainExcerpt($answer), 497),
             'metadata' => array_filter($data['metadata'] ?? [], fn ($value) => $value !== null && $value !== ''),
             'answer' => $answer,
         ]);
@@ -535,16 +558,65 @@ class AiTeacherController extends Controller
         return $title !== '' ? $title : $this->learningToolLabel($data['tool']);
     }
 
-    private function quizFormatInstruction(int $jumlah, string $jenis, string $tingkat, ?string $jenjang, string $topik): string
+    private function quizTypeSummary(array $jenisSoal): string
+    {
+        return implode(', ', array_map(fn (string $type) => self::QUIZ_TYPES[$type], $jenisSoal));
+    }
+
+    private function quizSectionTemplates(array $jenisSoal): string
+    {
+        $templates = [
+            'pg_kompleks' => "Bagian %s - Pilihan Ganda Kompleks\n[nomor]. [soal]\nA. [opsi]\nB. [opsi]\nC. [opsi]\nD. [opsi]\nPetunjuk: pilih semua jawaban yang benar.",
+            'pg' => "Bagian %s - Pilihan Ganda\n[nomor]. [soal]\nA. [opsi]\nB. [opsi]\nC. [opsi]\nD. [opsi]",
+            'benar_salah' => "Bagian %s - Benar/Salah\n[nomor]. [pernyataan yang harus dinilai benar atau salah]",
+            'mencocokkan' => "Bagian %s - Mencocokkan\n[nomor]. Cocokkan pernyataan pada Kolom A dengan jawaban pada Kolom B.\nKolom A: [daftar pernyataan bernomor]\nKolom B: [daftar pilihan berhuruf]",
+            'isian' => "Bagian %s - Isian\n[nomor]. [kalimat soal dengan jawaban singkat]\nJawaban: ______________________________",
+        ];
+
+        $sections = [];
+        foreach ($jenisSoal as $index => $type) {
+            $letter = chr(65 + $index);
+            $sections[] = sprintf($templates[$type], $letter);
+        }
+
+        return implode("\n\n", $sections);
+    }
+
+    private function quizAnswerKeyTemplates(array $jenisSoal): string
+    {
+        $templates = [
+            'pg_kompleks' => "Pilihan Ganda Kompleks\n[nomor]. A, C",
+            'pg' => "Pilihan Ganda\n[nomor]. A",
+            'benar_salah' => "Benar/Salah\n[nomor]. Benar",
+            'mencocokkan' => "Mencocokkan\n[nomor]. 1-B, 2-A, 3-C",
+            'isian' => "Isian\n[nomor]. [jawaban singkat]",
+        ];
+
+        return implode("\n\n", array_map(fn (string $type) => $templates[$type], $jenisSoal));
+    }
+
+    private function quizTypeRules(array $jenisSoal): string
+    {
+        $rules = [
+            'pg_kompleks' => 'Pilihan Ganda Kompleks memakai opsi A-D dan boleh memiliki lebih dari satu jawaban benar; kunci ditulis seperti "1. A, C".',
+            'pg' => 'Pilihan Ganda memakai opsi A-D dan hanya satu jawaban benar; kunci ditulis seperti "1. A".',
+            'benar_salah' => 'Benar/Salah berupa pernyataan yang dinilai Benar atau Salah; kunci ditulis "Benar" atau "Salah".',
+            'mencocokkan' => 'Mencocokkan berisi pasangan Kolom A dan Kolom B; kunci ditulis dengan pasangan seperti "1-B, 2-A".',
+            'isian' => 'Isian meminta jawaban singkat; sediakan ruang jawaban dan kunci jawaban singkat.',
+        ];
+
+        return '- '.implode("\n- ", array_map(fn (string $type) => $rules[$type], $jenisSoal));
+    }
+
+    private function quizFormatInstruction(int $jumlah, array $jenisSoal, string $tingkat, ?string $jenjang, string $topik): string
     {
         $kelas = trim((string) $jenjang) !== '' ? trim((string) $jenjang) : '[KELAS / SEMESTER]';
         $topikJudul = trim($topik) !== '' ? mb_strtoupper($topik) : '[TOPIK]';
         $tingkatLabel = Str::title($tingkat);
-        $jenisLine = match ($jenis) {
-            'pg' => 'Buat Bagian A saja untuk pilihan ganda, lalu Kunci Jawaban pilihan ganda.',
-            'esai' => 'Buat Bagian B saja untuk esai, lalu Esai - Poin Jawaban Ideal dan Rubrik Penilaian Esai.',
-            default => 'Bagi jumlah soal menjadi pilihan ganda dan esai seperti contoh: Bagian A lalu Bagian B, kemudian kunci jawaban dan pedoman penilaian.',
-        };
+        $jenisLabel = $this->quizTypeSummary($jenisSoal);
+        $sectionTemplates = $this->quizSectionTemplates($jenisSoal);
+        $answerKeyTemplates = $this->quizAnswerKeyTemplates($jenisSoal);
+        $typeRules = $this->quizTypeRules($jenisSoal);
 
         return <<<TXT
 FORMAT WAJIB mengikuti contoh file soal-agama-buddha.docx. Tulis teks polos dengan urutan ini, tanpa Markdown:
@@ -562,43 +634,21 @@ Nama : ...............................................................
 Nilai : ...............................................................
 
 Petunjuk Pengerjaan
-Kerjakan soal pilihan ganda dengan memberi tanda silang (X) pada jawaban yang benar.
-Jawablah soal esai secara jelas, terstruktur, dan menggunakan bahasa yang baik.
+Kerjakan soal sesuai instruksi pada setiap bagian.
+Periksa kembali jawaban sebelum dikumpulkan.
 
-Bagian A - Pilihan Ganda
-1. [soal]
-A. [opsi]
-B. [opsi]
-C. [opsi]
-D. [opsi]
-
-Bagian B - Esai
-Jawablah setiap pertanyaan berikut dengan uraian sekitar 150-200 kata.
-[nomor lanjutan]. [soal esai]
-_______________________________________________________________________
+{$sectionTemplates}
 
 Kunci Jawaban & Pedoman Penilaian
 (Untuk Guru)
 
-Pilihan Ganda
-1. A
-2. B
-
-Esai - Poin Jawaban Ideal
-Soal [nomor]
-[poin jawaban ideal dalam paragraf pendek]
-
-Rubrik Penilaian Esai (masing-masing 4 poin)
-Pemahaman konsep (2 poin): memaparkan ide utama dengan benar.
-Contoh konkret (1 poin): menyertakan contoh yang relevan dari materi/topik.
-Bahasa & struktur (1 poin): jawaban terorganisir, tata bahasa baik, dan ringkas.
-Skor maksimum bagian esai: [jumlah soal esai x 4] poin.
+{$answerKeyTemplates}
 
 ATURAN:
-- {$jenisLine}
-- Total soal harus {$jumlah} nomor.
-- Nomor soal berurutan dari Bagian A ke Bagian B.
-- Opsi pilihan ganda selalu A-D dan hanya satu jawaban benar.
+- Jenis soal yang dibuat hanya: {$jenisLabel}.
+- Total soal harus {$jumlah} nomor, dibagi proporsional jika ada lebih dari satu jenis soal.
+- Nomor soal berurutan dari Bagian A sampai bagian terakhir.
+{$typeRules}
 - Jika data mata pelajaran/kelas/semester tidak tersedia, gunakan placeholder jelas, jangan mengarang data sekolah selain kop contoh.
 - Jangan menulis pengantar atau catatan di luar dokumen soal.
 TXT;

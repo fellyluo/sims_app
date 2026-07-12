@@ -31,24 +31,8 @@
                 <div class="mt-2 h-3 rounded-full bg-slate-100 dark:bg-slate-800" x-show="quota.remaining_percent === null"></div>
             </div>
         </div>
-
-        @if($canViewQuotaUsage ?? false)
-            <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <template x-for="item in quota.models" :key="item.model">
-                    <div class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/40">
-                        <div class="flex items-center justify-between gap-2 text-xs">
-                            <span class="truncate font-semibold text-slate-700 dark:text-slate-100" x-text="item.model"></span>
-                            <span class="shrink-0 text-slate-400" x-text="item.remaining !== null ? item.remaining + ' tersisa' : 'batas AI Studio'"></span>
-                        </div>
-                        <div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                            <div class="h-full rounded-full transition-all"
-                                 :class="item.status === 'exhausted' ? 'bg-rose-500' : (item.status === 'warning' ? 'bg-amber-500' : 'bg-primary')"
-                                 :style="'width: ' + (item.limit ? Math.max(0, Math.min(100, Math.floor((item.remaining / item.limit) * 100))) : 0) + '%'"></div>
-                        </div>
-                    </div>
-                </template>
-            </div>
-        @endif
+        {{-- Rincian per-model sengaja tidak ditampilkan agar nama/penyedia model
+             (mis. Gemini) tidak terekspos ke pengguna; cukup total kuota tersisa. --}}
     </div>
     {{-- Tab --}}
     <div class="flex flex-wrap gap-2">
@@ -110,14 +94,19 @@
                         <input type="text" x-model="quiz.jenjang" placeholder="mis. Kelas 5 SD" class="form-input">
                     </div>
                 </div>
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
                     <div>
                         <label class="form-label">Jenis Soal <span class="text-rose-500">*</span></label>
-                        <select x-model="quiz.jenis" class="form-input">
-                            <option value="pg">Pilihan Ganda</option>
-                            <option value="esai">Esai / Uraian</option>
-                            <option value="campuran">Campuran</option>
-                        </select>
+                        <div class="grid gap-2 rounded-xl border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900">
+                            <template x-for="option in quizTypeOptions" :key="option.value">
+                                <label class="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition"
+                                       :class="quiz.jenis_soal.includes(option.value) ? 'border-primary bg-primary/5 text-primary' : 'border-slate-200 text-slate-600 hover:border-primary/50 dark:border-slate-700 dark:text-slate-300'">
+                                    <input type="checkbox" :value="option.value" x-model="quiz.jenis_soal" class="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary">
+                                    <span x-text="option.label"></span>
+                                </label>
+                            </template>
+                        </div>
+                        <p class="mt-1 text-[11px] text-rose-500" x-show="quiz.jenis_soal.length === 0" x-cloak>Pilih minimal satu jenis soal.</p>
                     </div>
                     <div>
                         <label class="form-label">Tingkat Kesulitan <span class="text-rose-500">*</span></label>
@@ -128,7 +117,7 @@
                         </select>
                     </div>
                 </div>
-                <button type="button" @click="submit('quiz')" :disabled="loading || (quiz.source === 'file' ? !quiz.file : quiz.topik.trim() === '')" class="btn-primary w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40">
+                <button type="button" @click="submit('quiz')" :disabled="loading || quiz.jenis_soal.length === 0 || (quiz.source === 'file' ? !quiz.file : quiz.topik.trim() === '')" class="btn-primary w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40">
                     <i data-lucide="wand-2" class="w-4 h-4"></i> Buat Soal
                 </button>
             </div>
@@ -336,7 +325,14 @@
                 { key: 'summary',  label: 'Perangkum Materi', icon: 'list-collapse' },
                 { key: 'feedback', label: 'Draft Feedback',   icon: 'message-square-heart' },
             ],
-            quiz:     { topik: '', jumlah: 5, jenis: 'pg', tingkat: 'sedang', jenjang: '', source: 'ai', file: null, fileName: '' },
+            quizTypeOptions: [
+                { value: 'pg_kompleks', label: 'Pilihan Ganda Kompleks' },
+                { value: 'pg', label: 'Pilihan Ganda' },
+                { value: 'benar_salah', label: 'Benar/Salah' },
+                { value: 'mencocokkan', label: 'Mencocokkan' },
+                { value: 'isian', label: 'Isian' },
+            ],
+            quiz:     { topik: '', jumlah: 5, jenis_soal: ['pg'], tingkat: 'sedang', jenjang: '', source: 'ai', file: null, fileName: '' },
             learning: { tool: 'rpp', topik: '', mapel: '', jenjang: '', durasi: '', source: 'ai', file: null, fileName: '' },
             summary:  { materi: '' },
             feedback: { nama: '', konteks: '' },
@@ -414,7 +410,7 @@
                 } else {
                     form.append('topik', this.quiz.topik || '');
                     form.append('jumlah', this.quiz.jumlah || 1);
-                    form.append('jenis', this.quiz.jenis);
+                    this.quiz.jenis_soal.forEach((jenis) => form.append('jenis_soal[]', jenis));
                     form.append('tingkat', this.quiz.tingkat);
                     form.append('jenjang', this.quiz.jenjang || '');
                     if (this.quiz.source === 'file' && this.quiz.file) form.append('file', this.quiz.file);

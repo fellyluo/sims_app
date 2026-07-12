@@ -129,7 +129,7 @@ final class QuizDocxBuilder
 
     private static function kunci(array $kunci): string
     {
-        if ($kunci['heading'] === '' && $kunci['pg'] === [] && $kunci['esai'] === []) {
+        if ($kunci['heading'] === '' && $kunci['pg'] === [] && $kunci['lainnya'] === [] && $kunci['esai'] === []) {
             return '';
         }
 
@@ -142,6 +142,13 @@ final class QuizDocxBuilder
 
         if ($kunci['pg'] !== []) {
             $xml .= self::subheading('Pilihan Ganda').self::pgTable($kunci['pg']);
+        }
+
+        foreach ($kunci['lainnya'] as $kunciLainnya) {
+            $xml .= self::subheading($kunciLainnya['heading']);
+            foreach ($kunciLainnya['lines'] as $line) {
+                $xml .= self::p([self::run('• '.$line)], ['after' => 20, 'left' => 284, 'hanging' => 284]);
+            }
         }
 
         if ($kunci['esai'] !== []) {
