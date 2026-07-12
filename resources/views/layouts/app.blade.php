@@ -37,6 +37,9 @@
         }
         $fontMap = ['sm' => ['11px','13px','15px'], 'md' => ['12px','14px','16px'], 'lg' => ['13px','15px','17px']];
         $fonts = $fontMap[$pref->font_size ?? 'md'];
+        $dashboardTheme = in_array($pref->dashboard_theme ?? 'windows11', ['windows11', 'macos'], true)
+            ? $pref->dashboard_theme
+            : 'windows11';
 
         // Cek apakah background sidebar gelap
         $sbgHex = str_replace('#', '', $pref->sidebar_bg ?? '#fceadb');
@@ -380,7 +383,7 @@
     </style>
     @stack('styles')
 </head>
-<body class="app-bg antialiased text-slate-800 dark:text-slate-100 relative overflow-hidden" data-motif="{{ $pref->motif ?? 'botanical' }}" data-style="{{ $pref->ui_style ?? 'soft' }}">
+<body class="app-bg antialiased text-slate-800 dark:text-slate-100 relative overflow-hidden" data-motif="{{ $pref->motif ?? 'botanical' }}" data-style="{{ $pref->ui_style ?? 'soft' }}" data-dashboard-theme="{{ $dashboardTheme }}">
 
 {{-- ===== Dekorasi motif (ikut tema pilihan) ===== --}}
 @include('partials.decorations')
@@ -474,12 +477,12 @@
                 if ($isAdmin || auth()->user()?->canAccess('manage_perangkat')) {
                     $akademik[] = ['perangkat.index', ['perangkat.index', 'perangkat.show'], 'folder-check', 'Perangkat Ajar'];
                 } elseif (auth()->user()?->guru) {
-                    $akademik[] = ['perangkat.self', ['perangkat.self', 'perangkat.show'], 'folder-check', 'Perangkat Ajar Saya'];
+                    $akademik[] = ['perangkat.self', ['perangkat.self', 'perangkat.show'], 'folder-check', 'Perangkat Ajar'];
                 }
 
-                // Asisten AI untuk guru & wali kelas (Fase 3)
+                // Asisten Guru untuk guru & wali kelas (Fase 3)
                 if (in_array($access, ['guru', 'walikelas'])) {
-                    $akademik[] = ['ai.teacher.index', ['ai.teacher.*'], 'sparkles', 'Asisten AI'];
+                    $akademik[] = ['ai.teacher.index', ['ai.teacher.*'], 'sparkles', 'Asisten Guru'];
                 }
                 if (auth()->user()?->siswa || $access === 'orangtua') {
                     $akademik[] = ['nilai.self', ['nilai.self'], 'chart-column', 'Nilai Saya'];
@@ -552,7 +555,7 @@
                     $walikelasItems = [
                         ['walikelas.siswa.index', ['walikelas.siswa.*'], 'users-round', 'Data Siswa Kelas'],
                         ['walikelas.sekretaris.form', ['walikelas.sekretaris.*'], 'user-cog', 'Set Sekretaris'],
-                        ['absensi.index', ['absensi.index', 'absensi.store'], 'clipboard-check', 'Absensi Kelas Saya'],
+                        ['absensi.index', ['absensi.index', 'absensi.store'], 'clipboard-check', 'Absensi Kelas'],
                         ['absensi.rekap', ['absensi.rekap'], 'calendar-check-2', 'Rekap Absensi Kelas'],
                     ];
                     $walikelasItems[] = $jenisAturan === 'poin'
@@ -625,6 +628,10 @@
                         ['setting.index', ['setting.index', 'setting.kopRapor', 'setting.penjabaran', 'setting.tpRange'], 'settings-2', 'Pengaturan'],
                         ['setting.roles', ['setting.roles'], 'shield-check', 'Hak Akses (RBAC)'],
                     ]];
+                    // Langganan (lisensi) — hanya superadmin (titik integrasi 1, PRD langganan).
+                    if ($access === 'superadmin') {
+                        $groups['sistem'][2][] = ['langganan.index', ['langganan.*'], 'badge-check', 'Langganan'];
+                    }
                 }
                 // (Akun Saya dipindah ke dropdown profil di navbar)
 
@@ -937,6 +944,7 @@
         @endunless
 
         <main class="flex-1 overflow-y-auto px-5 md:px-7 py-4 flex flex-col">
+            @include('partials.langganan-banner')
             <div class="anim-fade flex-1">@yield('content')</div>
             {{-- Footer — selalu menempel di bawah berkat mt-auto (konten flex-1 mendorongnya turun) --}}
             <footer class="mt-auto pt-4 border-t border-slate-200/70 dark:border-slate-700/60 text-center text-xs text-slate-400">
@@ -1168,7 +1176,7 @@
 @if(in_array($access, ['siswa', 'orangtua']) && !$kioskChrome)
 {{-- ─── Floating Asisten Sekolah ─────────────────────────────────────────────
      Bola mengambang khusus SISWA & ORANG TUA untuk menghubungi admin manusia
-     (handoff). Staf & admin memakai widget AsistenAI, bukan ini — agar tiap
+     (handoff). Staf & admin memakai widget Asisten Guru, bukan ini — agar tiap
      pengguna hanya melihat SATU bola sesuai kebutuhannya. Klik membuka panel
      chat yang meng-embed /chatbot via iframe; panel mengirim 'chatfab:close'
      lewat postMessage saat tombol tutup di dalam widget ditekan. --}}
@@ -1243,7 +1251,7 @@
 </script>
 @endif
 
-{{-- Widget AsistenAI (Fase 2) — STAF & ADMIN saja. Siswa & orang tua tidak
+{{-- Widget Asisten Guru (Fase 2) — STAF & ADMIN saja. Siswa & orang tua tidak
      mendapat AI generatif; mereka memakai chatbot handoff ke admin di atas. --}}
 @unless(in_array($access, ['siswa', 'orangtua']))
 @include('partials.ai-assistant')
@@ -1528,6 +1536,8 @@
     };
     // ===== UI style switcher (soft <-> corporate) =====
     window.setStyle = function(name){ document.body.dataset.style = name; };
+    // ===== Dashboard theme switcher (Windows 11 <-> macOS) =====
+    window.setDashboardTheme = function(name){ document.body.dataset.dashboardTheme = name; };
     document.addEventListener('DOMContentLoaded', ()=>{
         setMotif(document.body.dataset.motif || 'botanical');
         lucide.createIcons();

@@ -194,7 +194,7 @@ Berikut adalah panduan langkah demi langkah untuk menggunakannya:
 7. Klik `Tutup` untuk menyelesaikan percakapan.
 8. Atur avatar, pesan notifikasi, dan pertanyaan cepat lewat pengaturan inbox.
 
-### AsistenAI Global
+### Asisten Guru Global
 
 Fitur:
 
@@ -205,18 +205,18 @@ Fitur:
 
 Berikut adalah panduan langkah demi langkah untuk menggunakannya:
 
-1. Silakan buka halaman atau menu gawit/fitur AsistenAI global jika tampil.
+1. Silakan buka halaman atau menu gawit/fitur Asisten Guru global jika tampil.
 2. Ketik pertanyaan.
 3. Buka riwayat jika ingin melanjutkan percakapan lama.
 4. Anda juga dapat menghapus percakapan yang tidak diperlukan. jika data tersebut tidak lagi diperlukan.
 
-### Asisten AI Guru
+### Asisten Guru
 
-Untuk mengakses fitur ini, silakan buka menu **`Akademik > Asisten AI`.** pada bilah navigasi (sidebar).
+Untuk mengakses fitur ini, silakan buka menu **`Akademik > Asisten Guru`.** pada bilah navigasi (sidebar).
 
 Berikut adalah panduan langkah demi langkah untuk menggunakannya:
 
-1. Silakan navigasikan ke menu `Asisten AI`.
+1. Silakan navigasikan ke menu `Asisten Guru`.
 2. Pilih fitur: buat soal, rangkum materi, atau buat umpan balik.
 3. Isi konteks materi/kelas/kebutuhan.
 4. Klik buat.
@@ -693,7 +693,7 @@ Berikut adalah panduan langkah demi langkah untuk menggunakannya:
 
 Menu admin: `Akademik > Perangkat Ajar`.
 
-Menu guru: `Akademik > Perangkat Ajar Saya`.
+Menu guru: `Akademik > Perangkat Ajar`.
 
 Fitur ini menyediakan beberapa fungsi utama, di antaranya:
 
@@ -713,7 +713,7 @@ Cara admin:
 
 Langkah-langkah khusus untuk Guru:
 
-1. Silakan navigasikan ke menu `Perangkat Ajar Saya`.
+1. Silakan navigasikan ke menu `Perangkat Ajar`.
 2. Pilih jenis dokumen.
 3. Unggah berkas.
 4. Preview atau unduh untuk cek.
@@ -888,11 +888,11 @@ Berikut adalah panduan langkah demi langkah untuk menggunakannya:
 2. Pilih siswa yang menjadi sekretaris.
 3. Simpan.
 
-### Absensi Kelas Saya
+### Absensi Kelas
 
 Berikut adalah panduan langkah demi langkah untuk menggunakannya:
 
-1. Silakan navigasikan ke menu `Absensi Kelas Saya`.
+1. Silakan navigasikan ke menu `Absensi Kelas`.
 2. Pilih tanggal.
 3. Isi status kehadiran siswa.
 4. Terakhir, klik tombol "Simpan" untuk menerapkan perubahan.

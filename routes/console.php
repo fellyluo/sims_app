@@ -13,3 +13,9 @@ Schedule::command('classroom:publish-scheduled')->everyMinute()->withoutOverlapp
 
 // Sarpras: pengingat jadwal pemeliharaan yang jatuh tempo (harian 07:00).
 Schedule::command('sarpras:pemeliharaan-reminder')->dailyAt('07:00')->withoutOverlapping();
+
+// Langganan: sinkronkan status tersimpan setelah tanggal berakhir terlewati.
+Schedule::call(static fn () => \App\Models\Langganan::sinkronkanStatusKadaluarsa())
+    ->dailyAt('00:05')
+    ->name('langganan.sinkronkan-status')
+    ->withoutOverlapping();

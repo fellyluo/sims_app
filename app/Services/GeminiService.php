@@ -2,11 +2,18 @@
 
 namespace App\Services;
 
+use App\Exceptions\AiProviderUnavailableException;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /*
-| Gateway terpusat ke Google Gemini. SEMUA fitur AI SIMS memanggil kelas ini —
+| Gateway terpusat ke provider AI. SEMUA fitur AI SIMS memanggil kelas ini —
 | key ditambahkan di server, tak pernah sampai ke browser. Meniru pola
 | FcmService: ada enabled() guard supaya bila key belum diisi, fitur AI mati
 | diam-diam alih-alih melempar error keras.
@@ -17,71 +24,563 @@ use RuntimeException;
 */
 class GeminiService
 {
-    /** AI aktif hanya bila GEMINI_API_KEY terisi. */
+    private const SUPPORTED_PROVIDERS = ['gemini', 'openrouter'];
+
+    /** AI aktif bila ada minimal satu provider (utama atau cadangan) yang punya key. */
     public function enabled(): bool
     {
-        return !empty(config('ai.api_key'));
+        return $this->providerChain() !== [];
+    }
+
+    private function provider(): string
+    {
+        return strtolower(trim((string) config('ai.provider', 'gemini')));
+    }
+
+    /**
+     * Urutan provider yang dicoba: provider utama lebih dulu, lalu cadangan dari
+     * ai.fallback_providers. Provider tanpa API key dibuang di sini supaya router
+     * tidak membuang waktu pada provider yang memang belum dikonfigurasi.
+     *
+     * @return string[]
+     */
+    private function providerChain(): array
+    {
+        $chain = array_merge([$this->provider()], (array) config('ai.fallback_providers', []));
+        $chain = array_map(fn ($provider) => strtolower(trim((string) $provider)), $chain);
+        $chain = array_values(array_unique(array_filter($chain)));
+
+        return array_values(array_filter($chain, fn (string $provider) => $this->providerConfigured($provider)));
+    }
+
+    private function providerConfigured(string $provider): bool
+    {
+        return match ($provider) {
+            'gemini' => ! empty(config('ai.api_key')),
+            'openrouter' => ! empty(config('ai.openrouter.api_key')),
+            default => false,
+        };
+    }
+
+    private function missingConfigurationMessage(): string
+    {
+        return $this->provider() === 'openrouter'
+            ? 'Fitur AI belum dikonfigurasi (OPENROUTER_API_KEY kosong).'
+            : 'Fitur AI belum dikonfigurasi (GEMINI_API_KEY kosong).';
     }
 
     /**
      * Hasilkan teks dari Gemini.
      *
-     * @param  string  $prompt   Pesan/konteks dari pengguna (sudah dibangun controller).
-     * @param  array   $options  system, model, temperature, max_output_tokens, history
+     * @param  string  $prompt  Pesan/konteks dari pengguna (sudah dibangun controller).
+     * @param  array  $options  system, model, temperature, max_output_tokens, history
      * @return array{text:string,model:string,prompt_tokens:int,completion_tokens:int}
      */
     public function generate(string $prompt, array $options = []): array
     {
-        if (!$this->enabled()) {
-            throw new RuntimeException('Fitur AI belum dikonfigurasi (GEMINI_API_KEY kosong).');
+        if (! in_array($this->provider(), self::SUPPORTED_PROVIDERS, true)) {
+            throw new RuntimeException('Provider AI tidak dikenali. Gunakan gemini atau openrouter.');
         }
 
-        $model  = $options['model'] ?? config('ai.model');
-        $system = trim(($options['system'] ?? '')."\n\n".config('ai.system_prompt')."\n\n".config('ai.answer_style'));
+        $chain = $this->providerChain();
 
-        $body = [
-            'systemInstruction' => [
-                'parts' => [['text' => $system]],
-            ],
-            'contents' => $this->buildContents($prompt, $options['history'] ?? []),
-            'generationConfig' => [
-                'temperature'     => $options['temperature'] ?? config('ai.temperature'),
-                'maxOutputTokens' => $options['max_output_tokens'] ?? config('ai.max_output_tokens'),
-            ],
-        ];
-
-        // Grounding Google Search: biarkan model mencari di web & menautkan sumber.
-        if (!empty($options['grounding'])) {
-            $body['tools'] = [$this->groundingTool($model)];
+        if ($chain === []) {
+            throw new RuntimeException($this->missingConfigurationMessage());
         }
 
-        $url = rtrim(config('ai.base_url'), '/')."/models/{$model}:generateContent";
+        $failures = [];
 
-        try {
-            $response = Http::timeout(config('ai.timeout'))
-                ->retry(config('ai.retries'), config('ai.retry_delay'), throw: false)
-                ->withQueryParameters(['key' => config('ai.api_key')])
-                ->acceptJson()
-                ->post($url, $body);
-        } catch (\Throwable $e) {
-            throw new RuntimeException('Gagal menghubungi layanan AI. Coba lagi beberapa saat.');
+        // Router provider: bila provider utama kehabisan kuota / sedang down, pindah ke
+        // provider cadangan alih-alih menampilkan error ke guru. Kegagalan lain (mis.
+        // konfigurasi salah, prompt ditolak) tidak di-failover — biar cepat ketahuan.
+        foreach ($chain as $index => $provider) {
+            // Opsi `model` milik provider sebelumnya (mis. nama model Gemini) tidak
+            // berlaku di provider cadangan — biarkan cadangan memakai model defaultnya.
+            $providerOptions = $index === 0 ? $options : Arr::except($options, ['model']);
+
+            try {
+                return match ($provider) {
+                    'openrouter' => $this->generateOpenRouter($prompt, $providerOptions),
+                    default => $this->generateGemini($prompt, $providerOptions),
+                };
+            } catch (AiProviderUnavailableException $e) {
+                $failures[$provider] = $e->getMessage();
+
+                Log::warning('Provider AI tidak tersedia, mencoba cadangan berikutnya.', [
+                    'provider' => $provider,
+                    'next' => $chain[$index + 1] ?? null,
+                    'message' => $e->getMessage(),
+                ]);
+            }
         }
 
-        if ($response->failed()) {
+        throw new AiProviderUnavailableException($this->routerFailureMessage($failures));
+    }
+
+    /** Gabungkan kegagalan tiap provider jadi satu pesan yang jujur untuk guru. */
+    private function routerFailureMessage(array $failures): string
+    {
+        $primary = (string) array_key_first($failures);
+        $message = (string) $failures[$primary];
+        unset($failures[$primary]);
+
+        foreach ($failures as $provider => $failure) {
+            $message .= " Provider cadangan {$provider} juga gagal: {$failure}";
+        }
+
+        return $message;
+    }
+
+    /**
+     * Hasilkan teks via Gemini REST.
+     *
+     * @return array{text:string,model:string,prompt_tokens:int,completion_tokens:int}
+     */
+    private function generateGemini(string $prompt, array $options = []): array
+    {
+        // answer_style bisa dikosongkan per-request: keluaran dokumen (RPM/LKPD) harus
+        // teks polos, sedangkan gaya global justru menyuruh model memakai Markdown.
+        $answerStyle = $options['answer_style'] ?? config('ai.answer_style');
+        $system = trim(($options['system'] ?? '')."\n\n".config('ai.system_prompt')."\n\n".$answerStyle);
+        $contents = $this->buildContents($prompt, $options['history'] ?? []);
+        $modelChain = $this->modelChain($options);
+
+        $this->ensureFreeTierQuotaIsOpen($modelChain);
+
+        $lastQuotaError = null;
+        $allModelsHitDailyQuota = true;
+
+        // Kuota free tier Gemini dihitung PER MODEL PER HARI (mis. gemini-3.5-flash hanya
+        // 20 request/hari). Bila model utama habis, pindah ke model cadangan yang punya
+        // jatah sendiri — jauh lebih baik daripada melempar "kuota penuh" ke guru.
+        foreach ($modelChain as $model) {
+            $body = [
+                'systemInstruction' => ['parts' => [['text' => $system]]],
+                'contents' => $contents,
+                'generationConfig' => [
+                    'temperature' => $options['temperature'] ?? config('ai.temperature'),
+                    'maxOutputTokens' => $options['max_output_tokens'] ?? config('ai.max_output_tokens'),
+                ],
+            ];
+
+            if (! empty($options['thinking_level'])) {
+                $body['generationConfig']['thinkingConfig'] = $this->thinkingConfig($model, $options['thinking_level']);
+            }
+
+            // Grounding Google Search: biarkan model mencari di web & menautkan sumber.
+            if (! empty($options['grounding'])) {
+                $body['tools'] = [$this->groundingTool($model)];
+            }
+
+            $this->extendExecutionTime($options);
+
+            try {
+                $response = Http::timeout($options['timeout'] ?? config('ai.timeout'))
+                    // `when`: JANGAN ulangi permintaan yang ditolak (429/4xx) — tiap percobaan
+                    // memotong kuota harian, jadi retry justru mempercepat kuota habis.
+                    // Yang layak diulang hanya kegagalan transien: koneksi putus & error 5xx.
+                    ->retry(
+                        $options['retries'] ?? config('ai.retries'),
+                        config('ai.retry_delay'),
+                        fn (\Throwable $e) => $this->isTransient($e),
+                        throw: false,
+                    )
+                    ->withQueryParameters(['key' => config('ai.api_key')])
+                    ->acceptJson()
+                    ->post(rtrim(config('ai.base_url'), '/')."/models/{$model}:generateContent", $body);
+            } catch (\Throwable $e) {
+                throw new AiProviderUnavailableException('Gagal menghubungi layanan AI. Coba lagi beberapa saat.');
+            }
+
+            if ($response->successful()) {
+                return $this->parse($response->json(), $model);
+            }
+
+            // Kuota model ini habis: coba model berikutnya. Jangan retry model yang sama.
+            if ($response->status() === 429) {
+                $json = $response->json();
+                $lastQuotaError = $this->normalizeError(429, $json);
+                $allModelsHitDailyQuota = $allModelsHitDailyQuota && $this->isDailyQuotaError($json);
+
+                continue;
+            }
+
+            // Layanan sedang bermasalah (5xx) — layak dialihkan ke provider cadangan.
+            if ($response->status() >= 500) {
+                throw new AiProviderUnavailableException($this->normalizeError($response->status(), $response->json()));
+            }
+
             throw new RuntimeException($this->normalizeError($response->status(), $response->json()));
         }
 
-        return $this->parse($response->json(), $model);
+        if ($this->freeTierOnly() && $lastQuotaError !== null && $allModelsHitDailyQuota) {
+            $this->rememberFreeTierQuotaExhausted($modelChain);
+
+            throw new AiProviderUnavailableException($this->freeTierQuotaMessage());
+        }
+
+        throw new AiProviderUnavailableException($lastQuotaError ?? 'Terjadi kesalahan saat memproses permintaan AI.');
+    }
+
+    /**
+     * Hasilkan teks via OpenRouter Chat Completions. Saat free-only aktif,
+     * model berbayar ditolak sebelum HTTP request terkirim.
+     *
+     * @return array{text:string,model:string,prompt_tokens:int,completion_tokens:int,sources?:array}
+     */
+    private function generateOpenRouter(string $prompt, array $options = []): array
+    {
+        $answerStyle = $options['answer_style'] ?? config('ai.answer_style');
+        $system = trim(($options['system'] ?? '')."\n\n".config('ai.system_prompt')."\n\n".$answerStyle);
+        $messages = $this->buildOpenRouterMessages($system, $prompt, $options['history'] ?? []);
+        $modelChain = $this->openRouterModelChain($options);
+
+        $this->ensureOpenRouterModelsAreFree($modelChain);
+        $this->ensureOpenRouterFreeQuotaIsOpen($modelChain);
+
+        $lastQuotaError = null;
+
+        foreach ($modelChain as $model) {
+            $body = [
+                'model' => $model,
+                'messages' => $messages,
+                'temperature' => $options['temperature'] ?? config('ai.temperature'),
+                'max_tokens' => $options['max_output_tokens'] ?? config('ai.max_output_tokens'),
+            ];
+
+            $this->extendExecutionTime($options);
+
+            try {
+                $response = Http::timeout($options['timeout'] ?? config('ai.timeout'))
+                    ->retry(
+                        $options['retries'] ?? config('ai.retries'),
+                        config('ai.retry_delay'),
+                        fn (\Throwable $e) => $this->isTransient($e),
+                        throw: false,
+                    )
+                    ->withToken((string) config('ai.openrouter.api_key'))
+                    ->withHeaders($this->openRouterHeaders())
+                    ->acceptJson()
+                    ->post(rtrim((string) config('ai.openrouter.base_url'), '/').'/chat/completions', $body);
+            } catch (\Throwable $e) {
+                throw new AiProviderUnavailableException('Gagal menghubungi layanan OpenRouter. Coba lagi beberapa saat.');
+            }
+
+            if ($response->successful()) {
+                return $this->parseOpenRouter($response->json(), $model);
+            }
+
+            if ($response->status() === 429) {
+                $lastQuotaError = $this->normalizeOpenRouterError(429, $response->json());
+
+                continue;
+            }
+
+            if ($response->status() >= 500) {
+                throw new AiProviderUnavailableException($this->normalizeOpenRouterError($response->status(), $response->json()));
+            }
+
+            throw new RuntimeException($this->normalizeOpenRouterError($response->status(), $response->json()));
+        }
+
+        if ($this->openRouterFreeOnly() && $lastQuotaError !== null) {
+            $this->rememberOpenRouterQuotaExhausted($modelChain);
+
+            throw new AiProviderUnavailableException($this->openRouterFreeQuotaMessage());
+        }
+
+        throw new AiProviderUnavailableException($lastQuotaError ?? 'Terjadi kesalahan saat memproses permintaan OpenRouter.');
+    }
+
+    /**
+     * Cegah fatal "Maximum execution time exceeded": batas waktu PHP (mis. 60 detik)
+     * bisa lebih pendek daripada total waktu tunggu AI (timeout x retry x rantai model
+     * x rantai provider). Timer PHP di-reset sebelum setiap percobaan, jadi anggaran
+     * waktunya cukup untuk satu percobaan, bukan seluruh rantai.
+     */
+    private function extendExecutionTime(array $options): void
+    {
+        $timeout = (int) ($options['timeout'] ?? config('ai.timeout'));
+        $retries = (int) ($options['retries'] ?? config('ai.retries'));
+        $budget = $timeout * max(1, $retries) + 30;
+
+        @set_time_limit($budget);
+    }
+
+    /** @return string[] */
+    private function openRouterModelChain(array $options): array
+    {
+        $chain = [$options['model'] ?? config('ai.openrouter.model')];
+
+        if (! isset($options['model'])) {
+            $chain = array_merge($chain, (array) config('ai.openrouter.fallback_models', []));
+        }
+
+        return array_values(array_unique(array_filter(array_map('trim', $chain))));
+    }
+
+    /** @param string[] $modelChain */
+    private function ensureOpenRouterModelsAreFree(array $modelChain): void
+    {
+        if (! $this->openRouterFreeOnly()) {
+            return;
+        }
+
+        foreach ($modelChain as $model) {
+            if ($this->isOpenRouterFreeModel($model)) {
+                continue;
+            }
+
+            throw new RuntimeException("Mode OpenRouter free-only aktif. Model {$model} ditolak karena bukan openrouter/free atau slug :free.");
+        }
+    }
+
+    private function isOpenRouterFreeModel(string $model): bool
+    {
+        return $model === 'openrouter/free' || str_ends_with($model, ':free');
+    }
+
+    private function openRouterFreeOnly(): bool
+    {
+        return (bool) config('ai.openrouter.free_only', true);
+    }
+
+    /** @param string[] $modelChain */
+    private function ensureOpenRouterFreeQuotaIsOpen(array $modelChain): void
+    {
+        if (! $this->openRouterFreeOnly()) {
+            return;
+        }
+
+        $resetAt = Cache::get($this->openRouterQuotaCacheKey($modelChain));
+        if (! $resetAt) {
+            return;
+        }
+
+        throw new AiProviderUnavailableException($this->openRouterFreeQuotaMessage((string) $resetAt));
+    }
+
+    /** @param string[] $modelChain */
+    private function rememberOpenRouterQuotaExhausted(array $modelChain): void
+    {
+        $resetAt = now(config('app.timezone', 'Asia/Jakarta'))->addDay()->startOfDay();
+
+        Cache::put(
+            $this->openRouterQuotaCacheKey($modelChain),
+            $resetAt->toIso8601String(),
+            $resetAt,
+        );
+    }
+
+    /** @param string[] $modelChain */
+    private function openRouterQuotaCacheKey(array $modelChain): string
+    {
+        return 'ai:openrouter:free-tier-quota-exhausted:'.sha1((string) config('ai.openrouter.api_key').'|'.implode('|', $modelChain));
+    }
+
+    private function openRouterFreeQuotaMessage(?string $resetAt = null): string
+    {
+        $displayReset = '';
+        if ($resetAt) {
+            $displayReset = ' Perkiraan reset: '.Carbon::parse($resetAt)
+                ->setTimezone(config('app.timezone', 'Asia/Jakarta'))
+                ->format('d/m/Y H:i T').'.';
+        }
+
+        return 'Kuota gratis OpenRouter sedang habis atau terkena rate limit. '
+            .'Sistem tidak akan mencoba OpenRouter lagi sampai kuota free tier reset dan tidak akan memakai model berbayar.'
+            .$displayReset;
+    }
+
+    private function openRouterHeaders(): array
+    {
+        return array_filter([
+            'HTTP-Referer' => config('ai.openrouter.site_url'),
+            'X-OpenRouter-Title' => config('ai.openrouter.site_name'),
+        ]);
+    }
+
+    private function buildOpenRouterMessages(string $system, string $prompt, array $history): array
+    {
+        $messages = [];
+
+        if ($system !== '') {
+            $messages[] = ['role' => 'system', 'content' => $system];
+        }
+
+        foreach ($history as $turn) {
+            $role = ($turn['role'] ?? 'user') === 'assistant' ? 'assistant' : 'user';
+            $text = (string) ($turn['text'] ?? $turn['content'] ?? '');
+            if ($text !== '') {
+                $messages[] = ['role' => $role, 'content' => $text];
+            }
+        }
+
+        $messages[] = ['role' => 'user', 'content' => $prompt];
+
+        return $messages;
+    }
+
+    private function parseOpenRouter(array $json, string $model): array
+    {
+        $choice = $json['choices'][0] ?? null;
+        $finishReason = $choice['finish_reason'] ?? null;
+        $content = $choice['message']['content'] ?? '';
+        $text = is_array($content) ? $this->openRouterContentToText($content) : trim((string) $content);
+
+        if ($text === '') {
+            throw new RuntimeException('OpenRouter tidak mengembalikan jawaban. Coba lagi.');
+        }
+
+        if ($finishReason === 'length') {
+            throw new RuntimeException('Jawaban OpenRouter terpotong karena terlalu panjang. Persempit topik atau coba lagi.');
+        }
+
+        $usage = $json['usage'] ?? [];
+
+        return [
+            'text' => $text,
+            'model' => (string) ($json['model'] ?? $model),
+            'prompt_tokens' => (int) ($usage['prompt_tokens'] ?? 0),
+            'completion_tokens' => (int) ($usage['completion_tokens'] ?? 0),
+            'sources' => [],
+        ];
+    }
+
+    private function openRouterContentToText(array $content): string
+    {
+        $text = '';
+
+        foreach ($content as $part) {
+            $text .= is_array($part) ? (string) ($part['text'] ?? '') : (string) $part;
+        }
+
+        return trim($text);
+    }
+
+    private function normalizeOpenRouterError(int $status, ?array $json): string
+    {
+        $detail = (string) ($json['error']['message'] ?? $json['message'] ?? '');
+
+        return match (true) {
+            $status === 429 => 'Kuota atau rate limit free model OpenRouter sedang habis. Coba lagi besok atau setelah kuota free tier kembali.',
+            $status === 402 => 'OpenRouter membutuhkan saldo/kredit untuk model ini. SIMS berada di mode free-only dan tidak akan mencoba model berbayar.',
+            $status === 400 => 'Permintaan ke OpenRouter tidak valid.'.($detail ? " ({$detail})" : ''),
+            $status === 401,
+            $status === 403 => 'Konfigurasi OpenRouter bermasalah (kredensial ditolak).',
+            $status >= 500 => 'Layanan OpenRouter sedang gangguan. Coba lagi nanti.',
+            default => 'Terjadi kesalahan saat memproses permintaan OpenRouter.',
+        };
+    }
+
+    /**
+     * Urutan model yang dicoba: model utama lalu cadangan. Cadangan punya kuota harian
+     * sendiri, jadi rantai ini yang membuat fitur tetap hidup setelah kuota model utama habis.
+     *
+     * @return string[]
+     */
+    private function modelChain(array $options): array
+    {
+        $chain = [$options['model'] ?? config('ai.model')];
+
+        // Override model per-request berarti pemanggil sengaja memilih model itu — hormati.
+        if (! isset($options['model'])) {
+            $chain = array_merge($chain, (array) config('ai.fallback_models', []));
+        }
+
+        return array_values(array_unique(array_filter(array_map('trim', $chain))));
+    }
+
+    /**
+     * Penekan porsi "berpikir" berbeda antar keluarga model: Gemini 3.x memakai
+     * `thinkingLevel`, sedangkan 2.5 ke bawah memakai `thinkingBudget` (angka token).
+     * Mengirim kunci yang salah membuat Gemini menolak permintaan dengan 400.
+     */
+    private function thinkingConfig(string $model, string $level): array
+    {
+        if (preg_match('/gemini-3/', $model)) {
+            return ['thinkingLevel' => $level];
+        }
+
+        return ['thinkingBudget' => $level === 'low' ? 0 : -1];
+    }
+
+    private function freeTierOnly(): bool
+    {
+        return (bool) config('ai.free_tier_only', true);
+    }
+
+    /** @param string[] $modelChain */
+    private function ensureFreeTierQuotaIsOpen(array $modelChain): void
+    {
+        if (! $this->freeTierOnly()) {
+            return;
+        }
+
+        $resetAt = Cache::get($this->freeTierQuotaCacheKey($modelChain));
+        if (! $resetAt) {
+            return;
+        }
+
+        throw new AiProviderUnavailableException($this->freeTierQuotaMessage((string) $resetAt));
+    }
+
+    /** @param string[] $modelChain */
+    private function rememberFreeTierQuotaExhausted(array $modelChain): void
+    {
+        $resetAt = $this->nextFreeTierResetAt();
+
+        Cache::put(
+            $this->freeTierQuotaCacheKey($modelChain),
+            $resetAt->toIso8601String(),
+            $resetAt,
+        );
+    }
+
+    /** @param string[] $modelChain */
+    private function freeTierQuotaCacheKey(array $modelChain): string
+    {
+        return 'ai:gemini:free-tier-quota-exhausted:'.sha1((string) config('ai.api_key').'|'.implode('|', $modelChain));
+    }
+
+    private function nextFreeTierResetAt(): Carbon
+    {
+        // Google menyebut RPD reset tengah malam Pacific time.
+        return now('America/Los_Angeles')->addDay()->startOfDay();
+    }
+
+    private function freeTierQuotaMessage(?string $resetAt = null): string
+    {
+        $displayReset = '';
+        if ($resetAt) {
+            $displayReset = ' Perkiraan reset: '.Carbon::parse($resetAt)
+                ->setTimezone(config('app.timezone', 'Asia/Jakarta'))
+                ->format('d/m/Y H:i T').'.';
+        }
+
+        return 'Kuota gratis Google AI Studio sudah habis untuk semua model yang dikonfigurasi. '
+            .'Sistem tidak akan mencoba Gemini lagi sampai kuota free tier reset agar tidak memakai API berbayar.'
+            .$displayReset;
+    }
+
+    /** Layak diulang hanya bila gangguan sesaat (koneksi/5xx), bukan penolakan (4xx). */
+    private function isTransient(\Throwable $e): bool
+    {
+        if ($e instanceof ConnectionException) {
+            return true;
+        }
+
+        return $e instanceof RequestException && $e->response->serverError();
     }
 
     /**
      * Hasilkan vektor embedding untuk satu teks (FASE 5 — RAG).
      *
-     * @return float[]  Vektor embedding.
+     * @return float[] Vektor embedding.
      */
     public function embed(string $text): array
     {
-        if (!$this->enabled()) {
+        if (empty(config('ai.api_key'))) {
             throw new RuntimeException('Fitur AI belum dikonfigurasi (GEMINI_API_KEY kosong).');
         }
 
@@ -94,7 +593,7 @@ class GeminiService
                 ->withQueryParameters(['key' => config('ai.api_key')])
                 ->acceptJson()
                 ->post($url, [
-                    'model'   => "models/{$model}",
+                    'model' => "models/{$model}",
                     'content' => ['parts' => [['text' => $text]]],
                 ]);
         } catch (\Throwable $e) {
@@ -106,7 +605,7 @@ class GeminiService
         }
 
         $values = $response->json('embedding.values');
-        if (!is_array($values) || $values === []) {
+        if (! is_array($values) || $values === []) {
             throw new RuntimeException('Layanan embedding tidak mengembalikan vektor.');
         }
 
@@ -134,15 +633,19 @@ class GeminiService
     /** Ambil teks + hitungan token dari respons; deteksi jawaban yang diblokir. */
     private function parse(array $json, string $model): array
     {
-        $candidate    = $json['candidates'][0] ?? null;
+        $candidate = $json['candidates'][0] ?? null;
         $finishReason = $candidate['finishReason'] ?? null;
 
         if ($finishReason === 'SAFETY' || $finishReason === 'PROHIBITED_CONTENT') {
             throw new RuntimeException('Permintaan diblokir oleh filter keamanan AI. Ubah pertanyaanmu.');
         }
 
+        // Part ber-flag `thought` = catatan berpikir internal model, bukan jawaban.
         $text = '';
         foreach ($candidate['content']['parts'] ?? [] as $part) {
+            if (($part['thought'] ?? false) === true) {
+                continue;
+            }
             $text .= $part['text'] ?? '';
         }
 
@@ -151,14 +654,20 @@ class GeminiService
             throw new RuntimeException('AI tidak mengembalikan jawaban. Coba lagi.');
         }
 
+        // Jawaban terpotong karena kehabisan jatah token: lebih baik gagal terang-terangan
+        // daripada mengembalikan dokumen setengah jadi yang tampak benar.
+        if ($finishReason === 'MAX_TOKENS') {
+            throw new RuntimeException('Jawaban AI terpotong karena terlalu panjang. Persempit topik atau coba lagi.');
+        }
+
         $usage = $json['usageMetadata'] ?? [];
 
         return [
-            'text'              => $text,
-            'model'             => $model,
-            'prompt_tokens'     => (int) ($usage['promptTokenCount'] ?? 0),
+            'text' => $text,
+            'model' => $model,
+            'prompt_tokens' => (int) ($usage['promptTokenCount'] ?? 0),
             'completion_tokens' => (int) ($usage['candidatesTokenCount'] ?? 0),
-            'sources'           => $this->extractSources($candidate),
+            'sources' => $this->extractSources($candidate),
         ];
     }
 
@@ -170,10 +679,10 @@ class GeminiService
     private function groundingTool(string $model): array
     {
         if (str_contains($model, '1.5') || str_contains($model, '1.0')) {
-            return ['google_search_retrieval' => new \stdClass()];
+            return ['google_search_retrieval' => new \stdClass];
         }
 
-        return ['google_search' => new \stdClass()];
+        return ['google_search' => new \stdClass];
     }
 
     /**
@@ -189,16 +698,35 @@ class GeminiService
 
         foreach ($chunks as $chunk) {
             $uri = $chunk['web']['uri'] ?? null;
-            if (!$uri || isset($sources[$uri])) {
+            if (! $uri || isset($sources[$uri])) {
                 continue;
             }
             $sources[$uri] = [
                 'title' => (string) ($chunk['web']['title'] ?? $uri),
-                'uri'   => $uri,
+                'uri' => $uri,
             ];
         }
 
         return array_values($sources);
+    }
+
+    private function isDailyQuotaError(?array $json): bool
+    {
+        return str_contains($this->quotaId($json), 'PerDay');
+    }
+
+    /** Ambil quotaId dari error 429 Gemini (mis. "GenerateRequestsPerDayPerProjectPerModel-FreeTier"). */
+    private function quotaId(?array $json): string
+    {
+        foreach ($json['error']['details'] ?? [] as $detail) {
+            foreach ($detail['violations'] ?? [] as $violation) {
+                if (! empty($violation['quotaId'])) {
+                    return (string) $violation['quotaId'];
+                }
+            }
+        }
+
+        return '';
     }
 
     /** Terjemahkan status HTTP Gemini jadi pesan Bahasa Indonesia yang aman. */
@@ -206,13 +734,20 @@ class GeminiService
     {
         $detail = $json['error']['message'] ?? '';
 
+        // Bedakan batas HARIAN (habis sampai reset tengah malam waktu Pasifik) dari batas
+        // per-menit, supaya guru tak menunggu sia-sia menekan tombol yang pasti gagal seharian.
+        // Jenis kuota hanya ada di error.details[].violations[].quotaId, bukan di message.
+        $isDaily = str_contains($this->quotaId($json), 'PerDay');
+
         return match (true) {
-            $status === 429             => 'Kuota AI sedang penuh. Coba lagi sebentar lagi.',
-            $status === 400             => 'Permintaan ke AI tidak valid.'.($detail ? " ({$detail})" : ''),
+            $status === 429 && $isDaily => 'Kuota AI harian sudah habis untuk semua model gratis. '
+                .'Coba lagi besok, atau aktifkan billing di Google AI Studio untuk kuota lebih besar.',
+            $status === 429 => 'Permintaan AI terlalu sering. Tunggu sebentar lalu coba lagi.',
+            $status === 400 => 'Permintaan ke AI tidak valid.'.($detail ? " ({$detail})" : ''),
             $status === 401,
-            $status === 403             => 'Konfigurasi AI bermasalah (kredensial ditolak).',
-            $status >= 500              => 'Layanan AI sedang gangguan. Coba lagi nanti.',
-            default                     => 'Terjadi kesalahan saat memproses permintaan AI.',
+            $status === 403 => 'Konfigurasi AI bermasalah (kredensial ditolak).',
+            $status >= 500 => 'Layanan AI sedang gangguan. Coba lagi nanti.',
+            default => 'Terjadi kesalahan saat memproses permintaan AI.',
         };
     }
 }
