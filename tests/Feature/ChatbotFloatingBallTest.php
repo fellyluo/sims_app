@@ -23,7 +23,7 @@ class ChatbotFloatingBallTest extends TestCase
     public function test_floating_ball_muncul_untuk_siswa_dan_orangtua(): void
     {
         // Aturan "satu bola per pengguna": floating ball handoff ke admin hanya
-        // untuk siswa & orang tua. Staf/admin memakai widget AsistenAI.
+        // untuk siswa & orang tua. Staf/admin memakai widget Asisten Guru.
         foreach (['siswa', 'orangtua'] as $i => $access) {
             $user = $this->makeUser($access, "fab_{$access}_{$i}");
 
@@ -37,7 +37,7 @@ class ChatbotFloatingBallTest extends TestCase
     public function test_floating_ball_tersembunyi_untuk_staf_dan_admin(): void
     {
         // Guru, wali kelas, kurikulum, kepala, dan admin TIDAK dapat floating ball
-        // handoff — mereka memakai widget AsistenAI (generatif), bukan chatFab.
+        // handoff — mereka memakai widget Asisten Guru (generatif), bukan chatFab.
         foreach (['guru', 'walikelas', 'kurikulum', 'kepala', 'admin'] as $i => $access) {
             $user = $this->makeUser($access, "nofab_{$access}_{$i}");
 
