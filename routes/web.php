@@ -680,8 +680,8 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
 Route::middleware(['auth', 'chatbot.user'])->group(function () {
     Route::get('/chatbot', [ChatbotController::class, 'show'])->name('chatbot.show');
     Route::post('/chatbot/send', [ChatbotController::class, 'send'])->name('chatbot.send');
-    Route::post('/chatbot/upload', [ChatbotController::class, 'upload'])->name('chatbot.upload');
-    Route::post('/chatbot/upload-file', [ChatbotController::class, 'uploadFile'])->name('chatbot.upload-file');
+    Route::post('/chatbot/upload', [ChatbotController::class, 'upload'])->middleware('throttle:30,1')->name('chatbot.upload');
+    Route::post('/chatbot/upload-file', [ChatbotController::class, 'uploadFile'])->middleware('throttle:30,1')->name('chatbot.upload-file');
     Route::get('/chatbot/poll', [ChatbotController::class, 'poll'])->name('chatbot.poll');
     Route::get('/chatbot/unread', [ChatbotController::class, 'unread'])->name('chatbot.unread');
 
@@ -698,8 +698,8 @@ Route::middleware(['auth', 'role:admin'])->prefix('chatbot/admin')->name('chatbo
     Route::get('/{conversation}/messages', [ChatbotAdminController::class, 'messages'])->name('messages');
     Route::post('/{conversation}/assign', [ChatbotAdminController::class, 'assign'])->name('assign');
     Route::post('/{conversation}/reply', [ChatbotAdminController::class, 'reply'])->name('reply');
-    Route::post('/{conversation}/reply-image', [ChatbotAdminController::class, 'replyImage'])->name('reply-image');
-    Route::post('/{conversation}/reply-file', [ChatbotAdminController::class, 'replyFile'])->name('reply-file');
+    Route::post('/{conversation}/reply-image', [ChatbotAdminController::class, 'replyImage'])->middleware('throttle:60,1')->name('reply-image');
+    Route::post('/{conversation}/reply-file', [ChatbotAdminController::class, 'replyFile'])->middleware('throttle:60,1')->name('reply-file');
     Route::post('/{conversation}/back-to-bot', [ChatbotAdminController::class, 'backToBot'])->name('back-to-bot');
     Route::post('/{conversation}/close', [ChatbotAdminController::class, 'close'])->name('close');
     Route::delete('/{conversation}', [ChatbotAdminController::class, 'destroy'])->name('destroy');

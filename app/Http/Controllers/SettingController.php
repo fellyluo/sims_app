@@ -76,7 +76,7 @@ class SettingController extends Controller
     public function setIdentitasSekolah(Request $request)
     {
         $request->validate([
-            'sekolah_logo' => 'nullable|image|mimes:png,jpg,jpeg,svg,webp|max:2048',
+            'sekolah_logo' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:2048',
             'hapus_logo' => 'nullable|boolean',
         ]);
 
@@ -93,7 +93,7 @@ class SettingController extends Controller
             if ($old && Storage::disk('public')->exists($old)) {
                 Storage::disk('public')->delete($old);
             }
-            $ext = Uploads::safeExtension($request->file('sekolah_logo'), ['png', 'jpg', 'jpeg', 'svg', 'webp'], 'png');
+            $ext = Uploads::safeExtension($request->file('sekolah_logo'), ['png', 'jpg', 'jpeg', 'webp'], 'png');
             $path = $request->file('sekolah_logo')->storeAs('logo', 'sekolah_logo_'.now()->format('YmdHis').'.'.$ext, 'public');
             Setting::set('sekolah_logo', $path);
         } elseif ($request->boolean('hapus_logo')) {
