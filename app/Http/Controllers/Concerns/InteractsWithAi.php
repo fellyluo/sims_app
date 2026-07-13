@@ -166,6 +166,38 @@ trait InteractsWithAi
         ];
     }
 
+    /** @return array<string,mixed> */
+    protected function aiPublicQuotaUsage(): array
+    {
+        $quota = $this->aiFreeTierUsage();
+        $remaining = $quota['total']['remaining'] ?? null;
+        $limit = $quota['total']['limit'] ?? null;
+        $remainingPercent = $remaining !== null && $limit
+            ? max(0, min(100, (int) floor(($remaining / $limit) * 100)))
+            : null;
+        $remainingLabel = $remaining !== null
+            ? number_format((int) $remaining, 0, ',', '.').' request tersisa'
+            : 'Sisa kuota tidak diketahui';
+
+        return [
+            'enabled' => $quota['enabled'] ?? true,
+            'status' => $quota['status'] ?? 'ok',
+            'reset_at' => $quota['reset_at'] ?? null,
+            'reset_at_human' => $quota['reset_at_human'] ?? '-',
+            'day_start' => $quota['day_start'] ?? null,
+            'day_start_human' => $quota['day_start_human'] ?? null,
+            'remaining' => $remaining,
+            'remaining_percent' => $remainingPercent,
+            'remaining_label' => $remainingLabel,
+            'total' => [
+                'remaining' => $remaining,
+                'limit' => $limit,
+            ],
+            'models' => [],
+            'can_view_usage' => false,
+        ];
+    }
+
     /** @return string[] */
     private function aiModelChain(): array
     {
