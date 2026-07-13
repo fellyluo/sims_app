@@ -74,6 +74,39 @@ class QuizDocumentTest extends TestCase
         );
     }
 
+    public function test_kunci_jawaban_tipe_soal_baru_tetap_terbaca(): void
+    {
+        $content = implode("\n", [
+            'SOAL EVALUASI IPA',
+            'Bagian A - Pilihan Ganda Kompleks',
+            '1. Manakah yang termasuk komponen biotik?',
+            'A. Air',
+            'B. Rumput',
+            'C. Kucing',
+            'D. Batu',
+            'Bagian B - Benar/Salah',
+            '2. Air termasuk komponen abiotik.',
+            'Kunci Jawaban & Pedoman Penilaian',
+            '(Untuk Guru)',
+            'Pilihan Ganda Kompleks',
+            '1. B, C',
+            'Benar/Salah',
+            '2. Benar',
+        ]);
+
+        $doc = QuizDocument::parse($content);
+
+        $this->assertTrue($doc['parsed']);
+        $this->assertSame('Pilihan Ganda Kompleks', $doc['kunci']['lainnya'][0]['heading']);
+        $this->assertSame(['1. B, C'], $doc['kunci']['lainnya'][0]['lines']);
+        $this->assertSame('Benar/Salah', $doc['kunci']['lainnya'][1]['heading']);
+        $this->assertSame(['2. Benar'], $doc['kunci']['lainnya'][1]['lines']);
+
+        $xml = QuizDocxBuilder::documentXml($doc);
+        $this->assertStringContainsString('Pilihan Ganda Kompleks', $xml);
+        $this->assertStringContainsString('2. Benar', $xml);
+    }
+
     public function test_konten_tanpa_format_soal_tidak_dianggap_parsed(): void
     {
         $doc = QuizDocument::parse("Catatan bebas guru.\nTidak berformat soal sama sekali.");

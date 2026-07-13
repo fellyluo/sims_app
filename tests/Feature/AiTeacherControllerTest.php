@@ -79,6 +79,70 @@ class AiTeacherControllerTest extends TestCase
         ]);
     }
 
+    public function test_generator_soal_bisa_memilih_beberapa_jenis_soal(): void
+    {
+        $user = User::create([
+            'username' => 'guru-ai-checkbox',
+            'password' => 'password',
+            'access' => 'guru',
+        ]);
+
+        $capturedPrompt = '';
+        $this->mock(GeminiService::class, function (MockInterface $mock) use (&$capturedPrompt) {
+            $mock->shouldReceive('generate')
+                ->once()
+                ->withArgs(function (string $prompt, array $options) use (&$capturedPrompt) {
+                    $capturedPrompt = $prompt;
+
+                    return str_contains($prompt, 'Pilihan Ganda Kompleks')
+                        && str_contains($prompt, 'Benar/Salah')
+                        && str_contains($prompt, 'Bagian A - Pilihan Ganda Kompleks')
+                        && str_contains($prompt, 'Bagian B - Benar/Salah')
+                        && str_contains($prompt, 'Jenis soal yang dibuat hanya: Pilihan Ganda Kompleks, Benar/Salah')
+                        && ! str_contains($prompt, 'Bagian C - Mencocokkan')
+                        && ($options['max_output_tokens'] ?? null) === 4096;
+                })
+                ->andReturn([
+                    'text' => 'Soal campuran baru.',
+                    'model' => 'gemini-test',
+                    'prompt_tokens' => 12,
+                    'completion_tokens' => 8,
+                ]);
+        });
+
+        $response = $this->actingAs($user)->postJson(route('ai.teacher.quiz'), [
+            'topik' => 'Ekosistem',
+            'jumlah' => 4,
+            'jenis_soal' => ['pg_kompleks', 'benar_salah'],
+            'tingkat' => 'sedang',
+            'jenjang' => 'Kelas 7 SMP',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('history.metadata.jenis_soal', ['pg_kompleks', 'benar_salah']);
+
+        $this->assertStringContainsString('Buat 4 soal (Pilihan Ganda Kompleks, Benar/Salah)', $capturedPrompt);
+    }
+
+    public function test_generator_soal_wajib_memilih_minimal_satu_jenis_soal(): void
+    {
+        $user = User::create([
+            'username' => 'guru-ai-no-type',
+            'password' => 'password',
+            'access' => 'guru',
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('ai.teacher.quiz'), [
+            'topik' => 'Ekosistem',
+            'jumlah' => 4,
+            'jenis_soal' => [],
+            'tingkat' => 'sedang',
+        ]);
+
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors('jenis_soal');
+    }
+
     public function test_halaman_asisten_guru_hanya_menampilkan_keterangan_kuota_untuk_guru(): void
     {
         config()->set('ai.model', 'gemini-3.5-flash');

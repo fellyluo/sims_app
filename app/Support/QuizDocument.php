@@ -29,7 +29,7 @@ final class QuizDocument
             'identity' => [],
             'petunjuk' => ['heading' => '', 'lines' => []],
             'sections' => [],   // ['heading' => 'Bagian A - Pilihan Ganda', 'intro' => [], 'questions' => []]
-            'kunci' => ['heading' => '', 'subtitle' => '', 'pg' => [], 'esai' => [], 'rubrik' => ['heading' => '', 'lines' => []]],
+            'kunci' => ['heading' => '', 'subtitle' => '', 'pg' => [], 'lainnya' => [], 'esai' => [], 'rubrik' => ['heading' => '', 'lines' => []]],
         ];
 
         $lines = LearningDocument::sanitize($content, keepUnderline: true);
@@ -40,6 +40,7 @@ final class QuizDocument
         $section = null;          // bagian soal aktif
         $question = null;         // butir soal aktif
         $esai = null;             // blok "Soal 11" pada kunci jawaban
+        $kunciLainnya = null;     // sub-bagian kunci untuk tipe baru
 
         $flushQuestion = function () use (&$section, &$question) {
             if ($question !== null && $section !== null) {
@@ -59,6 +60,12 @@ final class QuizDocument
                 $doc['kunci']['esai'][] = $esai;
             }
             $esai = null;
+        };
+        $flushKunciLainnya = function () use (&$doc, &$kunciLainnya) {
+            if ($kunciLainnya !== null) {
+                $doc['kunci']['lainnya'][] = $kunciLainnya;
+            }
+            $kunciLainnya = null;
         };
 
         foreach ($lines as $line) {
@@ -165,8 +172,18 @@ final class QuizDocument
                     continue;
                 }
 
+                if (preg_match('/^(Pilihan Ganda Kompleks|Benar\/Salah|Mencocokkan|Isian)\b/iu', $trimmed)) {
+                    $flushEsai();
+                    $flushKunciLainnya();
+                    $kunciMode = 'lainnya';
+                    $kunciLainnya = ['heading' => $trimmed, 'lines' => []];
+
+                    continue;
+                }
+
                 if (preg_match('/^Pilihan Ganda\b/iu', $trimmed)) {
                     $flushEsai();
+                    $flushKunciLainnya();
                     $kunciMode = 'pg';
 
                     continue;
@@ -174,6 +191,7 @@ final class QuizDocument
 
                 if (preg_match('/^Esai\b/iu', $trimmed) && ! preg_match('/^Esai\s+\d/iu', $trimmed)) {
                     $flushEsai();
+                    $flushKunciLainnya();
                     $kunciMode = 'esai';
 
                     continue;
@@ -181,14 +199,21 @@ final class QuizDocument
 
                 if (preg_match('/^Rubrik\b/iu', $trimmed)) {
                     $flushEsai();
+                    $flushKunciLainnya();
                     $kunciMode = 'rubrik';
                     $doc['kunci']['rubrik']['heading'] = $trimmed;
 
                     continue;
                 }
 
-                if ($kunciMode === 'pg' && preg_match('/^(\d{1,2})[.)]\s*([A-E])\b\.?$/u', $trimmed, $m)) {
+                if ($kunciMode === 'pg' && preg_match('/^(\d{1,2})[.)]\s*([A-E](?:\s*,\s*[A-E])*)\b\.?$/u', $trimmed, $m)) {
                     $doc['kunci']['pg'][] = ['number' => $m[1], 'answer' => $m[2]];
+
+                    continue;
+                }
+
+                if ($kunciMode === 'lainnya' && $kunciLainnya !== null) {
+                    $kunciLainnya['lines'][] = self::stripBullet($trimmed);
 
                     continue;
                 }
@@ -223,6 +248,7 @@ final class QuizDocument
 
         $flushSection();
         $flushEsai();
+        $flushKunciLainnya();
 
         // Kunci PG dirender dua kolom (1-5 kiri, sisanya kanan), jadi urutan nomor wajib rapi
         // meski model menuliskannya berselang-seling.
