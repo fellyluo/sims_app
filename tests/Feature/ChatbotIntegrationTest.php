@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\SendFcmNotificationJob;
 use App\Models\ChatbotConversation;
 use App\Models\ChatbotMessage;
 use App\Models\Jadwal;
@@ -14,6 +15,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 /**
@@ -123,6 +125,58 @@ class ChatbotIntegrationTest extends TestCase
             ->assertJsonPath('mode', 'bot');
 
         $this->assertSame('active', $conversation->refresh()->status);
+    }
+
+    public function test_handoff_chat_mendorong_badge_bell_dan_fcm_ke_admin(): void
+    {
+        Queue::fake();
+
+        $siswa = $this->makeUser('siswa', 'siswa_push_admin');
+        $admin = $this->makeUser('admin', 'admin_push_inbox');
+
+        $this->actingAs($siswa)->postJson('/chatbot/send', ['message' => 'butuh bantuan admin'])->assertOk();
+        $conversation = ChatbotConversation::where('user_id', $siswa->getKey())->firstOrFail();
+
+        $this->actingAs($siswa)
+            ->postJson("/chatbot/{$conversation->id}/request-human")
+            ->assertOk()
+            ->assertJsonPath('status', 'waiting');
+
+        $this->assertSame(1, $admin->notifications()->where('data->type', 'chatbot_inbox')->count());
+
+        Queue::assertPushed(SendFcmNotificationJob::class, function (SendFcmNotificationJob $job) use ($admin, $conversation) {
+            return $job->userUuid === $admin->uuid
+                && $job->connection === 'sync'
+                && $job->payload['type'] === 'chatbot_inbox'
+                && $job->payload['url'] === '/chatbot/admin/inbox'
+                && $job->payload['conversation_id'] === $conversation->id;
+        });
+    }
+
+    public function test_balasan_admin_mendorong_badge_bell_dan_fcm_ke_user(): void
+    {
+        Queue::fake();
+
+        $siswa = $this->makeUser('siswa', 'siswa_push_reply');
+        $admin = $this->makeUser('admin', 'admin_push_reply');
+
+        $this->actingAs($siswa)->postJson('/chatbot/send', ['message' => 'halo admin'])->assertOk();
+        $conversation = ChatbotConversation::where('user_id', $siswa->getKey())->firstOrFail();
+        $this->actingAs($siswa)->postJson("/chatbot/{$conversation->id}/request-human")->assertOk();
+
+        $this->actingAs($admin)->postJson("/chatbot/admin/{$conversation->id}/reply", [
+            'body' => 'Halo, silakan cek informasi terbaru.',
+        ])->assertOk()->assertJsonPath('status', 'assigned');
+
+        $this->assertSame(1, $siswa->notifications()->where('data->type', 'chatbot_admin_reply')->count());
+
+        Queue::assertPushed(SendFcmNotificationJob::class, function (SendFcmNotificationJob $job) use ($siswa, $conversation) {
+            return $job->userUuid === $siswa->uuid
+                && $job->connection === 'sync'
+                && $job->payload['type'] === 'chatbot_admin_reply'
+                && $job->payload['url'] === '/chatbot'
+                && $job->payload['conversation_id'] === $conversation->id;
+        });
     }
 
     public function test_unread_count_untuk_badge_floating_ball(): void

@@ -5,8 +5,11 @@ namespace App\Services\Chatbot;
 use App\Models\ChatbotConversation;
 use App\Models\ChatbotMessage;
 use App\Models\User;
+use App\Notifications\ChatbotAdminReplyReceived;
+use App\Notifications\ChatbotInboxMessageReceived;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 
 /**
  * Orkestrasi inti chatbot SIMS — mode "handoff + chat".
@@ -67,6 +70,8 @@ class ChatbotService
 
             // Saat mode human, bot DIAM. Pesan hanya disimpan menunggu admin.
             if ($conversation->isHumanMode()) {
+                $this->notifyChatAdmins($conversation, $userMessage);
+
                 return [
                     'conversation_id' => $conversation->id,
                     'mode' => $conversation->mode,
@@ -128,6 +133,8 @@ class ChatbotService
                 'sistem_handoff'
             );
 
+            $this->notifyChatAdmins($conversation, null, 'handoff');
+
             return $conversation->refresh();
         });
     }
@@ -161,6 +168,8 @@ class ChatbotService
             $this->activity->log('admin_reply_sent', $admin, [
                 'conversation_id' => $conversation->id,
             ]);
+
+            $this->notifyChatUser($conversation, $message);
 
             return $message;
         });
@@ -296,6 +305,32 @@ class ChatbotService
         ]);
     }
 
+    private function notifyChatAdmins(ChatbotConversation $conversation, ?ChatbotMessage $message = null, string $event = 'message'): void
+    {
+        $query = User::query()->whereIn('access', ['admin', 'superadmin']);
+
+        if ($conversation->assigned_admin_id) {
+            $query->whereKey($conversation->assigned_admin_id);
+        }
+
+        $admins = $query->get();
+        if ($admins->isEmpty()) {
+            return;
+        }
+
+        Notification::send($admins, new ChatbotInboxMessageReceived($conversation->loadMissing('user'), $message, $event));
+    }
+
+    private function notifyChatUser(ChatbotConversation $conversation, ChatbotMessage $message): void
+    {
+        $user = $conversation->user()->first();
+        if (! $user) {
+            return;
+        }
+
+        $user->notify(new ChatbotAdminReplyReceived($conversation, $message->loadMissing('senderUser')));
+    }
+
     private function storeMessage(
         ChatbotConversation $conversation,
         string $sender,
@@ -361,6 +396,8 @@ class ChatbotService
             ]);
 
             if ($conversation->isHumanMode()) {
+                $this->notifyChatAdmins($conversation, $userMessage);
+
                 return [
                     'conversation_id' => $conversation->id,
                     'mode' => $conversation->mode,

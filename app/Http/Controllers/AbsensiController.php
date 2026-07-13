@@ -11,6 +11,7 @@ use App\Models\RolePermission;
 use App\Models\Setting;
 use App\Models\User;
 use App\Support\AbsensiGuru;
+use App\Support\AttendanceParentNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -286,6 +287,9 @@ class AbsensiController extends Controller
         $terlambat = $row->terlambat($batas);
         if ($scanPertama && $terlambat) {
             \App\Http\Controllers\PoinController::autoTerlambat($data['id_siswa'], $data['tanggal']);
+        }
+        if ($scanPertama && $row->status === 'hadir') {
+            AttendanceParentNotifier::notify($row);
         }
 
         return response()->json([
