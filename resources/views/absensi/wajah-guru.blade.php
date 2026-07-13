@@ -1,77 +1,73 @@
 @extends('layouts.app')
-@section('title', 'Registrasi Wajah')
+@section('title', 'Registrasi Wajah Guru')
 
 @section('content')
-<div class="space-y-5" x-data="faceEnroll()" @keydown.space.window="onSpace($event)">
+<div class="space-y-5" x-data="faceEnrollGuru()" @keydown.space.window="onSpace($event)">
 
     {{-- Header --}}
     <div class="flex items-center justify-between flex-wrap gap-3">
         <div>
-            <h1 class="page-title">Registrasi Wajah Siswa</h1>
-            <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Daftarkan wajah tiap siswa untuk absensi otomatis</p>
+            <h1 class="page-title">Registrasi Wajah Guru</h1>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Daftarkan wajah tiap guru untuk presensi otomatis</p>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
-            <a href="{{ route('absensi.wajah-guru') }}" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition">
-                <i data-lucide="user-cog" class="w-4 h-4"></i> Registrasi Wajah Guru
+            <a href="{{ route('absensi.wajah') }}" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+                <i data-lucide="users" class="w-4 h-4"></i> Registrasi Wajah Siswa
             </a>
-            <a href="{{ route('wajah.galeri', ['kelas'=>$selectedKelas]) }}" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+            <a href="{{ route('wajah.galeri') }}" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition">
                 <i data-lucide="images" class="w-4 h-4"></i> Validasi Wajah
             </a>
-            <a href="{{ route('absensi.scan', ['kelas'=>$selectedKelas]) }}" class="btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition">
+            <a href="{{ route('absensi.scan') }}" class="btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition">
                 <i data-lucide="scan-face" class="w-4 h-4"></i> Mulai Absen Scan
             </a>
         </div>
     </div>
 
     {{-- Filter --}}
-    <form method="GET" action="{{ route('absensi.wajah') }}" class="card p-4 flex flex-wrap gap-3 items-end">
+    <div class="card p-4 flex flex-wrap gap-3 items-end">
         <div class="flex-1 min-w-48">
-            <label class="form-label">Kelas</label>
-            <select name="kelas" class="form-select" onchange="this.form.submit()">
-                @foreach($kelasList as $k)
-                <option value="{{ $k->uuid }}" @selected($selectedKelas===$k->uuid)>Kelas {{ $k->tingkat }}{{ $k->kelas }}</option>
-                @endforeach
-            </select>
+            <label class="form-label">Cari nama guru</label>
+            <input type="text" x-model="q" placeholder="Ketik nama..." class="form-input">
         </div>
-        @php $terdaftar = $siswas->whereNotNull('face_descriptor')->count(); @endphp
+        @php $terdaftar = $gurus->whereNotNull('face_descriptor')->count(); @endphp
         <div class="text-sm text-slate-500">
-            <span class="font-bold text-primary">{{ $terdaftar }}</span> / {{ $siswas->count() }} wajah terdaftar
+            <span class="font-bold text-primary">{{ $terdaftar }}</span> / {{ $gurus->count() }} wajah terdaftar
         </div>
-    </form>
+    </div>
 
-    @if($siswas->isEmpty())
+    @if($gurus->isEmpty())
     <div class="card p-12 text-center text-slate-400">
-        <i data-lucide="users" class="w-12 h-12 mx-auto mb-3 opacity-30"></i>
-        <p class="font-medium">Belum ada siswa di kelas ini.</p>
+        <i data-lucide="user-x" class="w-12 h-12 mx-auto mb-3 opacity-30"></i>
+        <p class="font-medium">Belum ada data guru.</p>
     </div>
     @else
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        @foreach($siswas as $s)
-        <div class="card p-3.5 flex items-center gap-3">
-            <div class="w-11 h-11 rounded-full grid place-items-center text-white font-bold flex-shrink-0 relative overflow-hidden" style="background:{{ $s->jk==='L' ? 'var(--cp)' : '#ec4899' }}">
-                @if($s->face_photo)
-                <img src="{{ $s->face_photo_url }}" class="w-full h-full object-cover cursor-zoom-in" @click="zoom('{{ $s->face_photo_url }}', @js($s->nama))" alt="wajah">
+        @foreach($gurus as $g)
+        <div class="card p-3.5 flex items-center gap-3" x-show="q==='' || @js(strtolower($g->nama)).includes(q.toLowerCase())">
+            <div class="w-11 h-11 rounded-full grid place-items-center text-white font-bold flex-shrink-0 relative overflow-hidden" style="background:{{ $g->jk==='P' ? '#ec4899' : 'var(--cp)' }}">
+                @if($g->face_photo)
+                <img src="{{ $g->face_photo_url }}" class="w-full h-full object-cover cursor-zoom-in" @click="zoom('{{ $g->face_photo_url }}', @js($g->nama))" alt="wajah">
                 @else
-                {{ strtoupper(substr($s->nama,0,1)) }}
+                {{ strtoupper(substr($g->nama,0,1)) }}
                 @endif
-                @if($s->face_descriptor)
+                @if($g->face_descriptor)
                 <span class="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 grid place-items-center ring-2 ring-white"><i data-lucide="check" class="w-2.5 h-2.5 text-white"></i></span>
                 @endif
             </div>
             <div class="flex-1 min-w-0">
-                <p class="font-semibold text-sm text-slate-700 dark:text-slate-200 truncate">{{ $s->nama }}</p>
-                @if($s->face_descriptor)
+                <p class="font-semibold text-sm text-slate-700 dark:text-slate-200 truncate">{{ $g->nama }}</p>
+                @if($g->face_descriptor)
                 <p class="text-xs text-emerald-600 flex items-center gap-1"><i data-lucide="badge-check" class="w-3 h-3"></i> Terdaftar</p>
                 @else
-                <p class="text-xs text-slate-400">Belum daftar wajah</p>
+                <p class="text-xs text-slate-400">{{ $g->nip ?: $g->nik ?: 'Belum daftar wajah' }}</p>
                 @endif
             </div>
             <div class="flex items-center gap-1 flex-shrink-0">
-                <button @click="openFor('{{ $s->uuid }}', @js($s->nama))" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-primary-50 text-primary hover:bg-primary-100 transition flex items-center gap-1">
-                    <i data-lucide="camera" class="w-3.5 h-3.5"></i> {{ $s->face_descriptor ? 'Ulangi' : 'Daftar' }}
+                <button @click="openFor('{{ $g->uuid }}', @js($g->nama))" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-primary-50 text-primary hover:bg-primary-100 transition flex items-center gap-1">
+                    <i data-lucide="camera" class="w-3.5 h-3.5"></i> {{ $g->face_descriptor ? 'Ulangi' : 'Daftar' }}
                 </button>
-                @if($s->face_descriptor)
-                <button @click="hapus('{{ $s->uuid }}')" class="p-1.5 rounded-lg hover:bg-rose-50 text-rose-500" title="Hapus wajah"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                @if($g->face_descriptor)
+                <button @click="hapus('{{ $g->uuid }}')" class="p-1.5 rounded-lg hover:bg-rose-50 text-rose-500" title="Hapus wajah"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
                 @endif
             </div>
         </div>
@@ -111,6 +107,10 @@
                     <div x-show="streaming" class="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
                         <template x-for="i in 3"><span class="w-3 h-3 rounded-full transition" :class="samples.length>=i ? 'bg-emerald-400' : 'bg-white/40'"></span></template>
                     </div>
+                    {{-- indikator pencahayaan rendah --}}
+                    <div x-show="streaming && lowLight" x-cloak class="absolute top-3 left-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/85 backdrop-blur text-white text-xs font-semibold">
+                        <i data-lucide="sun" class="w-3.5 h-3.5"></i> Pencahayaan rendah — kecerahan otomatis aktif
+                    </div>
                 </div>
                 <p class="text-center text-sm" :class="msgErr ? 'text-rose-500' : 'text-slate-500'" x-text="msg"></p>
             </div>
@@ -140,12 +140,12 @@
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/human/dist/human.js"></script>
 <script>
-let human=null, humanReady=false;
-async function loadHuman(){
-    if(humanReady) return human;
+let humanGuru=null, humanGuruReady=false;
+async function loadHumanGuru(){
+    if(humanGuruReady) return humanGuru;
     const HumanLib = window.Human?.Human || window.Human?.default || window.Human;
     const backend = (typeof navigator!=='undefined' && navigator.gpu) ? 'webgpu' : 'webgl';
-    human = new HumanLib({
+    humanGuru = new HumanLib({
         modelBasePath:'https://vladmandic.github.io/human-models/models/',
         backend: backend, cacheSensitivity: 0, warmup:'none',
         face:{ enabled:true, detector:{ maxDetected:1, minConfidence:0.45 }, mesh:{enabled:true}, iris:{enabled:false},
@@ -153,18 +153,45 @@ async function loadHuman(){
         body:{enabled:false}, hand:{enabled:false}, object:{enabled:false}, gesture:{enabled:false},
         filter:{enabled:false}, segmentation:{enabled:false},
     });
-    await human.load();
-    humanReady = true;
-    return human;
+    await humanGuru.load();
+    humanGuruReady = true;
+    return humanGuru;
 }
 
-function faceEnroll(){
+function faceEnrollGuru(){
     return {
-        modal:false, loading:false, streaming:false, capturing:false, saving:false,
+        modal:false, loading:false, streaming:false, capturing:false, saving:false, lowLight:false, q:'',
         uuid:null, nama:'', samples:[], photo:null, _bestYaw:Infinity, stream:null, status:'', msg:'', msgErr:false,
         zoomSrc:null, zoomNama:'',
         zoom(src, nama){ this.zoomSrc=src; this.zoomNama=nama; },
         closeZoom(){ this.zoomSrc=null; },
+
+        // Pencerahan otomatis: gambar video digambar ke kanvas offscreen, dicerahkan bila gelap,
+        // lalu KANVAS itu (bukan video mentah) yang dipakai utk deteksi wajah & snapshot foto.
+        // Sengaja TIDAK dicampur dgn contrast() — contrast linear di sekitar titik tengah 128 justru
+        // menekan piksel gelap balik ke bawah, melawan efek brightness yg baru dinaikkan.
+        enhanceFrame(video){
+            const w=video.videoWidth, h=video.videoHeight;
+            if(!w || !h) return video;
+            if(!this._ecv){ this._ecv=document.createElement('canvas'); this._ectx=this._ecv.getContext('2d', { willReadFrequently:true }); }
+            const cv=this._ecv, ctx=this._ectx;
+            cv.width=w; cv.height=h;
+            ctx.filter='none';
+            ctx.drawImage(video, 0, 0, w, h);
+            const px=ctx.getImageData(0, 0, w, h).data;
+            let sum=0, n=0;
+            for(let i=0; i<px.length; i+=160){ sum += 0.299*px[i] + 0.587*px[i+1] + 0.114*px[i+2]; n++; }
+            const avgLuma = n ? sum/n : 128;
+            this.lowLight = avgLuma < 90;
+            if(this.lowLight){
+                const boost = Math.min(2.8, 1 + (90-avgLuma)/50).toFixed(2);
+                ctx.filter = `brightness(${boost})`;
+                ctx.drawImage(video, 0, 0, w, h);
+                ctx.filter = 'none';
+            }
+            return cv;
+        },
+
         faceQuality(face){
             if(!face || !face.embedding || !face.box) return { ok:false, msg:'Wajah tidak terdeteksi. Pastikan wajah masuk bingkai.' };
             const v=this.$refs.video;
@@ -176,33 +203,33 @@ function faceEnroll(){
             return { ok:true };
         },
 
-        cropFace(box){
+        cropFace(box, source){
             try {
-                const v=this.$refs.video, vw=v.videoWidth, vh=v.videoHeight;
+                const src = source || this.$refs.video;
+                const vw = src.videoWidth || src.width, vh = src.videoHeight || src.height;
                 const [x,y,w,h]=box, cx=x+w/2, cy=y+h/2;
                 let side=Math.max(w,h)*1.7;
                 side=Math.min(side, vw, vh);
                 let sx=Math.max(0, Math.min(cx-side/2, vw-side));
                 let sy=Math.max(0, Math.min(cy-side/2, vh-side));
-                const size=320;
+                const size=480;
                 const cv=document.createElement('canvas'); cv.width=size; cv.height=size;
-                cv.getContext('2d').drawImage(v, sx,sy,side,side, 0,0,size,size);
-                return cv.toDataURL('image/jpeg', 0.92);
+                cv.getContext('2d').drawImage(src, sx,sy,side,side, 0,0,size,size);
+                return cv.toDataURL('image/jpeg', 0.95);
             } catch(e){ return null; }
         },
 
         async openFor(uuid, nama){
-            this.uuid=uuid; this.nama=nama; this.samples=[]; this.photo=null; this._bestYaw=Infinity; this.msg=''; this.msgErr=false;
+            this.uuid=uuid; this.nama=nama; this.samples=[]; this.photo=null; this._bestYaw=Infinity; this.msg=''; this.msgErr=false; this.lowLight=false;
             this.modal=true; this.streaming=false; this.loading=true; this.status='Memuat model AI (pertama kali agak lama)...';
             try {
-                // kamera nyala dulu
-                this.stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'user', width:{ideal:1280}, height:{ideal:720} } });
+                const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'user', width:{ideal:1280}, height:{ideal:720} } });
+                this.stream = stream;
                 this.$refs.video.srcObject = this.stream;
                 this.streaming=true;
-                await loadHuman();
-                // Warm-up: kompilasi shader sekali (saat loading) agar capture pertama tak nge-lag
+                await loadHumanGuru();
                 this.status='Menyiapkan model (sekali saja)...';
-                try { const cv=document.createElement('canvas'); cv.width=256; cv.height=256; cv.getContext('2d').fillRect(0,0,256,256); await human.detect(cv); } catch(e){}
+                try { const cv=document.createElement('canvas'); cv.width=256; cv.height=256; cv.getContext('2d').fillRect(0,0,256,256); await humanGuru.detect(cv); } catch(e){}
                 this.loading=false;
                 this.msg='Posisikan wajah dalam bingkai, lalu tekan Spasi / klik Ambil Sampel.';
             } catch(e){
@@ -210,7 +237,6 @@ function faceEnroll(){
                 this.status='Gagal: ' + (e.name==='NotAllowedError' ? 'akses kamera ditolak' : e.message);
             }
         },
-        // Spasi = ambil sampel (saat modal kamera terbuka)
         onSpace(e){
             if(this.modal && this.streaming && !this.capturing && !this.saving && this.samples.length < 3){
                 e.preventDefault();
@@ -220,14 +246,14 @@ function faceEnroll(){
         async capture(){
             this.capturing=true; this.msg='Mendeteksi wajah...'; this.msgErr=false;
             try {
-                const res = await human.detect(this.$refs.video);
+                const frame = this.enhanceFrame(this.$refs.video); // pencerahan otomatis sebelum deteksi (aman di tempat gelap)
+                const res = await humanGuru.detect(frame);
                 const face = (res.face||[])[0];
                 const quality = this.faceQuality(face);
                 if(quality.ok){
                     this.samples.push(Array.from(face.embedding));
-                    // foto profil = pose paling menghadap depan (yaw terkecil)
                     const yaw = Math.abs(face.rotation?.angle?.yaw ?? 0);
-                    if(face.box && yaw < this._bestYaw){ this.photo = this.cropFace(face.box); this._bestYaw = yaw; }
+                    if(face.box && yaw < this._bestYaw){ this.photo = this.cropFace(face.box, frame); this._bestYaw = yaw; }
                     this.msg = 'Sampel ' + this.samples.length + ' tersimpan. ' + (this.samples.length<3 ? 'Ambil lagi dari sudut sedikit berbeda.' : 'Cukup, klik Simpan.');
                     this.msgErr=false;
                 } else {
@@ -241,7 +267,7 @@ function faceEnroll(){
             if(this.samples.length < 3){ this.msg='Ambil minimal 3 sampel wajah dulu.'; this.msgErr=true; return; }
             this.saving=true;
             try {
-                const res = await fetch(`/siswa/${this.uuid}/wajah`, {
+                const res = await fetch(`/guru/${this.uuid}/wajah`, {
                     method:'POST', headers:{'Content-Type':'application/json','X-CSRF-TOKEN':$('meta[name=csrf-token]').attr('content'),Accept:'application/json'},
                     body: JSON.stringify({ descriptors: this.samples, photo: this.photo, force })
                 });
@@ -267,9 +293,9 @@ function faceEnroll(){
             } catch { showToast('Gagal menghubungi server','error'); this.saving=false; }
         },
         hapus(uuid){
-            $.confirm({ title:'Hapus data wajah?', content:'Siswa perlu daftar ulang untuk absen scan.', type:'red',
+            $.confirm({ title:'Hapus data wajah?', content:'Guru perlu daftar ulang untuk absen scan.', type:'red',
                 buttons:{ hapus:{ text:'Hapus', btnClass:'btn-red', action: async ()=>{
-                    const res = await fetch(`/siswa/${uuid}/wajah`, { method:'DELETE', headers:{'X-CSRF-TOKEN':$('meta[name=csrf-token]').attr('content'),Accept:'application/json'} });
+                    const res = await fetch(`/guru/${uuid}/wajah`, { method:'DELETE', headers:{'X-CSRF-TOKEN':$('meta[name=csrf-token]').attr('content'),Accept:'application/json'} });
                     if(res.ok){ showToast('Data wajah dihapus.'); setTimeout(()=>location.reload(),600); }
                 } }, batal:{text:'Batal'} } });
         },

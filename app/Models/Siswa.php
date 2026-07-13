@@ -68,4 +68,9 @@ class Siswa extends Model
     {
         return $this->hasMany(SppPembayaran::class, 'id_siswa', 'uuid');
     }
+
+    public function kaihJawaban()
+    {
+        return $this->hasMany(KaihJawaban::class, 'id_siswa', 'uuid');
+    }
 }

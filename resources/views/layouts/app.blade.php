@@ -17,12 +17,17 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     @php
+        // Halaman kiosk publik (lihat EnsureKioskOrPermission) bisa dirender TANPA user login sama
+        // sekali → $pref harus tetap objek valid (bukan null) agar semua akses $pref->xxx di bawah aman.
         $pref = auth()->user()?->preference()->firstOrCreate(
             ['user_uuid' => auth()->id()],
             \App\Models\UserPreference::defaults()
-        );
-        // Mode kiosk: sidebar/header/ticker disembunyikan (lihat AbsensiController::kioskEnter).
-        $kioskChrome = (bool) session('kiosk_chrome', false);
+        ) ?? new \App\Models\UserPreference(\App\Models\UserPreference::defaults());
+        // Mode kiosk: sidebar/header/ticker disembunyikan. Dihitung PER-REQUEST dari variabel
+        // $isKiosk yg dikirim controller (lihat AbsensiController::scan/QrAbsensiController::show),
+        // BUKAN dari session — supaya membuka link kiosk tak pernah memengaruhi tab lain di
+        // browser yang sama yg mungkin sedang login sbg user lain.
+        $kioskChrome = (bool) ($isKiosk ?? false);
         // $access/$isAdmin dipakai di luar blok sidebar juga (mis. floating chat) — jadi
         // dihitung di sini, bukan cuma di dalam <aside> yang bisa disembunyikan (mode kiosk).
         $access  = auth()->user()?->access;
@@ -444,6 +449,16 @@
                     $presensiItems[] = ['presensi-guru.index', ['presensi-guru.*'], 'user-check',      'Presensi Guru'];
                     $presensiItems[] = ['wajah.galeri',        ['wajah.*'],         'scan-face',       'Validasi Wajah'];
                     $presensiItems[] = ['qr.absensi',          ['qr.*'],            'qr-code',         'QR Absensi'];
+                }
+                // 7 KAIH: siswa isi sendiri tiap pagi; walikelas/admin lihat rekap; admin/kurikulum kelola soal.
+                if (auth()->user()?->siswa) {
+                    $presensiItems[] = ['kaih.isi', ['kaih.isi'], 'heart-handshake', 'Isi 7 KAIH'];
+                }
+                if ($isAdmin || auth()->user()?->canAccess('manage_kaih') || auth()->user()?->guru?->walikelas) {
+                    $presensiItems[] = ['kaih.rekap', ['kaih.rekap', 'kaih.override.*'], 'list-checks', 'Rekap 7 KAIH'];
+                }
+                if ($isAdmin || auth()->user()?->canAccess('manage_kaih')) {
+                    $presensiItems[] = ['kaih.soal', ['kaih.soal', 'kaih.opsi.*'], 'settings-2', 'Soal 7 KAIH'];
                 }
                 if (!empty($presensiItems)) {
                     $groups['presensi'] = ['Absensi & Presensi', 'clipboard-check', $presensiItems];
