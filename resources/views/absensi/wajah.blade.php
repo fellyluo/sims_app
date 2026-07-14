@@ -11,6 +11,9 @@
             <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Daftarkan wajah tiap siswa untuk absensi otomatis</p>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
+            <a href="{{ route('absensi.wajah-guru') }}" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+                <i data-lucide="user-cog" class="w-4 h-4"></i> Registrasi Wajah Guru
+            </a>
             <a href="{{ route('wajah.galeri', ['kelas'=>$selectedKelas]) }}" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition">
                 <i data-lucide="images" class="w-4 h-4"></i> Validasi Wajah
             </a>
@@ -92,7 +95,7 @@
                     @include('partials.face-tutorial')
                     @include('partials.face-registration-rules')
                 </div>
-                <div class="relative rounded-2xl overflow-hidden bg-slate-900 aspect-[4/3]">
+                <div class="relative rounded-2xl overflow-hidden bg-slate-900 aspect-[3/4] sm:aspect-[4/3]">
                     <video x-ref="video" autoplay muted playsinline class="w-full h-full object-cover" :class="streaming ? '' : 'opacity-0'"></video>
                     <div x-show="!streaming" class="absolute inset-0 grid place-items-center text-slate-400 text-sm">
                         <div class="text-center">
@@ -111,13 +114,13 @@
                 </div>
                 <p class="text-center text-sm" :class="msgErr ? 'text-rose-500' : 'text-slate-500'" x-text="msg"></p>
             </div>
-            <div class="p-5 border-t border-slate-100 dark:border-slate-700 flex gap-2 justify-end">
-                <button @click="close()" class="px-4 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700">Batal</button>
-                <button @click="capture()" :disabled="!streaming || capturing || samples.length>=3" class="px-4 py-2 rounded-xl text-sm font-semibold border border-primary text-primary hover:bg-primary-50 transition flex items-center gap-1.5 disabled:opacity-40">
+            <div class="p-5 border-t border-slate-100 dark:border-slate-700 flex flex-wrap sm:flex-nowrap gap-2 justify-end">
+                <button @click="close()" class="flex-1 sm:flex-none justify-center px-4 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700">Batal</button>
+                <button @click="capture()" :disabled="!streaming || capturing || samples.length>=3" class="w-full sm:w-auto order-first sm:order-none justify-center px-4 py-2 rounded-xl text-sm font-semibold border border-primary text-primary hover:bg-primary-50 transition flex items-center gap-1.5 disabled:opacity-40">
                     <i data-lucide="aperture" class="w-4 h-4"></i> Ambil Sampel (<span x-text="samples.length"></span>/3)
                     <kbd class="text-[10px] px-1.5 py-0.5 rounded bg-primary-50 border border-primary/30">Spasi</kbd>
                 </button>
-                <button @click="save()" :disabled="samples.length<3 || saving" class="btn-primary px-5 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 disabled:opacity-40">
+                <button @click="save()" :disabled="samples.length<3 || saving" class="flex-1 sm:flex-none justify-center btn-primary px-5 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 disabled:opacity-40">
                     <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin" x-show="saving"></i><span x-text="saving?'Menyimpan...':'Simpan'"></span>
                 </button>
             </div>

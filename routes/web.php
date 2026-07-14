@@ -27,6 +27,7 @@ use App\Http\Controllers\ForumController;
 use App\Http\Controllers\ForumReactionController;
 use App\Http\Controllers\GuruController;
 use App\Http\Controllers\JadwalController;
+use App\Http\Controllers\KaihController;
 use App\Http\Controllers\KalenderController;
 use App\Http\Controllers\KartuPelajarController;
 use App\Http\Controllers\KelasController;
@@ -45,11 +46,13 @@ use App\Http\Controllers\PoinController;
 use App\Http\Controllers\PresensiGuruController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QrAbsensiController;
+use App\Http\Controllers\RapatController;
 use App\Http\Controllers\RekapController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SiswaController;
 use App\Http\Controllers\WalikelasController;
 use App\Http\Middleware\EnsureFaceRegistered;
+use App\Http\Middleware\EnsureKioskOrPermission;
 use App\Support\TickerStats;
 use Illuminate\Support\Facades\Route;
 use Laragear\WebAuthn\Http\Routes as WebAuthnRoutes;
@@ -73,8 +76,19 @@ WebAuthnRoutes::register('webauthn');
 
 // ─── Kiosk Absensi: link rahasia PUBLIK (tanpa login) — dipasang sbg shortcut di komputer
 //     meja piket supaya guru bisa langsung scan tanpa minta admin buka/login-kan dulu.
-//     Token di URL didapat dari Pengaturan → Absensi (admin-only, lihat setting.kioskToken.regenerate). ───
+//     Token di URL didapat dari Pengaturan → Absensi (admin-only, lihat setting.kioskToken.regenerate).
+//     PENTING: tidak ada Auth::login()/session di sini sama sekali (lihat EnsureKioskOrPermission) —
+//     supaya membuka link ini di browser yang sama dgn tab lain yg sudah login tidak pernah
+//     menimpa/mengeluarkan sesi login orang itu. Token divalidasi ulang tiap request lewat URL. ───
 Route::get('/kiosk-absensi/{token}', [AbsensiController::class, 'kioskEnter'])->name('absensi.kioskEnter');
+
+Route::middleware(EnsureKioskOrPermission::class)->group(function () {
+    Route::get('/absensi/scan', [AbsensiController::class, 'scan'])->name('absensi.scan');
+    Route::post('/absensi/mark', [AbsensiController::class, 'mark'])->name('absensi.mark');
+    Route::get('/presensi-guru/scan', [AbsensiController::class, 'scan'])->name('presensi-guru.scan');
+    Route::post('/presensi-guru/mark', [PresensiGuruController::class, 'mark'])->name('presensi-guru.mark');
+    Route::get('/qr-absensi', [QrAbsensiController::class, 'show'])->name('qr.absensi');
+});
 
 // Halaman "Langganan berakhir" — PUBLIK (tanpa auth) supaya siapa pun yang terkunci
 // oleh middleware EnforceLangganan tetap bisa melihat penjelasannya.
@@ -362,6 +376,23 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
         Route::post('/mode', 'mode')->name('mode');
     });
 
+    // ─── 7 KAIH (siswa isi harian sebelum absen; rekap walikelas/admin; soal admin/kurikulum) ───
+    Route::prefix('kaih')->name('kaih.')->controller(KaihController::class)->group(function () {
+        Route::get('/isi', 'isi')->name('isi');
+        Route::post('/isi', 'simpan')->name('simpan');
+        Route::get('/rekap', 'rekap')->name('rekap');
+        Route::get('/rekap/{siswa}/override', 'overrideForm')->name('override.form');
+        Route::post('/rekap/{siswa}/override', 'overrideStore')->name('override.store');
+        Route::get('/soal', 'soal')->name('soal');
+        Route::post('/toggle-aktif', 'toggleAktif')->name('toggle-aktif');
+        Route::post('/soal', 'soalStore')->name('soal.store');
+        Route::put('/soal/{pertanyaan}', 'soalUpdate')->name('soal.update');
+        Route::delete('/soal/{pertanyaan}', 'soalDestroy')->name('soal.destroy');
+        Route::post('/soal/{pertanyaan}/opsi', 'opsiStore')->name('opsi.store');
+        Route::put('/opsi/{opsi}', 'opsiUpdate')->name('opsi.update');
+        Route::delete('/opsi/{opsi}', 'opsiDestroy')->name('opsi.destroy');
+    });
+
     // ─── Agenda Guru (guru mengisi; rekap utk admin/kepala/kurikulum) ───
     Route::prefix('agenda')->name('agenda.')->controller(AgendaController::class)->group(function () {
         Route::get('/', 'index')->name('index');
@@ -376,6 +407,25 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
         Route::put('/{agenda}', 'update')->name('update');
         Route::delete('/{agenda}', 'destroy')->name('destroy');
         Route::post('/{agenda}/validasi', 'validasi')->name('validasi');
+    });
+
+    // ─── Agenda Rapat / Notulen Rapat — admin/kurikulum/kepala atau guru sekretaris ───
+    Route::prefix('rapat')->name('rapat.')->controller(RapatController::class)->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/buat', 'create')->name('create');
+        Route::post('/', 'store')->name('store');
+        Route::get('/sekretaris', 'sekretaris')->name('sekretaris');
+        Route::post('/sekretaris/{guru}/toggle', 'sekretarisToggle')->name('sekretaris.toggle');
+        Route::get('/{rapat}', 'show')->name('show');
+        Route::get('/{rapat}/edit', 'edit')->name('edit');
+        Route::put('/{rapat}', 'update')->name('update');
+        Route::delete('/{rapat}', 'destroy')->name('destroy');
+        Route::get('/{rapat}/hadir', 'hadir')->name('hadir');
+        Route::post('/{rapat}/hadir', 'hadirStore')->name('hadir.store');
+        Route::get('/{rapat}/dokumentasi', 'dokumentasi')->name('dokumentasi');
+        Route::post('/{rapat}/dokumentasi', 'dokumentasiStore')->name('dokumentasi.store');
+        Route::delete('/{rapat}/dokumentasi/{dokumentasi}', 'dokumentasiDestroy')->name('dokumentasi.destroy');
+        Route::get('/{rapat}/cetak', 'cetak')->name('cetak');
     });
 
     // ─── Poin/Aturan (lama, ledger basis 100) — dua sistem, dipilih di Pengaturan ───
@@ -577,19 +627,14 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
     Route::middleware('permission:manage_absensi')->group(function () {
         // Absensi wajah (face recognition)
         Route::get('/absensi/wajah', [AbsensiController::class, 'wajah'])->name('absensi.wajah');
-        Route::get('/absensi/scan', [AbsensiController::class, 'scan'])->name('absensi.scan');
-        Route::post('/absensi/mark', [AbsensiController::class, 'mark'])->name('absensi.mark');
+        Route::get('/absensi/wajah-guru', [AbsensiController::class, 'wajahGuru'])->name('absensi.wajah-guru');
         Route::post('/siswa/{uuid}/wajah', [SiswaController::class, 'storeFace'])->name('siswa.face.store');
         Route::delete('/siswa/{uuid}/wajah', [SiswaController::class, 'destroyFace'])->name('siswa.face.destroy');
 
-        // Presensi Guru (scan wajah kiosk + koreksi manual)
+        // Presensi Guru (koreksi manual + rekap — TIDAK termasuk scan/mark, lihat grup kiosk publik di atas)
         Route::get('/presensi-guru', [PresensiGuruController::class, 'index'])->name('presensi-guru.index');
         Route::post('/presensi-guru', [PresensiGuruController::class, 'store'])->name('presensi-guru.store');
-        Route::get('/presensi-guru/scan', [AbsensiController::class, 'scan'])->name('presensi-guru.scan');
         Route::get('/presensi-guru/rekap', [PresensiGuruController::class, 'rekap'])->name('presensi-guru.rekap');
-        Route::post('/presensi-guru/mark', [PresensiGuruController::class, 'mark'])->name('presensi-guru.mark');
-        // QR Absensi — tampilan QR harian untuk dipajang
-        Route::get('/qr-absensi', [QrAbsensiController::class, 'show'])->name('qr.absensi');
         Route::post('/guru/{uuid}/wajah', [GuruController::class, 'storeFace'])->name('guru.face.store');
         Route::delete('/guru/{uuid}/wajah', [GuruController::class, 'destroyFace'])->name('guru.face.destroy');
         Route::get('/wajah-galeri', [FaceController::class, 'gallery'])->name('wajah.galeri');

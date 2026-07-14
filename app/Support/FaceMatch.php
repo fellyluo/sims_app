@@ -5,11 +5,17 @@ namespace App\Support;
 use App\Models\Guru;
 use App\Models\Siswa;
 use Illuminate\Support\Facades\Storage;
+use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\ImageManager;
 
 class FaceMatch
 {
     /** Ambang default "kemungkinan wajah sama" (cosine). Bisa disetel via ?min=. */
     public const THRESHOLD = 0.92;
+
+    /** Kompresi foto wajah: lebar maksimum & kualitas WebP (lebih tinggi dari kompresi materi biasa — dipakai utk verifikasi visual). */
+    private const PHOTO_MAX_WIDTH = 480;
+    private const PHOTO_QUALITY = 88;
 
     /** Rata-rata sampel → 1 vektor ternormalisasi. */
     public static function centroid(?array $samples): ?array
@@ -82,7 +88,23 @@ class FaceMatch
             return self::isValidStoredPath($oldPath, $ownerUuid) ? $oldPath : null;
         }
 
-        $path = 'faces/'.$ownerUuid.'_'.now()->format('YmdHis').'.jpg';
+        // Kompres ulang di server (bukan simpan mentah dari kanvas browser): resize bila perlu
+        // + re-encode WebP kualitas tinggi. Beda dari FileCompressionService (materi/dokumen) —
+        // foto wajah dipakai utk verifikasi visual jadi kualitasnya sengaja dijaga lebih tinggi.
+        $ext = 'jpg';
+        try {
+            $manager = new ImageManager(new Driver());
+            $image = $manager->read($bin);
+            if ($image->width() > self::PHOTO_MAX_WIDTH) {
+                $image->scaleDown(width: self::PHOTO_MAX_WIDTH);
+            }
+            $bin = (string) $image->toWebp(self::PHOTO_QUALITY);
+            $ext = 'webp';
+        } catch (\Throwable $e) {
+            // gagal re-encode (mis. driver tak tersedia) → simpan data asli apa adanya
+        }
+
+        $path = 'faces/' . $ownerUuid . '_' . now()->format('YmdHis') . '.' . $ext;
         Storage::disk('public')->put($path, $bin);
 
         if ($oldPath && self::isValidStoredPath($oldPath, $ownerUuid)) {

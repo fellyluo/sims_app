@@ -7,21 +7,14 @@ use App\Models\Kelas;
 use App\Models\Siswa;
 use App\Models\Guru;
 use App\Models\PresensiGuru;
-use App\Models\RolePermission;
 use App\Models\Setting;
-use App\Models\User;
 use App\Support\AbsensiGuru;
 use App\Support\AttendanceParentNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str;
 
 class AbsensiController extends Controller
 {
-    /** Username tetap akun perangkat kiosk (bukan orang sungguhan, dibuat lazy saat link pertama dipakai). */
-    private const KIOSK_USERNAME = '__kiosk_absensi__';
-
     /** Kelas homeroom guru saat ini bila BUKAN admin (null berarti admin = boleh semua kelas). */
     private function walikelasKelasId(): ?string
     {
@@ -29,31 +22,20 @@ class AbsensiController extends Controller
     }
 
     /**
-     * Masuk mode kiosk publik via link rahasia (tanpa login manual) — dipakai sbg shortcut
-     * di komputer meja piket, supaya guru bisa langsung scan tanpa minta admin login-kan.
-     * Login sbg akun perangkat khusus (role 'kiosk', hanya diberi izin manage_absensi),
-     * lalu diarahkan ke halaman scan wajah/QR sesuai metode aktif sekolah.
+     * Masuk mode kiosk publik via link rahasia — TANPA login sama sekali (tidak ada Auth::login,
+     * tidak ada session). Token diteruskan lewat query string `?_kiosk=` ke halaman scan/QR, lalu
+     * divalidasi ulang per-request oleh EnsureKioskOrPermission. Dengan begitu membuka link ini di
+     * browser yang sama dengan tab lain yang sudah login (mis. admin) tidak pernah mengubah sesi
+     * login orang itu — beda dari pendekatan lama yang login-kan browser sbg akun kiosk.
      */
     public function kioskEnter(string $token)
     {
         $real = Setting::get('kiosk_token');
         abort_unless($real && hash_equals((string) $real, $token), 404);
 
-        $kiosk = User::firstOrCreate(
-            ['username' => self::KIOSK_USERNAME],
-            [
-                'access'               => 'kiosk',
-                'password'             => Str::random(40),
-                'must_change_password' => false,
-            ]
-        );
-        RolePermission::firstOrCreate(['role' => 'kiosk', 'permission' => 'manage_absensi']);
+        $target = AbsensiGuru::bolehQr() ? route('qr.absensi') : route('absensi.scan');
 
-        Auth::login($kiosk);
-        // Tandai seluruh sesi ini "kiosk" → layout (sidebar/header/ticker) disembunyikan, lihat layouts/app.blade.php.
-        session(['kiosk_chrome' => true]);
-
-        return AbsensiGuru::bolehQr() ? redirect()->route('qr.absensi') : redirect()->route('absensi.scan');
+        return redirect($target . '?_kiosk=' . urlencode($token));
     }
 
     public function index(Request $request)
@@ -192,6 +174,13 @@ class AbsensiController extends Controller
         return view('absensi.wajah', compact('kelasList', 'selectedKelas', 'siswas'));
     }
 
+    /** Halaman registrasi wajah guru */
+    public function wajahGuru()
+    {
+        $gurus = Guru::orderBy('nama')->get();
+        return view('absensi.wajah-guru', compact('gurus'));
+    }
+
     /** Halaman scan absensi via kamera — mode kiosk, lintas semua kelas untuk siswa dan guru */
     public function scan(Request $request)
     {
@@ -243,7 +232,12 @@ class AbsensiController extends Controller
 
         $payload = $payloadSiswa->concat($payloadGuru)->values();
 
-        return view('absensi.scan', compact('tanggal', 'siswas', 'gurus', 'payload', 'existingSiswa', 'existingGuru'));
+        // Mode kiosk ditentukan per-request dari token di URL (lihat EnsureKioskOrPermission),
+        // BUKAN dari session — supaya tab lain di browser yang sama yg sudah login tak terganggu.
+        $isKiosk = \App\Http\Middleware\EnsureKioskOrPermission::hasValidToken($request);
+        $kioskToken = $isKiosk ? $request->query('_kiosk') : null;
+
+        return view('absensi.scan', compact('tanggal', 'siswas', 'gurus', 'payload', 'existingSiswa', 'existingGuru', 'isKiosk', 'kioskToken'));
     }
 
     /** Tandai 1 siswa hadir (AJAX dari scan wajah) */
@@ -269,6 +263,14 @@ class AbsensiController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Absensi siswa tidak dibuka untuk tanggal ini.',
+            ]);
+        }
+
+        // Wajib isi kuesioner 7 KAIH hari ini sebelum boleh absen (berlaku juga di kios scan wajah).
+        if (!\App\Support\KaihSiswa::bolehAbsen($data['id_siswa'], $data['tanggal'])) {
+            return response()->json([
+                'success' => false,
+                'message' => \App\Support\KaihSiswa::pesanTolak(),
             ]);
         }
 

@@ -18,6 +18,13 @@
         <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Pindai QR absensi sekolah hari ini. Lokasi Anda harus berada di area sekolah.</p>
     </div>
 
+    @if($kaihBelum)
+    {{-- Wajib isi 7 KAIH dulu — tombol/scanner absen disembunyikan sampai kuesioner hari ini terisi. --}}
+    <div class="card p-4 border-l-4 !border-l-amber-500 text-sm text-amber-700 dark:text-amber-300 flex items-center gap-2">
+        <i data-lucide="clipboard-list" class="w-4 h-4 flex-shrink-0"></i> Isi kuesioner 7 KAIH dulu sebelum bisa absen hari ini.
+    </div>
+    @include('kaih._form', ['pertanyaans' => $kaihPertanyaans])
+    @else
     {{-- status / kondisi --}}
     <template x-if="!aktif">
         <div class="card p-4 border-l-4 !border-l-amber-500 text-sm text-amber-700 dark:text-amber-300 flex items-center gap-2"><i data-lucide="alert-triangle" class="w-4 h-4"></i> Absen QR sedang dinonaktifkan oleh admin.</div>
@@ -74,6 +81,7 @@
             <span x-text="loading ? 'Memproses...' : (isGuru && mode==='pulang' ? 'Scan QR — Absen Pulang' : 'Scan QR — Absen' + (isGuru ? ' Masuk' : ''))"></span>
         </button>
     </div>
+    @endif
 </div>
 
 @push('scripts')
