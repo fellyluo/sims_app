@@ -168,7 +168,10 @@
                                     <p class="font-semibold text-sm text-slate-700 dark:text-slate-200 truncate" x-text="s.nama"></p>
                                     <p class="text-xs text-slate-400">Kelas <span x-text="s.kelas"></span> &bull; <span x-text="s.nis"></span></p>
                                 </div>
-                                <span x-show="s.marked" class="badge bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 flex items-center gap-1"><i data-lucide="check" class="w-3 h-3"></i> Hadir</span>
+                                <div x-show="s.marked" class="flex items-center">
+                                    <span class="badge bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 flex items-center gap-1"><i data-lucide="check" class="w-3 h-3"></i> Hadir <span x-text="s.jam_masuk" class="ml-1 font-mono"></span></span>
+                                    <button @click="cancelAbsen(s, 'masuk')" class="text-rose-500 hover:text-rose-700 ml-1 p-1 rounded hover:bg-rose-50 dark:hover:bg-rose-900/30 transition" title="Batalkan absensi"><i data-lucide="x" class="w-4 h-4"></i></button>
+                                </div>
                                 <span x-show="!s.marked" class="text-xs text-slate-300">—</span>
                             </div>
                         </template>
@@ -202,8 +205,17 @@
                                     <p class="font-semibold text-sm text-slate-700 dark:text-slate-200 truncate" x-text="g.nama"></p>
                                     <p class="text-xs text-slate-400" x-text="g.nip || 'Guru'"></p>
                                 </div>
-                                <span x-show="g.marked" class="badge bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 flex items-center gap-1"><i data-lucide="check" class="w-3 h-3"></i> Hadir</span>
-                                <span x-show="!g.marked" class="text-xs text-slate-300">—</span>
+                                <div class="flex flex-col gap-1 items-end">
+                                    <div x-show="g.marked" class="flex items-center">
+                                        <span class="badge bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 flex items-center gap-1"><i data-lucide="log-in" class="w-3 h-3"></i> M: <span x-text="g.jam_masuk" class="font-mono"></span></span>
+                                        <button @click="cancelAbsen(g, 'masuk')" class="text-rose-500 hover:text-rose-700 ml-1 p-1 rounded hover:bg-rose-50 dark:hover:bg-rose-900/30 transition" title="Batalkan masuk"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+                                    </div>
+                                    <div x-show="g.pulangMarked" class="flex items-center">
+                                        <span class="badge bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 flex items-center gap-1"><i data-lucide="log-out" class="w-3 h-3"></i> P: <span x-text="g.jam_pulang" class="font-mono"></span></span>
+                                        <button @click="cancelAbsen(g, 'pulang')" class="text-rose-500 hover:text-rose-700 ml-1 p-1 rounded hover:bg-rose-50 dark:hover:bg-rose-900/30 transition" title="Batalkan pulang"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+                                    </div>
+                                </div>
+                                <span x-show="!g.marked && !g.pulangMarked" class="text-xs text-slate-300">—</span>
                             </div>
                         </template>
                         <div x-show="filteredGuru.length === 0" class="text-center py-8 text-slate-400 text-sm">
@@ -262,17 +274,17 @@ function faceScan(data){
     return {
         loading:false, camOn:false, scanning:false, busy:false, fs:false, lowLight:false,
         status:'Klik "Mulai Scan" untuk mengaktifkan kamera',
-        attendees: data.map(s=>({ ...s, marked: s.status==='hadir', justMarked:false, pulangMarked: !!s.pulangDone })),
+        attendees: data.map(s=>({ ...s, marked: s.status==='hadir', justMarked:false, pulangMarked: !!s.pulangDone, jam_masuk: s.jam_masuk, jam_pulang: s.jam_pulang })),
         enrolled:[], stream:null, timer:null,
         // ===== Ambang pencocokan wajah: ketat untuk absensi produksi (hindari false positive) =====
-        threshold:0.66,        // skor robust minimum; jangan turunkan tanpa uji lapangan
+        threshold:0.58,        // skor robust minimum; diturunkan agar lebih toleran
         confidentThreshold:0.80,
-        supportThreshold:0.62, // minimal 2 sampel orang yang sama harus cukup mirip
+        supportThreshold:0.55, // minimal 2 sampel orang yang sama harus cukup mirip
         minSampleSupport:2,
         margin:0.08,           // kandidat terbaik harus unggul jelas dari kandidat kedua
-        minFaceFrac:0.14,      // wajah harus cukup besar di frame agar embedding stabil
+        minFaceFrac:0.10,      // wajah harus cukup besar di frame agar embedding stabil (diturunkan agar bisa mendeteksi jarak agak jauh)
         minFaceScore:0.55,     // buang deteksi ragu/blur/pencahayaan buruk
-        confirmFrames:4,       // wajib stabil beberapa frame beruntun sebelum absen ditandai
+        confirmFrames:2,       // wajib stabil beberapa frame beruntun sebelum absen ditandai (diturunkan agar lebih cepat)
         _streak:{},            // penghitung frame beruntun per uuid
         recent:[], lastMatch:null, _seq:0, audioCtx:null,
         scanMode:'masuk',
@@ -563,10 +575,11 @@ function faceScan(data){
                     }
                     // Lolos → tampilkan konfirmasi pulang
                     s.pulangMarked=true; s.justMarked=true;
-                    this.playDing();
-                    this.speak('pulang', s.nama);
                     const k=++this._seq;
                     const jamK=d.jam || this.nowHM();
+                    s.jam_pulang = jamK;
+                    this.playDing();
+                    this.speak('pulang', s.nama);
                     this.lastMatch={ key:k, nama:s.nama, type:s.type, kelas:'Guru', mode:'pulang', jam:jamK };
                     this.recent.unshift({ key:k, nama:s.nama.split(' ')[0], type:s.type, kelas:'Pulang', mode:'pulang', jam:jamK });
                     if(this.recent.length>5) this.recent.pop();
@@ -597,8 +610,9 @@ function faceScan(data){
                         return;
                     }
                     s.marked=true; s.justMarked=true;
-                    this.playDing(); this.speak('masuk', s.nama);
                     const key=++this._seq; const jam=d.jam || this.nowHM();
+                    s.jam_masuk = jam;
+                    this.playDing(); this.speak('masuk', s.nama);
                     this.lastMatch={ key, nama:s.nama, type:'guru', kelas:'Guru', mode:'masuk', jam };
                     this.recent.unshift({ key, nama:s.nama.split(' ')[0], type:'guru', kelas:'Guru', mode:'masuk', jam });
                     if(this.recent.length>5) this.recent.pop();
@@ -627,8 +641,9 @@ function faceScan(data){
                     return;
                 }
                 s.marked=true; s.justMarked=true;
-                this.playDing(); this.speak('masuk', s.nama);
                 const key=++this._seq; const jam=d.jam || this.nowHM();
+                s.jam_masuk = jam;
+                this.playDing(); this.speak('masuk', s.nama);
                 this.lastMatch={ key, nama:s.nama, type:'siswa', kelas:s.kelas, mode:'masuk', jam };
                 this.recent.unshift({ key, nama:s.nama.split(' ')[0], type:'siswa', kelas:s.kelas, mode:'masuk', jam });
                 if(this.recent.length>5) this.recent.pop();
@@ -648,6 +663,52 @@ function faceScan(data){
             const c=this.$refs.canvas; if(c){ c.getContext('2d').clearRect(0,0,c.width,c.height); }
             this.recent=[]; this.lastMatch=null;
             this.status='Pemindaian dihentikan. '+this.totalHadir+' hadir. Klik Mulai Scan untuk lanjut.';
+        },
+
+        cancelAbsen(s, mode) {
+            $.confirm({
+                title: 'Konfirmasi Pembatalan',
+                content: 'Batalkan absen ' + mode + ' untuk <b>' + s.nama + '</b>?',
+                theme: 'material',
+                type: 'red',
+                buttons: {
+                    ok: {
+                        text: 'Batalkan',
+                        btnClass: 'btn-red',
+                        action: () => {
+                            s._masukBusy = true; // reuse busy state
+                            let url = s.type === 'guru' ? '{{ route('presensi-guru.cancel') }}' : '{{ route('absensi.cancel') }}';
+                            let body = s.type === 'guru' ? { id_guru: s.uuid, tanggal: '{{ $tanggal }}', mode: mode, _kiosk: @json($kioskToken ?? null) } : { id_siswa: s.uuid, tanggal: '{{ $tanggal }}', _kiosk: @json($kioskToken ?? null) };
+                            
+                            fetch(url, {
+                                method:'POST', headers:{'Content-Type':'application/json','X-CSRF-TOKEN':$('meta[name=csrf-token]').attr('content'),Accept:'application/json'},
+                                body: JSON.stringify(body)
+                            }).then(r=>r.json()).then(d=>{
+                                s._masukBusy=false;
+                                if(d && d.success) {
+                                    if (mode === 'masuk') {
+                                        s.marked = false;
+                                        s.jam_masuk = null;
+                                        if(s.type === 'siswa') s.pulangMarked = false; // reset
+                                    } else if (mode === 'pulang') {
+                                        s.pulangMarked = false;
+                                        s.jam_pulang = null;
+                                        s.pulangDone = false;
+                                    }
+                                    showToast('Absensi dibatalkan', 'success');
+                                    setTimeout(()=> window.lucide && lucide.createIcons(), 60);
+                                } else {
+                                    showToast('Gagal membatalkan', 'error');
+                                }
+                            }).catch(()=>{ s._masukBusy=false; showToast('Gagal membatalkan', 'error'); });
+                        }
+                    },
+                    batal: {
+                        text: 'Batal',
+                        btnClass: 'btn-default'
+                    }
+                }
+            });
         }
     }
 }

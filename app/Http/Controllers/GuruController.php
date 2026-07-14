@@ -311,7 +311,8 @@ class GuruController extends Controller
             \Maatwebsite\Excel\Facades\Excel::import($import, $request->file('file'));
 
             $msg = "Import selesai: {$import->imported} guru berhasil ditambahkan."
-                 . ($import->skipped > 0 ? " ({$import->skipped} baris dilewati)" : '');
+                 . ($import->skipped > 0 ? " ({$import->skipped} baris dilewati)" : '')
+                 . ($import->agamaTidakValid > 0 ? " {$import->agamaTidakValid} data agama diabaikan karena tidak sesuai pilihan dropdown." : '');
 
             // Simpan kredensial plaintext sementara ke session untuk diunduh.
             if (!empty($import->kredensial)) {

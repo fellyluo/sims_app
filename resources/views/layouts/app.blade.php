@@ -432,6 +432,7 @@
                     if ($isAdmin || auth()->user()?->canAccess('manage_users')) {
                         $masterItems[] = ['guru.index',      ['guru.*'],            'users',          'Data Guru'];
                         $masterItems[] = ['siswa.index',     ['siswa.*'],           'graduation-cap', 'Data Siswa'];
+                        $masterItems[] = ['alumni.index',    ['alumni.*'],          'award',          'Data Alumni'];
                         $masterItems[] = ['kelas.index',     ['kelas.*'],           'door-open',      'Data Kelas'];
                         $masterItems[] = ['pelajaran.index', ['pelajaran.*'],       'book-open-text', 'Mata Pelajaran'];
                         $masterItems[] = ['kartu-pelajar.kelola', ['kartu-pelajar.kelola'], 'id-card', 'Kartu Pelajar'];
@@ -454,7 +455,7 @@
                 if (auth()->user()?->siswa) {
                     $presensiItems[] = ['kaih.isi', ['kaih.isi'], 'heart-handshake', 'Isi 7 KAIH'];
                 }
-                if ($isAdmin || auth()->user()?->canAccess('manage_kaih') || auth()->user()?->guru?->walikelas) {
+                if ($isAdmin || auth()->user()?->canAccess('manage_kaih')) {
                     $presensiItems[] = ['kaih.rekap', ['kaih.rekap', 'kaih.override.*'], 'list-checks', 'Rekap 7 KAIH'];
                 }
                 if ($isAdmin || auth()->user()?->canAccess('manage_kaih')) {
@@ -576,6 +577,7 @@
                         ['walikelas.sekretaris.form', ['walikelas.sekretaris.*'], 'user-cog', 'Set Sekretaris'],
                         ['absensi.index', ['absensi.index', 'absensi.store'], 'clipboard-check', 'Absensi Kelas'],
                         ['absensi.rekap', ['absensi.rekap'], 'calendar-check-2', 'Rekap Absensi Kelas'],
+                        ['kaih.rekap', ['kaih.rekap', 'kaih.override.*'], 'list-checks', 'Rekap 7 KAIH Kelas'],
                     ];
                     $walikelasItems[] = $jenisAturan === 'poin'
                         ? ['poin.siswa.index', ['poin.siswa.*'], 'shield-alert', 'Poin Siswa Kelas']
@@ -631,6 +633,7 @@
                         ['cetak.guru.index', ['cetak.guru.*'], 'user-round', 'Data Guru'],
                         ['cetak.kelas.index', ['cetak.kelas.*'], 'school', 'Data Kelas'],
                         ['cetak.absensiGuru.index', ['cetak.absensiGuru.*'], 'clipboard-check', 'Absensi Guru'],
+                        ['cetak.absensiSiswa.index', ['cetak.absensiSiswa.*'], 'calendar-check-2', 'Absensi Siswa'],
                         ['cetak.agenda.index', ['cetak.agenda.*'], 'notebook-pen', 'Data Agenda'],
                         ['cetak.bukuBatas.index', ['cetak.bukuBatas.*'], 'book-open-text', 'Buku Batas'],
                         ['cetak.formatif.index', ['cetak.formatif.*'], 'pencil', 'Nilai Formatif'],

@@ -84,6 +84,7 @@ class AbsensiController extends Controller
             $row->id_kelas     = $request->id_kelas;
             $row->status       = $status;
             $row->dicatat_oleh = auth()->id();
+            if (!$row->exists) $row->id_semester = \App\Models\Semester::aktif()?->id;
             // keterangan: jangan timpa dengan kosong (pertahankan mis. "Scan wajah")
             $ket = $request->keterangan[$siswaUuid] ?? null;
             if ($ket !== null && $ket !== '') {
@@ -141,6 +142,26 @@ class AbsensiController extends Controller
         }
 
         return view('absensi.rekap', compact('kelasList', 'selectedKelas', 'dari', 'sampai', 'rekap', 'batas', 'dates'));
+    }
+
+    public function cetakRekap(Request $request)
+    {
+        $walikelasKelas = $this->walikelasKelasId();
+        abort_if(!auth()->user()->canAccess('manage_absensi') && !$walikelasKelas, 403);
+        
+        // admin harus milih kelas, wk otomatis pakai kelasnya
+        $selectedKelas = $walikelasKelas ?: $request->kelas;
+        abort_if(!$selectedKelas, 404, 'Kelas tidak valid.');
+        
+        $dari   = $request->dari   ?: now()->startOfMonth()->toDateString();
+        $sampai = $request->sampai ?: now()->toDateString();
+        if ($dari > $sampai) [$dari, $sampai] = [$sampai, $dari];
+
+        $k = Kelas::findOrFail($selectedKelas);
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\Cetak\AbsensiSiswaExport($selectedKelas, $dari, $sampai), 
+            "Rekap Absensi Siswa Kelas {$k->tingkat}{$k->kelas}.xlsx"
+        );
     }
 
     /** Daftar tanggal dalam rentang (untuk header rincian), dibatasi 92 hari. */
@@ -217,6 +238,7 @@ class AbsensiController extends Controller
             'id_kelas' => $s->id_kelas,
             'desc'     => $s->face_descriptor,           // array of embeddings
             'status'   => $existingSiswa->get($s->uuid)?->status,
+            'jam_masuk'=> substr($existingSiswa->get($s->uuid)?->jam_masuk, 0, 5),
         ]);
 
         $payloadGuru = $gurus->map(fn($g) => [
@@ -228,6 +250,8 @@ class AbsensiController extends Controller
             'nip'        => $g->nip ?: $g->nik,
             'status'     => $existingGuru->get($g->uuid)?->status,
             'pulangDone' => (bool) ($existingGuru->get($g->uuid)?->jam_pulang),  // sudah scan pulang?
+            'jam_masuk'  => substr($existingGuru->get($g->uuid)?->jam_masuk, 0, 5),
+            'jam_pulang' => substr($existingGuru->get($g->uuid)?->jam_pulang, 0, 5),
         ]);
 
         $payload = $payloadSiswa->concat($payloadGuru)->values();
@@ -285,9 +309,10 @@ class AbsensiController extends Controller
         $row->dicatat_oleh = auth()->id();
         // catat jam masuk hanya sekali (scan pertama) agar deteksi terlambat akurat
         $scanPertama = empty($row->jam_masuk);
-        if ($scanPertama) {
+        if (!$row->jam_masuk) {
             $row->jam_masuk = now()->format('H:i:s');
         }
+        if (!$row->exists) $row->id_semester = \App\Models\Semester::aktif()?->id;
         $row->save();
 
         $batas = Setting::get('waktu_terlambat', '07:30');
@@ -304,5 +329,21 @@ class AbsensiController extends Controller
             'jam'       => substr($row->jam_masuk, 0, 5),
             'terlambat' => $terlambat,
         ]);
+    }
+
+    /** Batalkan absen dari scan wajah */
+    public function cancel(Request $request)
+    {
+        $data = $request->validate([
+            'id_siswa' => 'required|exists:siswa,uuid',
+            'tanggal'  => 'required|date',
+        ]);
+        
+        $row = Absensi::where('id_siswa', $data['id_siswa'])->where('tanggal', $data['tanggal'])->first();
+        if ($row) {
+            $row->delete();
+        }
+        
+        return response()->json(['success' => true]);
     }
 }

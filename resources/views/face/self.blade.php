@@ -149,6 +149,62 @@ function selfEnroll(){
             return { ok:true };
         },
 
+        // Rata-rata kecerahan (luma) sebuah area kotak pada kanvas — dipakai checkOcclusion().
+        regionLuma(ctx, x, y, w, h){
+            x=Math.max(0,Math.round(x)); y=Math.max(0,Math.round(y));
+            w=Math.max(1,Math.round(w)); h=Math.max(1,Math.round(h));
+            try {
+                const px = ctx.getImageData(x, y, w, h).data;
+                let sum=0, n=0;
+                for(let i=0; i<px.length; i+=40){ sum += 0.299*px[i] + 0.587*px[i+1] + 0.114*px[i+2]; n++; }
+                return n ? sum/n : null;
+            } catch(e){ return null; }
+        },
+        // Fitur cek penutup wajah (mis. hijab/topi) + pencerahan LOKAL: bandingkan kecerahan
+        // dahi & rahang terhadap area tengah wajah (pipi/hidung — hampir selalu terlihat jelas).
+        // Kalau dahi/rahang jauh lebih gelap → dicoba cerahkan HANYA area itu dulu (bukan
+        // seluruh gambar, beda dari enhanceFrame yg global). Kalau tetap gelap/rata setelah
+        // dicerahkan, kemungkinan besar memang tertutup kain, bukan sekadar bayangan.
+        checkOcclusion(cv, ctx, box, source){
+            source = source || this.$refs.video;
+            const [bx,by,bw,bh] = box;
+            const center   = { x:bx+bw*0.25, y:by+bh*0.35, w:bw*0.50, h:bh*0.30 };
+            const forehead = { x:bx+bw*0.20, y:by+bh*0.00, w:bw*0.60, h:bh*0.16 };
+            const jaw      = { x:bx+bw*0.25, y:by+bh*0.80, w:bw*0.50, h:bh*0.18 };
+
+            const centerLuma = this.regionLuma(ctx, center.x, center.y, center.w, center.h);
+            let foreheadLuma = this.regionLuma(ctx, forehead.x, forehead.y, forehead.w, forehead.h);
+            let jawLuma      = this.regionLuma(ctx, jaw.x, jaw.y, jaw.w, jaw.h);
+            if(centerLuma===null || foreheadLuma===null || jawLuma===null || centerLuma < 5){
+                return { forehead:true, jaw:true, boosted:false }; // data tak cukup → jangan blokir pengguna
+            }
+
+            const RATIO_OK = 0.6; // dahi/rahang minimal 60% sekuat cahaya area tengah wajah
+            let foreheadOk = (foreheadLuma / centerLuma) >= RATIO_OK;
+            let jawOk = (jawLuma / centerLuma) >= RATIO_OK;
+            let boosted = false;
+
+            const boostRegion = (r, ratio) => {
+                const boost = Math.min(3.0, 1 + (RATIO_OK - ratio) * 4).toFixed(2);
+                ctx.save();
+                ctx.beginPath(); ctx.rect(r.x, r.y, r.w, r.h); ctx.clip();
+                ctx.filter = `brightness(${boost})`;
+                ctx.drawImage(source, 0, 0, cv.width, cv.height);
+                ctx.filter = 'none';
+                ctx.restore();
+            };
+            if(!foreheadOk){ boostRegion(forehead, foreheadLuma/centerLuma); boosted=true; }
+            if(!jawOk){ boostRegion(jaw, jawLuma/centerLuma); boosted=true; }
+
+            if(boosted){
+                foreheadLuma = this.regionLuma(ctx, forehead.x, forehead.y, forehead.w, forehead.h);
+                jawLuma = this.regionLuma(ctx, jaw.x, jaw.y, jaw.w, jaw.h);
+                foreheadOk = (foreheadLuma / centerLuma) >= RATIO_OK;
+                jawOk = (jawLuma / centerLuma) >= RATIO_OK;
+            }
+            return { forehead:foreheadOk, jaw:jawOk, boosted };
+        },
+
         // potong area wajah jadi kotak yang SELALU di dalam frame (anti bar hitam) + tajam.
         // `source` = frame yg sudah dicerahkan (kanvas) bila ada, supaya foto tersimpan konsisten
         // dgn frame yg dipakai model deteksi — bukan video mentah yg mungkin masih gelap.
@@ -198,13 +254,30 @@ function selfEnroll(){
             try {
                 const frame = this.enhanceFrame(this.$refs.video); // pencerahan otomatis sebelum deteksi (aman di tempat gelap)
                 const res = await human.detect(frame);
-                const face = (res.face||[])[0];
+                let face = (res.face||[])[0];
                 const quality = this.faceQuality(face);
                 if(quality.ok){
+                    // Cek dahi/rahang tertutup (mis. hijab) + coba cerahkan lokal dulu sebelum menolak.
+                    const occ = this.checkOcclusion(this._ecv, this._ectx, face.box);
+                    if(!occ.forehead || !occ.jaw){
+                        const bagian = (!occ.forehead && !occ.jaw) ? 'Dahi dan rahang'
+                            : (!occ.forehead ? 'Dahi' : 'Rahang/dagu');
+                        this.msg = bagian + ' belum cukup terlihat (mungkin tertutup hijab/topi atau bayangan). Sesuaikan sedikit ke belakang lalu ambil ulang.';
+                        this.msgErr = true;
+                        this.capturing = false;
+                        return;
+                    }
+                    // Kalau tadi dicerahkan lokal, deteksi ulang di kanvas yg sudah diperbaiki agar
+                    // embedding yg dipakai adalah versi kualitas terbaik, bukan versi sebelum dicerahkan.
+                    if(occ.boosted){
+                        const res2 = await human.detect(this._ecv);
+                        const face2 = (res2.face||[])[0];
+                        if(face2 && face2.embedding) face = face2;
+                    }
                     this.samples.push(Array.from(face.embedding));
                     // simpan snapshot HANYA dari pose paling menghadap depan (yaw terkecil)
                     const yaw = Math.abs(face.rotation?.angle?.yaw ?? 0);
-                    if(face.box && yaw < this._bestYaw){ this.photo = this.cropFace(face.box, frame); this._bestYaw = yaw; }
+                    if(face.box && yaw < this._bestYaw){ this.photo = this.cropFace(face.box, this._ecv); this._bestYaw = yaw; }
                     this.msg = 'Sampel ' + this.samples.length + ' tersimpan. ' + (this.samples.length<3 ? 'Ubah posisi sesuai animasi & ambil lagi.' : 'Lengkap! Klik Simpan & Lanjutkan.');
                 } else {
                     this.msg=quality.msg || 'Wajah tidak terdeteksi. Perbaiki posisi & pencahayaan.'; this.msgErr=true;

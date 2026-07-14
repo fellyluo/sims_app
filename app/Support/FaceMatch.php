@@ -60,7 +60,9 @@ class FaceMatch
         if (str_starts_with($v, 'http')) {
             return null;
         }
-        if (! preg_match('/^faces\/([a-f0-9\-]+)_\d{14}\.jpg$/', $v, $m)) {
+        // Terima jpg/jpeg/png/webp: foto wajah dikompres ke WebP (fallback JPEG bila driver tak
+        // mendukung), jadi ekstensinya bisa bermacam — jangan batasi hanya .jpg (bikin URL null).
+        if (! preg_match('/^faces\/([a-f0-9\-]+)_\d{14}\.(?:jpe?g|png|webp)$/', $v, $m)) {
             return null;
         }
         if ($ownerUuid !== null && $m[1] !== $ownerUuid) {
@@ -120,7 +122,7 @@ class FaceMatch
             return false;
         }
 
-        return (bool) preg_match('/^faces\/'.preg_quote($ownerUuid, '/').'_\d{14}\.jpg$/', $path);
+        return (bool) preg_match('/^faces\/'.preg_quote($ownerUuid, '/').'_\d{14}\.(?:jpe?g|png|webp)$/', $path);
     }
 
     /** Cosine similarity dua vektor ternormalisasi (= dot product). */

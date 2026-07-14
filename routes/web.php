@@ -8,6 +8,7 @@ use App\Http\Controllers\AiChatController;
 use App\Http\Controllers\AiController;
 use App\Http\Controllers\AiRagController;
 use App\Http\Controllers\AiTeacherController;
+use App\Http\Controllers\AlumniController;
 use App\Http\Controllers\AppDownloadController;
 use App\Http\Controllers\CetakController;
 use App\Http\Controllers\CetakRaporController;
@@ -50,6 +51,7 @@ use App\Http\Controllers\RapatController;
 use App\Http\Controllers\RekapController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SiswaController;
+use App\Http\Controllers\UserController;
 use App\Http\Controllers\WalikelasController;
 use App\Http\Middleware\EnsureFaceRegistered;
 use App\Http\Middleware\EnsureKioskOrPermission;
@@ -85,8 +87,10 @@ Route::get('/kiosk-absensi/{token}', [AbsensiController::class, 'kioskEnter'])->
 Route::middleware(EnsureKioskOrPermission::class)->group(function () {
     Route::get('/absensi/scan', [AbsensiController::class, 'scan'])->name('absensi.scan');
     Route::post('/absensi/mark', [AbsensiController::class, 'mark'])->name('absensi.mark');
+    Route::post('/absensi/cancel', [AbsensiController::class, 'cancel'])->name('absensi.cancel');
     Route::get('/presensi-guru/scan', [AbsensiController::class, 'scan'])->name('presensi-guru.scan');
     Route::post('/presensi-guru/mark', [PresensiGuruController::class, 'mark'])->name('presensi-guru.mark');
+    Route::post('/presensi-guru/cancel', [PresensiGuruController::class, 'cancel'])->name('presensi-guru.cancel');
     Route::get('/qr-absensi', [QrAbsensiController::class, 'show'])->name('qr.absensi');
 });
 
@@ -267,6 +271,9 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
     Route::get('/rekap-nilai', [RekapController::class, 'nilai'])->name('rekap.nilai');
 
     // ─── Cetak rapor (akses sama dgn rekap; walikelas = kelasnya) ───
+    Route::get('/cetak/absensi-siswa', [CetakController::class, 'absensiSiswa'])->name('cetak.absensiSiswa.index');
+    Route::post('/cetak/absensi-siswa', [CetakController::class, 'cetakAbsensiSiswa'])->name('cetak.absensiSiswa');
+    Route::get('/cetak/agenda', [CetakController::class, 'agenda'])->name('cetak.agenda.index');
     Route::get('/cetak-rapor', [CetakRaporController::class, 'index'])->name('cetak.rapor.index');
     Route::get('/cetak-rapor/cetak', [CetakRaporController::class, 'cetak'])->name('cetak.rapor');
 
@@ -520,6 +527,7 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
         Route::get('/absensi', [AbsensiController::class, 'index'])->name('absensi.index');
         Route::post('/absensi', [AbsensiController::class, 'store'])->name('absensi.store');
         Route::get('/absensi/rekap', [AbsensiController::class, 'rekap'])->name('absensi.rekap');
+        Route::get('/absensi/rekap/cetak', [AbsensiController::class, 'cetakRekap'])->name('absensi.rekap.cetak');
     });
 
     // ─── Wali Kelas: data siswa kelasnya, reset password, set sekretaris — guard peran
@@ -539,6 +547,15 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
         // Guru
         Route::get('/guru/import/kredensial', [GuruController::class, 'importKredensial'])->name('guru.import.kredensial');
         Route::get('/guru/import/template', [GuruController::class, 'downloadTemplate'])->name('guru.import.template');
+        Route::get('/siswa/template', [SiswaController::class, 'template'])->name('siswa.template');
+        Route::post('/siswa/import', [SiswaController::class, 'import'])->name('siswa.import');
+        Route::resource('siswa', SiswaController::class);
+
+        // ─── Alumni ───
+        Route::get('/alumni', [AlumniController::class, 'index'])->name('alumni.index');
+        Route::post('/alumni/luluskan', [AlumniController::class, 'luluskan'])->name('alumni.luluskan');
+
+        Route::get('/guru/template', [GuruController::class, 'template'])->name('guru.template');
         Route::get('/guru/import', [GuruController::class, 'importForm'])->name('guru.import.form');
         Route::post('/guru/import', [GuruController::class, 'import'])->name('guru.import');
         Route::resource('/guru', GuruController::class);
