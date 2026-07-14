@@ -191,8 +191,9 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.readAll');
     Route::post('/notifications/fcm-token', [NotificationController::class, 'storeFcmToken'])->name('notifications.fcmToken.store');
     Route::delete('/notifications/fcm-token', [NotificationController::class, 'destroyFcmToken'])->name('notifications.fcmToken.destroy');
-    Route::post('/fcm/token', [NotificationController::class, 'storeFcmToken'])->name('fcm.token.store.legacy');
-    Route::delete('/fcm/token', [NotificationController::class, 'destroyFcmToken'])->name('fcm.token.destroy.legacy');
+    // Alias legacy APK Android yang masih POST/DELETE ke /fcm/token.
+    Route::post('/fcm/token', [NotificationController::class, 'storeFcmToken'])->name('fcm.token.store');
+    Route::delete('/fcm/token', [NotificationController::class, 'destroyFcmToken'])->name('fcm.token.destroy');
 
     // Pengumuman: riwayat untuk semua user; buat/ubah/hapus butuh izin manage_pengumuman.
     Route::controller(PengumumanController::class)->prefix('pengumuman')->name('pengumuman.')->group(function () {

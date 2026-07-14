@@ -857,8 +857,8 @@
                                         <i :data-lucide="notifIcon(n)" class="w-4 h-4"></i>
                                     </div>
                                     <div class="min-w-0 flex-1">
-                                        <template x-if="n.data.judul">
-                                            <p class="text-xs font-bold text-slate-800 dark:text-slate-100 leading-normal" x-text="n.data.judul"></p>
+                                        <template x-if="n.data.judul || n.data.title">
+                                            <p class="text-xs font-bold text-slate-800 dark:text-slate-100 leading-normal" x-text="n.data.judul || n.data.title"></p>
                                         </template>
                                         <p class="text-xs text-slate-700 dark:text-slate-200 leading-normal" x-text="notifText(n)"></p>
                                         <p class="text-[10px] text-slate-400 mt-1" x-text="n.time_ago"></p>
@@ -1446,8 +1446,6 @@
                 // Arahkan ke URL target sesuai tipe notifikasi
                 if (n.data.type === 'pengumuman') {
                     window.location.href = `/pengumuman/${n.data.pengumuman_id}`;
-                } else if (n.data.type === 'chatbot_inbox' || n.data.type === 'chatbot_admin_reply') {
-                    window.location.href = n.data.url || '/chatbot';
                 } else if (n.data.type === 'forum_reply') {
                     window.location.href = `/forum/${n.data.topic_slug}#c-${n.data.comment_id}`;
                 } else if (n.data.type === 'classroom_comment') {
@@ -1456,6 +1454,13 @@
                         url += `?class=${n.data.classroom_id}`;
                     }
                     window.location.href = `${url}#c-${n.data.comment_id}`;
+                } else if (n.data.type === 'absensi_siswa') {
+                    window.location.href = n.data.url || '/dashboard';
+                } else if (n.data.type === 'chatbot_inbox') {
+                    if (!{{ $isAdmin ? 'true' : 'false' }}) return;
+                    window.location.href = n.data.url || '/chatbot/admin/inbox';
+                } else if (n.data.type === 'chatbot_admin_reply') {
+                    window.location.href = n.data.url || '/chatbot';
                 } else if (n.data.url) {
                     window.location.href = n.data.url;   // notifikasi umum (mis. Sarpras)
                 }
@@ -1468,9 +1473,10 @@
             notifIcon(n) {
                 const t = (n.data || {}).type;
                 if (t === 'pengumuman') return 'megaphone';
-                if (t === 'chatbot_inbox' || t === 'chatbot_admin_reply') return 'message-circle';
+                if (t === 'absensi_siswa') return 'clipboard-check';
                 if (t === 'forum_reply') return 'messages-square';
                 if (t === 'classroom_comment') return 'graduation-cap';
+                if (t === 'chatbot_inbox' || t === 'chatbot_admin_reply') return 'message-circle';
                 return (n.data && (n.data.url || n.data.laporan_id)) ? 'bell' : 'bell';
             },
             notifColor(n) {
