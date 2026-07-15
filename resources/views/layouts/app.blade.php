@@ -581,6 +581,20 @@
                         $groups['disiplin'] = [$jenisAturan === 'poin' ? 'Poin & Aturan' : 'P3 Kedisiplinan', 'shield-alert', $disiplinItems];
                     }
                 }
+                // Pemanggilan Ortu/Siswa: independen dari jenis_aturan, tampil di grup disiplin
+                // yg sedang aktif. Admin/kesiswaan lihat semua; guru biasa lihat riwayat sendiri.
+                if ($bolehKelolaDisiplin) {
+                    $disiplinItems[] = ['pemanggilan.index', ['pemanggilan.index', 'pemanggilan.show', 'pemanggilan.edit', 'pemanggilan.create'], 'phone-call', 'Pemanggilan Ortu/Siswa'];
+                } elseif (auth()->user()?->guru) {
+                    $disiplinItems[] = ['pemanggilan.riwayat', ['pemanggilan.riwayat', 'pemanggilan.create', 'pemanggilan.show', 'pemanggilan.edit'], 'phone-call', 'Pemanggilan Ortu/Siswa'];
+                }
+                if ($bolehLihatDisiplin) {
+                    $disiplinItems[] = ['pemanggilan.self', ['pemanggilan.self'], 'phone-call', 'Pemanggilan Saya'];
+                }
+
+                if (!empty($disiplinItems)) {
+                    $groups['disiplin'] = [$jenisAturan === 'poin' ? 'Poin & Aturan' : 'P3 Kedisiplinan', 'shield-alert', $disiplinItems];
+                }
 
                 // ── Wali Kelas ──
                 if (auth()->user()?->guru?->walikelas) {
