@@ -24,6 +24,8 @@ class User extends Authenticatable implements WebAuthnAuthenticatable
         'identifier',
         'password',
         'access',
+        'leaderboard_visible',
+        'mission_avatar_config',
         'pin',
         'reset_token',
         'must_change_password',
@@ -43,6 +45,8 @@ class User extends Authenticatable implements WebAuthnAuthenticatable
             'password' => 'hashed',
             'must_change_password' => 'boolean',
             'username_customized' => 'boolean',
+            'leaderboard_visible' => 'boolean',
+            'mission_avatar_config' => 'array',
             'last_seen_at' => 'datetime',
         ];
     }

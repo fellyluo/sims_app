@@ -54,6 +54,13 @@ use App\Http\Controllers\GameAttemptController;
 use App\Http\Controllers\GameLiveController;
 use App\Http\Controllers\GameQuizController;
 use App\Http\Controllers\GameTemplateController;
+use App\Http\Controllers\MissionAnalyticsController;
+use App\Http\Controllers\MissionBuilderController;
+use App\Http\Controllers\MissionClassroomController;
+use App\Http\Controllers\MissionDebriefController;
+use App\Http\Controllers\MissionNalarController;
+use App\Http\Controllers\MissionPlayerController;
+use App\Http\Controllers\MissionProgressController;
 use App\Http\Controllers\PengumumanController;
 use App\Http\Controllers\Keuangan\KeuanganController;
 use App\Http\Controllers\Keuangan\TagihanController;
@@ -392,12 +399,64 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
             Route::post('/{classroom}/arena-belajar/{quiz}/sync-offline', [GameTemplateController::class, 'syncOffline'])->middleware('throttle:30,1')->name('arena.sync');
         });
 
+        // Jagat Misi (misi edukatif — pola assignment seperti Arena Belajar)
+        Route::middleware('modul:jagat_misi')->group(function () {
+            Route::get('/{classroom}/jagat-misi', [MissionClassroomController::class, 'index'])->name('jagat.index');
+            Route::post('/{classroom}/jagat-misi/tugaskan', [MissionClassroomController::class, 'assign'])->middleware('throttle:30,1')->name('jagat.assign');
+            Route::get('/{classroom}/jagat-misi/{mission}/hasil', [MissionClassroomController::class, 'results'])->name('jagat.results');
+            Route::post('/{classroom}/jagat-misi/{mission}/transfer-nilai', [MissionClassroomController::class, 'transferGrades'])->middleware('throttle:20,1')->name('jagat.transfer');
+            Route::get('/{classroom}/jagat-misi/{mission}/main', [MissionClassroomController::class, 'play'])->name('jagat.play');
+            Route::get('/{classroom}/jagat-misi/{mission}', [MissionClassroomController::class, 'show'])->name('jagat.show');
+        });
+
         // Ruang mapel (auto-provisioned) + halaman tambah konten terpisah
         Route::get('/{classroom}/materi/buat', [ClassroomMaterialController::class, 'create'])->name('material.create');
         Route::get('/{classroom}/tugas/buat', [ClassroomAssignmentController::class, 'create'])->name('assignment.create');
         Route::get('/{classroom}', [ClassroomController::class, 'show'])->name('show');
         Route::post('/{classroom}/materi', [ClassroomMaterialController::class, 'store'])->middleware('throttle:30,1')->name('material.store');
         Route::post('/{classroom}/tugas', [ClassroomAssignmentController::class, 'store'])->middleware('throttle:30,1')->name('assignment.store');
+    });
+
+    // ─── Jagat Misi (migrasi dari JagatMISI) ───────────────────────────────
+    Route::middleware('modul:jagat_misi')->prefix('jagat-misi')->name('jagat-misi.')->group(function () {
+        Route::get('/', [MissionNalarController::class, 'index'])->name('index');
+        Route::get('/progres', [MissionProgressController::class, 'index'])->name('progress');
+
+        // Fase 7: Builder
+        Route::get('/builder', [MissionBuilderController::class, 'index'])->name('builder.index');
+        Route::get('/builder/buat', [MissionBuilderController::class, 'create'])->name('builder.create');
+        Route::post('/builder', [MissionBuilderController::class, 'store'])->middleware('throttle:30,1')->name('builder.store');
+        Route::get('/builder/{mission:slug}/edit', [MissionBuilderController::class, 'edit'])->name('builder.edit');
+        Route::post('/builder/{mission:slug}', [MissionBuilderController::class, 'update'])->middleware('throttle:30,1')->name('builder.update');
+        Route::post('/builder/{mission:slug}/terbit', [MissionBuilderController::class, 'publish'])->name('builder.publish');
+        Route::post('/builder/bank', [MissionBuilderController::class, 'storeBankItem'])->middleware('throttle:30,1')->name('builder.bank');
+
+        // Fase 5: Analytics
+        Route::get('/analitik', [MissionAnalyticsController::class, 'index'])->name('analytics');
+        Route::get('/api/analitik', [MissionAnalyticsController::class, 'matrix'])->name('api.analytics');
+        Route::get('/api/analitik/siswa/{user}', [MissionAnalyticsController::class, 'student'])->name('api.analytics.student');
+        Route::get('/analitik/laporan/{user}', [MissionAnalyticsController::class, 'report'])->name('analytics.report');
+
+        // Fase 4: Debrief
+        Route::get('/debrief/{attempt}', [MissionDebriefController::class, 'show'])->name('debrief');
+        Route::post('/api/debrief/{attempt}', [MissionDebriefController::class, 'store'])->middleware('throttle:30,1')->name('api.debrief');
+        Route::get('/debrief-guru', [MissionDebriefController::class, 'teacherPanel'])->name('debrief.teacher');
+        Route::post('/api/debrief-refleksi/{reflection}/review', [MissionDebriefController::class, 'markReviewed'])->name('api.debrief.review');
+
+        // Fase 3: Nalar
+        Route::get('/misi/{mission:slug}/main', [MissionNalarController::class, 'play'])->name('play');
+        Route::get('/api/misi/{mission:slug}', [MissionNalarController::class, 'show'])->name('api.show');
+        Route::post('/api/misi/{mission:slug}/attempts', [MissionNalarController::class, 'store'])->middleware('throttle:30,1')->name('api.attempts');
+
+        // Fase 2: Player recall/quiz
+        Route::get('/misi/{mission:slug}/player', [MissionPlayerController::class, 'play'])->name('player');
+        Route::get('/api/misi/{mission:slug}/player', [MissionPlayerController::class, 'show'])->name('api.player.show');
+        Route::post('/api/misi/{mission:slug}/player/attempts', [MissionPlayerController::class, 'store'])->middleware('throttle:30,1')->name('api.player.attempts');
+
+        // Progres API
+        Route::get('/api/progres', [MissionProgressController::class, 'show'])->name('api.progress');
+        Route::get('/api/leaderboard', [MissionProgressController::class, 'leaderboard'])->name('api.leaderboard');
+        Route::patch('/api/leaderboard/visibility', [MissionProgressController::class, 'updateVisibility'])->name('api.leaderboard.visibility');
     });
 
     // ─── Ekskul (pembina/guru & admin; CRUD master admin-only di controller) ───

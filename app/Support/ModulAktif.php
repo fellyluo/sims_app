@@ -41,6 +41,11 @@ class ModulAktif
                 'deskripsi' => 'Kuis interaktif di Ruang Kelas (async, live, template).',
                 'ikon' => 'gamepad-2',
             ],
+            'jagat_misi' => [
+                'label' => 'Jagat Misi',
+                'deskripsi' => 'Misi edukatif dan progres belajar di Ruang Kelas.',
+                'ikon' => 'map',
+            ],
             'agenda' => [
                 'label' => 'Agenda Guru & Rapat',
                 'deskripsi' => 'Agenda mengajar, rekap, buku batas, dan agenda rapat.',

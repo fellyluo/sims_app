@@ -40,8 +40,18 @@
     @endif
 
     {{-- Tabs --}}
+    @php
+        $tabs = ['materi' => 'Materi', 'tugas' => 'Latihan & Tugas'];
+        if (\App\Support\ModulAktif::aktif('arena_belajar')) {
+            $tabs['arena'] = 'Arena Belajar';
+        }
+        if (\App\Support\ModulAktif::aktif('jagat_misi')) {
+            $tabs['jagat'] = 'Jagat Misi';
+        }
+        $tabs['anggota'] = 'Anggota';
+    @endphp
     <div class="flex gap-1 border-b border-slate-200 dark:border-slate-700 overflow-x-auto">
-        @foreach(['materi'=>'Materi','tugas'=>'Latihan & Tugas','arena'=>'Arena Belajar','anggota'=>'Anggota'] as $k=>$label)
+        @foreach($tabs as $k=>$label)
         <button @click="tab='{{ $k }}'" :class="tab==='{{ $k }}' ? 'border-primary text-primary' : 'border-transparent text-slate-500'" class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition whitespace-nowrap" style="--tw-text-opacity:1" :style="tab==='{{ $k }}' ? 'color:var(--cp);border-color:var(--cp)' : ''">{{ $label }}</button>
         @endforeach
     </div>
@@ -113,6 +123,24 @@
                 </div>
                 <span class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-black text-[#0c1a24] bg-white min-h-[48px] shrink-0">
                     <i data-lucide="gamepad-2" class="w-4 h-4"></i> Masuk Arena
+                </span>
+            </div>
+        </a>
+    </div>
+
+    {{-- ===== TAB JAGAT MISI ===== --}}
+    <div x-show="tab==='jagat'" x-cloak class="space-y-4">
+        <a href="{{ route('classroom.jagat.index', $classroom) }}"
+           class="relative overflow-hidden block rounded-2xl p-5 sm:p-6 text-white"
+           style="background:radial-gradient(ellipse 80% 60% at 85% 0%,color-mix(in srgb,#7c3aed 45%,transparent),transparent 55%),linear-gradient(155deg,#1a0f2e,#2d1b4e 55%,#1a1030)">
+            <div class="relative z-[1] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-violet-200 mb-1">Petualangan edukatif</p>
+                    <h3 class="text-xl font-black">Jagat Misi</h3>
+                    <p class="text-sm text-violet-100/80 mt-1">Narasi interaktif, puzzle, recall quiz — skor masuk rapor.</p>
+                </div>
+                <span class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-black text-[#1a0f2e] bg-white min-h-[48px] shrink-0">
+                    <i data-lucide="compass" class="w-4 h-4"></i> Masuk Jagat Misi
                 </span>
             </div>
         </a>

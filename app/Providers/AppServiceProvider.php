@@ -3,8 +3,11 @@
 namespace App\Providers;
 
 use App\Models\Setting;
+use App\Models\User;
+use App\Policies\MissionProgressPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
@@ -20,6 +23,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Gate::policy(User::class, MissionProgressPolicy::class);
+
         // Rate limiter login: cegah brute force username/password & PIN.
         // Di-key per (kredensial + IP) agar penyerang tak bisa men-stuff banyak
         // password ke satu akun, dan satu IP tak bisa menebak banyak akun.
