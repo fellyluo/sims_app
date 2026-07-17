@@ -3,12 +3,50 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
 <title>Panduan Penggunaan SIMS</title>
+<script>
+(function () {
+  function apply(mode) {
+    var dark = mode === 'dark';
+    document.documentElement.classList.toggle('dark', dark);
+    document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+  }
+  try {
+    apply(localStorage.getItem('theme_mode') || 'light');
+  } catch (_) {
+    apply('light');
+  }
+  window.addEventListener('storage', function (e) {
+    if (e.key === 'theme_mode') apply(e.newValue || 'light');
+  });
+  window.addEventListener('message', function (e) {
+    if (e.origin !== window.location.origin) return;
+    if (!e.data || e.data.type !== 'sims-theme') return;
+    apply(e.data.mode === 'dark' ? 'dark' : 'light');
+  });
+})();
+</script>
 <style>
 :root{
  --bg:#eef1f6;--card:#fff;--ink:#0f1e35;--sub:#5b6b82;--line:#e4e9f0;
  --brand:#2f5fef;--brand2:#0ea472;--accent:#f59e0b;--soft:#eef3ff;
  --r:18px;--sh:0 1px 2px rgba(16,32,64,.05),0 10px 30px rgba(16,32,64,.06);
+ --muted-surface:#f8fafc;--muted-surface-2:#fbfcff;--muted-surface-3:#f1f5fb;
+ --who-bg:#f3f9f6;--shot-bg:#f7f9fc;--code-bg:#eef2f7;
+ --narr-bg:#fff8e6;--narr-border:#fde68a;--narr-ink:#7c5b12;
+ --stat-ink:#12275a;--topbar-bg:rgba(255,255,255,.96);
+ --role-tag-bg:#fef3c7;--role-tag-border:#fde68a;--role-tag-ink:#b45309;
+}
+html.dark{
+ --bg:#0b1220;--card:#1e293b;--ink:#e2e8f0;--sub:#94a3b8;--line:#334155;
+ --soft:#1a2740;--sh:0 1px 2px rgba(0,0,0,.25),0 12px 32px rgba(0,0,0,.35);
+ --muted-surface:#0f172a;--muted-surface-2:#152033;--muted-surface-3:#1a2438;
+ --who-bg:#123028;--shot-bg:#0f172a;--code-bg:#0f172a;
+ --narr-bg:#3b2f14;--narr-border:#854d0e;--narr-ink:#fde68a;
+ --stat-ink:#e2e8f0;--topbar-bg:rgba(15,23,42,.94);
+ --role-tag-bg:#422006;--role-tag-border:#854d0e;--role-tag-ink:#fbbf24;
+ color-scheme:dark;
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -21,28 +59,30 @@ a{color:var(--brand);text-decoration:none}
 .hero p{margin:0;max-width:730px;font-size:16.5px;opacity:.95}
 .hero-body{padding-bottom:28px}
 .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0;padding:0 0 22px;position:relative;z-index:2}
-.stat{display:flex;flex-direction:column;gap:4px;background:#fff;color:var(--ink);border:1px solid rgba(255,255,255,.7);border-radius:16px;padding:14px 16px;box-shadow:0 12px 28px rgba(16,32,64,.16);text-decoration:none;min-height:78px;transition:transform .15s ease,box-shadow .15s ease}
+.stat{display:flex;flex-direction:column;gap:4px;background:var(--card);color:var(--ink);border:1px solid rgba(255,255,255,.7);border-radius:16px;padding:14px 16px;box-shadow:0 12px 28px rgba(16,32,64,.16);text-decoration:none;min-height:78px;transition:transform .15s ease,box-shadow .15s ease}
+html.dark .stat{border-color:var(--line);box-shadow:0 12px 28px rgba(0,0,0,.35)}
 .stat:hover{transform:translateY(-2px);box-shadow:0 16px 32px rgba(16,32,64,.2)}
-.stat b{display:block;font-size:22px;font-weight:800;line-height:1.15;color:#12275a}
+html.dark .stat:hover{box-shadow:0 16px 32px rgba(0,0,0,.45)}
+.stat b{display:block;font-size:22px;font-weight:800;line-height:1.15;color:var(--stat-ink)}
 .stat span{font-size:12px;font-weight:600;color:var(--sub);line-height:1.35}
 .stat small{font-size:11px;color:var(--brand);font-weight:700}
 .cat-jump{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px;scroll-margin-top:88px}
-.cat-jump a{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:999px;background:#fff;border:1px solid var(--line);color:var(--ink);font-size:12.5px;font-weight:650;box-shadow:var(--sh)}
+.cat-jump a{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:999px;background:var(--card);border:1px solid var(--line);color:var(--ink);font-size:12.5px;font-weight:650;box-shadow:var(--sh)}
 .cat-jump a:hover{border-color:var(--brand);color:var(--brand);background:var(--soft)}
-.cat-jump a em{font-style:normal;font-size:11px;color:var(--sub);background:#f1f5fb;border-radius:999px;padding:1px 7px}
+.cat-jump a em{font-style:normal;font-size:11px;color:var(--sub);background:var(--muted-surface-3);border-radius:999px;padding:1px 7px}
 .role-box{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:16px 18px;margin:0 0 18px}
 .role-box .rb-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
 .role-box h3{margin:0;font-size:15px}
 .role-box .rb-meta{font-size:12.5px;color:var(--sub)}
 .role-box .rb-meta b{color:var(--ink)}
 .role-actions{display:flex;flex-wrap:wrap;gap:8px}
-.role-actions button{border:1px solid var(--line);background:#f8fafc;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;color:var(--ink)}
+.role-actions button{border:1px solid var(--line);background:var(--muted-surface);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;color:var(--ink)}
 .role-actions button:hover{border-color:var(--brand);color:var(--brand);background:var(--soft)}
 .role-checks{display:flex;flex-wrap:wrap;gap:8px}
-.role-checks label{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:12.5px;font-weight:650;cursor:pointer;user-select:none}
+.role-checks label{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:12.5px;font-weight:650;cursor:pointer;user-select:none}
 .role-checks label:has(input:checked){border-color:var(--brand);background:var(--soft);color:var(--brand)}
 .role-checks input{accent-color:var(--brand);width:14px;height:14px;margin:0}
-.role-empty{display:none;padding:28px 18px;text-align:center;color:var(--sub);border:1px dashed var(--line);border-radius:14px;background:#fbfcff;margin-bottom:18px}
+.role-empty{display:none;padding:28px 18px;text-align:center;color:var(--sub);border:1px dashed var(--line);border-radius:14px;background:var(--muted-surface-2);margin-bottom:18px}
 .feature[data-role-hide="1"],.cat-title[data-role-hide="1"],#manifest tr[data-role-hide="1"]{display:none!important}
 @media(max-width:720px){
   .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -59,22 +99,27 @@ nav.toc a.active{background:var(--soft);border-left-color:var(--brand);color:var
 .callout p{margin:0;color:var(--sub);font-size:14.5px}
 .cat-title{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--sub);font-weight:800;margin:40px 4px 16px;padding-bottom:8px;border-bottom:2px solid var(--line);scroll-margin-top:88px}
 .feature{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:26px;overflow:hidden;scroll-margin-top:88px}
-.fhead{display:flex;align-items:center;gap:16px;padding:20px 26px;background:linear-gradient(180deg,#fbfcff,#fff);border-bottom:1px solid var(--line)}
+.fhead{display:flex;align-items:center;gap:16px;padding:20px 26px;background:linear-gradient(180deg,var(--muted-surface-2),var(--card));border-bottom:1px solid var(--line)}
 .num{flex:none;width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,var(--brand),#4f7cff);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;box-shadow:0 6px 16px rgba(47,95,239,.3)}
 .feature.role .num{background:linear-gradient(135deg,var(--accent),#fbbf24);box-shadow:0 6px 16px rgba(245,158,11,.3)}
 .fhtxt h2{margin:0;font-size:21px;font-weight:750;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .fhtxt .path{display:inline-block;margin-top:6px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:var(--brand);background:var(--soft);padding:3px 9px;border-radius:6px}
-.role-tag{font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#b45309;background:#fef3c7;border:1px solid #fde68a;padding:3px 9px;border-radius:999px}
+.role-tag{font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--role-tag-ink);background:var(--role-tag-bg);border:1px solid var(--role-tag-border);padding:3px 9px;border-radius:999px}
 .body{padding:22px 26px 26px}
 .who{display:inline-flex;align-items:stretch;border-radius:999px;overflow:hidden;border:1px solid var(--line);margin-bottom:16px;font-size:13px}
 .who-label{background:var(--brand2);color:#fff;padding:5px 13px;font-weight:700}
-.who-val{padding:5px 15px;color:var(--ink);background:#f3f9f6}
-.desc{margin:2px 0 18px;font-size:16px;color:#263449}
-.shot{margin:0;border-radius:14px;overflow:hidden;border:1px solid var(--line);box-shadow:0 8px 24px rgba(16,32,64,.08);background:#f7f9fc;cursor:zoom-in}
+.who-val{padding:5px 15px;color:var(--ink);background:var(--who-bg)}
+.desc{margin:2px 0 18px;font-size:16px;color:var(--ink);opacity:.92}
+.shot{margin:0;border-radius:14px;overflow:hidden;border:1px solid var(--line);box-shadow:0 8px 24px rgba(16,32,64,.08);background:var(--shot-bg);cursor:zoom-in}
+html.dark .shot{box-shadow:0 8px 24px rgba(0,0,0,.35)}
 .shot img{display:block;width:100%;height:auto}
 .shot .ph{display:none;flex-direction:column;align-items:center;justify-content:center;padding:44px 20px;text-align:center;color:var(--sub);cursor:default}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin:12px 0 4px}
+.gshot{margin:0;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--shot-bg);cursor:zoom-in}
+.gshot img{display:block;width:100%;height:120px;object-fit:cover;object-position:top}
+.gshot figcaption{padding:8px 10px;font-size:11.5px;line-height:1.35;color:var(--sub);border-top:1px solid var(--line)}
 .ph .b{font-weight:700;color:var(--ink);margin-bottom:4px;font-size:15px}
-.ph code{background:#eef2f7;padding:2px 8px;border-radius:6px;font-size:12.5px}
+.ph code{background:var(--code-bg);padding:2px 8px;border-radius:6px;font-size:12.5px;color:var(--ink)}
 .ph .cap{font-size:13px;max-width:580px;margin-top:8px}
 .sec{display:flex;align-items:center;gap:10px;margin:24px 0 12px}
 .sec::before{content:"";width:4px;height:18px;border-radius:2px;background:var(--brand)}
@@ -83,7 +128,7 @@ nav.toc a.active{background:var(--soft);border-left-color:var(--brand);color:var
 .steps li{counter-increment:st;position:relative;padding:8px 0 8px 42px;font-size:15px;border-bottom:1px dashed var(--line)}
 .steps li:last-child{border-bottom:0}
 .steps li::before{content:counter(st);position:absolute;left:0;top:7px;width:28px;height:28px;border-radius:9px;background:var(--soft);color:var(--brand);font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center}
-details.story{border:1px solid var(--line);border-radius:14px;margin-top:20px;background:#fbfcff;overflow:hidden}
+details.story{border:1px solid var(--line);border-radius:14px;margin-top:20px;background:var(--muted-surface-2);overflow:hidden}
 details.story>summary{cursor:pointer;padding:14px 18px;font-weight:700;font-size:14px;color:var(--brand);list-style:none;display:flex;align-items:center;gap:10px}
 details.story>summary::-webkit-details-marker{display:none}
 details.story>summary::before{content:"VIDEO";font-size:10px;letter-spacing:1px;background:var(--brand);color:#fff;padding:3px 8px;border-radius:6px}
@@ -91,34 +136,35 @@ details.story[open]>summary{border-bottom:1px solid var(--line)}
 .sb{padding:14px 18px 18px}
 .sb .dur{font-size:12.5px;color:var(--sub);margin-bottom:10px}
 table.shots{width:100%;border-collapse:collapse;font-size:13.5px}
-table.shots th,table.shots td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
-table.shots th{background:#f1f5fb;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--sub)}
+table.shots th,table.shots td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top;color:var(--ink)}
+table.shots th{background:var(--muted-surface-3);font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--sub)}
 table.shots td:first-child{width:44px;text-align:center;font-weight:800;color:var(--brand)}
-.narr{margin-top:12px;padding:12px 14px;background:#fff8e6;border:1px solid #fde68a;border-radius:10px;color:#7c5b12;font-size:13.5px}
+.narr{margin-top:12px;padding:12px 14px;background:var(--narr-bg);border:1px solid var(--narr-border);border-radius:10px;color:var(--narr-ink);font-size:13.5px}
 .vid{margin-top:20px}
 .vid video{width:100%;border-radius:14px;border:1px solid var(--line);background:#000;display:block;box-shadow:0 8px 24px rgba(16,32,64,.1)}
 .vcap{font-size:12.5px;color:var(--sub);text-align:center;margin-top:8px;font-weight:600}
 footer{background:#0d1a30;color:#c7d2e2;padding:34px 0;font-size:13.5px;margin-top:30px}
 footer a{color:#93c5fd}
 .manifest{width:100%;border-collapse:collapse;font-size:13.5px;background:var(--card);border-radius:12px;overflow:hidden;box-shadow:var(--sh)}
-.manifest th,.manifest td{border-bottom:1px solid var(--line);padding:10px 14px;text-align:left}
-.manifest th{background:#f1f5fb;font-size:11px;text-transform:uppercase;color:var(--sub)}
+.manifest th,.manifest td{border-bottom:1px solid var(--line);padding:10px 14px;text-align:left;color:var(--ink)}
+.manifest th{background:var(--muted-surface-3);font-size:11px;text-transform:uppercase;color:var(--sub)}
 .manifest td code{font-size:12.5px}
 #lb{display:none;position:fixed;inset:0;background:rgba(6,12,24,.92);z-index:99;align-items:center;justify-content:center;cursor:zoom-out;padding:24px}
 #lb img{max-width:96%;max-height:96%;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
-.topbar{position:fixed;left:12px;right:12px;top:12px;z-index:40;max-width:1240px;margin:0 auto;background:rgba(255,255,255,.96);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 28px rgba(16,32,64,.12);opacity:0;pointer-events:none;transform:translateY(-8px);transition:opacity .18s ease,transform .18s ease}
+.topbar{position:fixed;left:12px;right:12px;top:12px;z-index:40;max-width:1240px;margin:0 auto;background:var(--topbar-bg);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 28px rgba(16,32,64,.12);opacity:0;pointer-events:none;transform:translateY(-8px);transition:opacity .18s ease,transform .18s ease}
+html.dark .topbar{box-shadow:0 10px 28px rgba(0,0,0,.4)}
 .topbar.show{opacity:1;pointer-events:auto;transform:translateY(0)}
 .topbar .inner{max-width:none;margin:0;padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .topbar .brand{font-size:13px;font-weight:800;color:var(--ink);white-space:nowrap}
-.topbar input,.topbar select{flex:1;min-width:140px;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px;background:#fff;color:var(--ink)}
+.topbar input,.topbar select{flex:1;min-width:140px;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px;background:var(--card);color:var(--ink)}
 .topbar select{max-width:280px;flex:1.2}
 @media(min-width:1280px){
   .topbar{left:max(12px, calc(50% - 620px));right:max(12px, calc(50% - 620px))}
 }
-.toc-search{width:100%;margin:0 0 10px;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:13.5px;background:#f8fafc}
+.toc-search{width:100%;margin:0 0 10px;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:13.5px;background:var(--muted-surface);color:var(--ink)}
 .toc-empty{display:none;padding:10px 12px;font-size:13px;color:var(--sub)}
 .fnav{display:flex;gap:10px;margin-top:22px;padding-top:16px;border-top:1px dashed var(--line);flex-wrap:wrap}
-.fnav a{flex:1;min-width:140px;display:flex;flex-direction:column;gap:2px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fbfcff;color:var(--ink);font-size:13px;transition:border-color .15s,background .15s}
+.fnav a{flex:1;min-width:140px;display:flex;flex-direction:column;gap:2px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--muted-surface-2);color:var(--ink);font-size:13px;transition:border-color .15s,background .15s}
 .fnav a:hover{border-color:var(--brand);background:var(--soft)}
 .fnav a span{font-size:11px;color:var(--sub);font-weight:700;letter-spacing:.4px;text-transform:uppercase}
 .fnav a b{font-size:14px;font-weight:700;line-height:1.3}
@@ -127,14 +173,15 @@ footer a{color:#93c5fd}
 .float-tools{position:fixed;right:18px;bottom:18px;z-index:50;display:flex;flex-direction:column;gap:10px}
 .float-btn{width:48px;height:48px;border:0;border-radius:16px;background:var(--brand);color:#fff;font-weight:800;font-size:18px;box-shadow:0 10px 28px rgba(47,95,239,.35);cursor:pointer;display:flex;align-items:center;justify-content:center}
 .float-btn.secondary{background:#0f1e35}
+html.dark .float-btn.secondary{background:#334155}
 .float-btn:hover{filter:brightness(1.08)}
 .drawer-backdrop{display:none;position:fixed;inset:0;background:rgba(6,12,24,.45);z-index:60}
 .drawer-backdrop.open{display:block}
 .drawer{position:fixed;top:0;right:0;width:min(360px,92vw);height:100%;background:var(--card);z-index:70;transform:translateX(100%);transition:transform .22s ease;box-shadow:-12px 0 40px rgba(16,32,64,.18);display:flex;flex-direction:column}
 .drawer.open{transform:translateX(0)}
 .drawer-head{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 10px;border-bottom:1px solid var(--line)}
-.drawer-head b{font-size:15px}
-.drawer-head button{border:0;background:#f1f5fb;border-radius:10px;width:36px;height:36px;font-size:18px;cursor:pointer;color:var(--ink)}
+.drawer-head b{font-size:15px;color:var(--ink)}
+.drawer-head button{border:0;background:var(--muted-surface-3);border-radius:10px;width:36px;height:36px;font-size:18px;cursor:pointer;color:var(--ink)}
 .drawer .toc-pane{flex:1;overflow:auto;padding:12px 14px 24px}
 .drawer .toc-pane h4{margin:12px 10px 4px;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--sub)}
 .drawer .toc-pane a{display:block;padding:8px 12px;border-radius:10px;color:var(--ink);font-size:14px;font-weight:500;border-left:3px solid transparent}
@@ -359,12 +406,27 @@ const F = [
  steps:["Buka Akademik ' Ruang Kelas.","Pilih kartu kelas yang dituju.","Di dalam ruang, akses materi, tugas, diskusi, dan Arena Belajar per mapel.","Guru mengunggah materi/tugas; siswa mengumpulkan & berdiskusi."],
  sb:{dur:"~40 detik", shots:[["1","Grid kartu kelas","Panning kartu berwarna"],["2","Klik satu kelas","Masuk ruang digital"],["3","Tab Materi/Tugas","Perlihatkan konten"],["4","Diskusi mapel","Balasan siswa"]], narr:"'Ruang Kelas adalah kelas digital tiap rombel. Pilih kelas untuk mengakses materi, tugas, diskusi, dan Arena Belajar tiap mata pelajaran.'"}},
 
-{cat:"Akademik", role:false, id:"arenabelajar", title:"Arena Belajar (Kuis Interaktif)", path:"/ruang-kelas/{kode}/arena-belajar", img:"ruang-kelas.png",
- users:"Guru (buat dan host), Siswa (mengerjakan)",
- cap:"Arena Belajar: daftar kuis di Ruang Kelas, mode async atau live, leaderboard, dan transfer nilai.",
- desc:"Modul kuis interaktif di dalam Ruang Kelas. Guru menyusun soal (pilihan ganda, benar/salah, isian, pasangkan), menerbitkan kuis, menjalankan sesi live, atau menugaskan latihan async. Skor dapat ditransfer ke nilai formatif/sumatif.",
- steps:["Buka Ruang Kelas, pilih ruang mapel, lalu tab Arena Belajar.","Guru: Buat Kuis, isi judul dan soal, lalu terbitkan.","Siswa (async): klik Mulai, jawab soal, kumpulkan skor.","Guru (live): Mulai Live, maju soal, siswa jawab, Akhiri; cek podium.","Guru: buka Hasil untuk pantau skor dan Transfer Nilai ke buku nilai."],
- sb:{dur:"~50 detik", shots:[["1","Tab Arena Belajar","Daftar kuis"],["2","Buat/edit kuis","Builder soal"],["3","Mode live","Lobi dan soal aktif"],["4","Hasil dan transfer","Podium skor"]], narr:"'Arena Belajar membawa kuis interaktif ke Ruang Kelas. Guru bisa latihan async atau sesi live, lalu mentransfer skor ke buku nilai.'"}},
+{cat:"Akademik", role:false, id:"arenabelajar", title:"Arena Belajar (Kuis & Misi)", path:"/ruang-kelas/{kode}/arena-belajar", img:"ruang-kelas.png",
+ users:"Guru (buat, host, tugaskan), Siswa (main & kumpulkan)",
+ cap:"Arena Belajar: satu hub di Ruang Kelas — tab Kuis (async/live) dan tab Misi (narasi, puzzle, recall); skor bisa masuk rapor.",
+ desc:"Modul permainan edukatif di Ruang Kelas. Guru membuat kuis interaktif (pilihan ganda, benar/salah, isian, pasangkan), menjalankan sesi live, atau menugaskan misi (narasi, keputusan, puzzle, recall, menjodohkan). Misi ditandai per jenjang: SD, SMP, SMA/SMK — ada panel rekomendasi di hub. Siswa masuk lewat satu tab Arena Belajar. Skor dapat ditransfer ke nilai formatif/sumatif. Modul diaktifkan di Pengaturan Sistem → Fitur → Arena Belajar.",
+ steps:["Buka Akademik → Ruang Kelas, pilih ruang mapel, lalu tab Arena Belajar.","Di hub, pilih mode Kuis atau Misi.","Di mode Misi, lihat panel Rekomendasi per jenjang (SD / SMP / SMA-SMK) lalu filter chip.","Guru (kuis): Buat Kuis → isi soal → Terbitkan. Siswa: Mulai → jawab → Kumpulkan.","Guru (live): dari kartu kuis, Mulai Live → maju soal → Akhiri → cek podium.","Guru (misi): di tab Misi, pilih misi dari daftar → Tugaskan (atau buat di Builder Misi).","Siswa (misi): buka kartu misi → Mulai → selesaikan → skor tersimpan.","Guru: buka Hasil / Monitor → Transfer Nilai ke buku nilai bila siap."],
+ sb:{dur:"~70 detik", shots:[["1","Tab Arena Belajar","Hero masuk Arena"],["2","Hub: tab Kuis / Misi","Switch mode"],["3","Buat kuis atau tugaskan misi","Builder / form tugaskan"],["4","Siswa main & skor","Hasil + transfer nilai"]], narr:"'Arena Belajar menyatukan kuis interaktif dan misi edukatif di satu tempat. Guru bisa latihan async, sesi live, atau menugaskan misi, lalu mentransfer skor ke buku nilai.'"}},
+
+{cat:"Akademik", role:false, id:"arenamisi", title:"Arena Belajar — Misi Edukatif", path:"/ruang-kelas/{kode}/arena-belajar?mode=misi", img:"ruang-kelas.png",
+ users:"Guru (tugaskan & pantau), Siswa (main misi)",
+ cap:"Misi di Arena: narasi interaktif, keputusan strategis, puzzle sequencing, recall quiz, dan menjodohkan — ditugaskan per kelas.",
+ desc:"Bagian misi dari Arena Belajar (sebelumnya Jagat Misi). Guru menugaskan misi dari katalog ke ruang mapel; siswa memainkan lewat tab Misi di hub Arena. Setiap misi punya mark jenjang (SD / SMP / SMA-SMK). Rekomendasi klasik + panel Tren 2025–2026 (AI, media/deepfake, iklim, green computing, wellbeing). Hasil bisa dipantau dan ditransfer ke rapor seperti kuis.",
+ steps:["Buka Ruang Kelas → tab Arena Belajar → mode Misi (atau URL …/arena-belajar?mode=misi).","Lihat panel Rekomendasi: SD / SMP / SMA-SMK — klik chip untuk filter.","Gunakan chip Tren 25–26 untuk fokus ke misi tren.","Guru: pilih misi di form Tugaskan, set jadwal opsional, klik Tugaskan misi.","Siswa: buka kartu misi (badge jenjang / Tren) → Mulai misi → selesaikan → kumpulkan.","Guru: Monitor hasil misi → Transfer Nilai ke formatif/sumatif bila siap."],
+ sb:{dur:"~55 detik", shots:[["1","Hub Arena tab Misi","Panel rekomendasi jenjang"],["2","Filter SD/SMP/SMA/Tren","Chip + badge kartu"],["3","Siswa main misi","Narasi / quiz / puzzle"],["4","Monitor & transfer","Tabel hasil kelas"]], narr:"'Misi edukatif di Arena Belajar ditandai per jenjang dan tren. Guru pilih rekomendasi SD, SMP, SMA/SMK, atau Tren 25–26, siswa main di kelas, skor bisa masuk rapor.'"}},
+
+{cat:"Akademik", role:false, id:"arenatren", title:"Arena Belajar — Tren 2025–2026", path:"/ruang-kelas/{kode}/arena-belajar?mode=misi", img:"ruang-kelas.png",
+ users:"Guru (tugaskan), Siswa (main)",
+ cap:"Katalog misi tren: literasi AI, cek fakta/deepfake, iklim, green computing, dan digital wellbeing — ditandai per jenjang SD/SMP/SMA-SMK.",
+ desc:"Koleksi permainan edukatif yang mengikuti tren pembelajaran 2025–2026: AI-enhanced literacy, critical media (anti-hoaks/deepfake), climate literacy, green computing, dan digital wellbeing. Setiap misi punya badge Tren 25–26 + mark jenjang. Cocok untuk pengayaan Informatika, PPKn, IPA/IPS, dan PJOK tanpa platform eksternal.",
+ steps:["Buka Ruang Kelas → Arena Belajar → mode Misi.","Di panel Rekomendasi, klik chip Tren 25–26 (atau biarkan Semua untuk melihat klasik + tren).","Pilih jenjang: SD / SMP / SMA-SMK agar daftar rekomendasi & kartu ikut tersaring.","Guru: tugaskan misi bertanda [Tren] ke kelas (jadwal opsional).","Siswa: main misi → selesaikan → skor tersimpan; guru pantau & transfer nilai bila perlu.","Diskusi singkat pasca-main: apa yang dipelajari (mis. cek sumber, etika prompt, hemat energi lab)."],
+ sb:{dur:"~60 detik", shots:[["1","Chip Tren 25–26","Panel tren per jenjang"],["2","Kartu badge Tren","Mark SD/SMP/SMA"],["3","Siswa main AI/iklim","Recall / keputusan / narasi"],["4","Debrief kelas","Diskusi singkat + nilai"]], narr:"'Tren 2025–2026 di Arena: literasi AI, cek fakta, iklim, green computing, dan wellbeing. Guru menugaskan, siswa bermain, lalu diskusi singkat di kelas.'"},
+ note:"Mark rekomendasi tren — SD: Jeda Layar Sehat, Bumi Sehat, Fakta vs Dongeng Online. SMP: Cek Fakta Sebelum Share, Kenalan dengan AI, Gelombang Panas di Sekolah. SMA/SMK: Prompt Cerdas Bukan Nyolong, Green Computing di Lab, Deepfake di Dunia Kerja."},
 
 {cat:"Akademik", role:false, id:"jadwal", title:"Editor Jadwal Pelajaran", path:"/jadwal", img:"editor-jadwal.png",
  users:"Admin, Kurikulum",
@@ -401,6 +463,16 @@ const F = [
  steps:["Buka Akademik ' Perangkat Ajar.","Tambahkan Jenis Dokumen (mis. RPP) bila belum ada.","Lihat kartu tiap guru beserta jumlah file terupload.","Klik kartu guru untuk melihat detail unggahan.","Pantau kelengkapan dokumen tiap guru."],
  sb:{dur:"~35 detik", shots:[["1","Halaman Perangkat Ajar","Sorot Jenis Dokumen"],["2","Tambah jenis dokumen","Ketik 'RPP'"],["3","Kartu per guru","Tunjuk '0 file terupload'"],["4","Buka detail guru","Daftar file"]], narr:"'Perangkat Ajar memantau kelengkapan dokumen mengajar tiap guru. Tentukan jenis dokumen, lalu pantau siapa yang sudah mengunggah.'"}},
 
+/* ============ ASISTEN GURU ============ */
+{cat:"Akademik", role:true, id:"ai", title:"Asisten Guru", path:"/ai/teacher", img:"asisten-ai.png",
+ users:"Guru, Wali Kelas, Kepala Sekolah, semua Waka (Kurikulum/Kesiswaan/Sarpras)  -  bukan Siswa/Orang Tua",
+ cap:"Asisten Guru siap pakai: kartu Nalar Guru (key tersimpan), Generate Kuota LIVE, tab Nalar Guru / Generator Soal / RPM / Perangkum / Draft Feedback.",
+ desc:"Pusat bantuan mengajar berbasis Gemini di dalam SIMS. Pertama kali muncul modal Hubungkan API key Gemini — buka Google AI Studio, buat/salin API key, tempel di SIMS, lalu Simpan. Setelah key aktif, pakai Nalar Guru (chat) atau tab generator tanpa membuka tab baru. Ganti/hapus key lewat tombol di kartu Nalar Guru. Hasil AI wajib diperiksa sebelum dibagikan ke siswa.",
+ steps:["Buka Akademik → Asisten Guru. Modal Hubungkan API key Gemini muncul jika belum ada key.","Klik Buka Google AI Studio → Create API key (atau salin key yang sudah ada).","Kembali ke SIMS, tempel API key, klik Simpan API key.","Lihat kartu Nalar Guru (key tersamarkan) dan Generate Kuota.","Buka tab Nalar Guru, pilih saran prompt atau ketik pertanyaan, lalu Kirim. Tab lain: Generator Soal, RPM Learning, Perangkum Materi, Draft Feedback."],
+ sb:{dur:"~50 detik", shots:[["1","Modal Hubungkan API key","Layar pertama: Buka Google AI Studio + kolom Tempel API key"],["2","Google AI Studio — API Keys","Create API key atau salin key yang sudah ada"],["3","Tempel & Simpan di SIMS","Kembali ke modal, tempel key, klik Simpan API key"],["4","Asisten Guru siap","Kartu Nalar Guru + kuota LIVE + deretan tab"],["5","Nalar Guru","Tanya Nalar Guru / saran prompt / kirim chat"]], narr:"'Asisten Guru memakai API key Gemini pribadi Anda. Buka Google AI Studio, buat atau salin API key, tempel di SIMS, lalu pakai Nalar Guru dan generator langsung di dalam aplikasi. Selalu periksa hasil sebelum dibagikan ke siswa.'"},
+ note:"Wajib API key Gemini pribadi (bukan email). Jangan bagikan API key. Screenshot AI Studio di panduan sudah di-redaksi (email/key). Siswa & Orang Tua tidak mendapat menu ini.",
+ gallery:["asisten-ai-s1.png","asisten-ai-s2.png","asisten-ai-s3.png","asisten-ai-s4.png","asisten-ai-s5.png"]},
+
 {cat:"Akademik", role:false, id:"cetakrapor", title:"Cetak Rapor", path:"/cetak-rapor", img:"cetak-rapor.png",
  users:"Admin, Wali Kelas",
  cap:"Cetak Rapor: pilih Kelas + Tampilkan; daftar peserta didik (Nama, NIS) dengan tombol Cetak per siswa; tombol Cetak Satu Kelas.",
@@ -432,15 +504,6 @@ const F = [
  steps:["Login dengan akun yang berstatus Wali Kelas.","Buka menu Wali Kelas ' Siswa Perwalian.","Lihat daftar & detail siswa kelas Anda.","Buka Rekap Nilai kelas untuk evaluasi.","Isi catatan wali sebagai bahan rapor."],
  sb:{dur:"~40 detik", shots:[["1","Login sebagai wali kelas","Dashboard wali"],["2","Siswa perwalian","Daftar siswa kelas"],["3","Rekap nilai kelas","Evaluasi kelas"],["4","Catatan wali","Isi catatan rapor"]], narr:"'Menu Wali Kelas hanya tampil untuk wali kelas. Di sini Anda mengelola siswa perwalian, rekap nilai, dan catatan untuk rapor.'"},
  note:"Fitur role-gated  -  saat direkam sebagai admin, sistem menolak dengan pesan 'Anda bukan wali kelas.' Rekam menggunakan akun wali kelas."},
-
-/* ============ ANALISIS AI ============ */
-{cat:"Analisis AI", role:true, id:"ai", title:"Asisten AI (Guru & Analisis)", path:"/ai/chat  -  /ai/teacher  -  /ai/analyze", img:"asisten-ai.png",
- users:"Guru, Kepala Sekolah, semua Waka (Kurikulum/Kesiswaan/Sarpras)  -  bukan Siswa/Orang Tua",
- cap:"Panel Analisis AI: Asisten Guru (bantu tugas mengajar), analisis data sekolah, dan tanya-jawab berbasis data (RAG). Kuota AI tampil di Dashboard.",
- desc:"Kumpulan asisten berbasis AI: Asisten Guru membantu menyusun materi/soal untuk Guru, Kepala Sekolah, dan semua Wakil Kepala (Waka). Modul Analisis membantu pimpinan membaca data sekolah. Tidak tersedia untuk Siswa dan Orang Tua. Pemakaian dibatasi kuota (terlihat di Dashboard).",
- steps:["Buka menu Asisten AI / Analisis AI (submenu sesuai peran).","Guru/Kepala/Waka: gunakan Asisten Guru untuk bantuan mengajar.","Kepala/Kurikulum: gunakan modul Analisis untuk membaca data.","Ketik pertanyaan/perintah, tinjau jawaban AI.","Pantau sisa kuota AI di Dashboard."],
- sb:{dur:"~40 detik", shots:[["1","Menu Analisis AI","Buka submenu"],["2","Asisten Guru","Ketik permintaan materi/soal"],["3","Jawaban AI","Perlihatkan hasil"],["4","Kuota di Dashboard","Sorot sisa kuota"]], narr:"'Asisten Guru membantu Guru, Kepala Sekolah, dan semua Waka menyiapkan materi. Siswa dan orang tua tidak memakai fitur ini. Pemakaian dibatasi kuota di dashboard.'"},
- note:"Role-gated  -  Siswa & Orang Tua tidak mendapat menu ini. Rekam menggunakan akun guru/kepala/waka."},
 
 /* ============ SARANA & PRASARANA ============ */
 {cat:"Sarana & Prasarana", role:false, id:"sarpras", title:"Dashboard Sarpras", path:"/sarpras", img:"sarpras-dashboard.png",
@@ -499,7 +562,7 @@ const FEATURE_ROLES = {
   pelajaran:['admin','kurikulum'], kartu:['admin','siswa'],
   absensi:['admin','guru','walikelas'], absenqr:['siswa','guru'],
   presensiguru:['admin','kepala'], kalender:['admin','kurikulum'],
-  ruangkelas:['guru','siswa'], arenabelajar:['guru','siswa'],
+  ruangkelas:['guru','siswa'], arenabelajar:['guru','siswa'], arenamisi:['guru','siswa'], arenatren:['guru','siswa'],
   jadwal:['admin','kurikulum'], penilaian:['guru'],
   rekapnilai:['guru','walikelas','kurikulum'], ekskul:['admin','guru'],
   perangkat:['admin','kurikulum','kepala'], cetakrapor:['admin','walikelas'],
@@ -622,6 +685,11 @@ catOrder.forEach(cat=>{
 
     const card=document.createElement('div');card.className='feature'+(f.role?' role':'');card.id=f.id;card.dataset.fid=f.id;
     const shotRows=f.sb.shots.map(s=>`<tr><td>${s[0]}</td><td>${s[1]}</td><td>${s[2]}</td></tr>`).join('');
+    const galleryHtml=(f.gallery&&f.gallery.length)?`<div class="sec"><b>Urutan Screenshot Storyboard</b></div>
+        <div class="gallery">${f.gallery.map((g,i)=>`<figure class="gshot" onclick="var img=this.querySelector('img');if(img)zoom(img.src)">
+          <img src="/images/panduan/${g}" alt="${f.title} shot ${i+1}" loading="lazy">
+          <figcaption>Shot ${i+1}${f.sb.shots[i]?': '+f.sb.shots[i][1]:''}</figcaption>
+        </figure>`).join('')}</div>`:'';
     card.innerHTML=`
       <div class="fhead">
         <span class="num">${n}</span>
@@ -638,9 +706,9 @@ catOrder.forEach(cat=>{
             <div class="cap">Isi gambar: ${f.cap}</div>
           </div>
         </figure>
-        ${f.note?`<div class="callout warn" style="margin:16px 0 0"><p><b>Catatan:</b> ${f.note}</p></div>`:''}
         <div class="sec"><b>Langkah Penggunaan</b></div>
         <ol class="steps">${f.steps.map(s=>`<li>${s}</li>`).join('')}</ol>
+        ${galleryHtml}
         <details class="story"><summary>Storyboard Video (${f.sb.dur})</summary>
           <div class="sb">
             <div class="dur">Durasi target: ${f.sb.dur}. Rekam layar mengikuti urutan shot berikut.</div>
@@ -652,6 +720,7 @@ catOrder.forEach(cat=>{
           <video controls preload="metadata" src="/videos/panduan/${f.id}.mp4" onerror="this.closest('.vid').style.display='none'"></video>
           <div class="vcap">Video storyboard - durasi ${f.sb.dur}</div>
         </div>
+        ${f.note?`<div class="callout warn" style="margin:16px 0 0"><p><b>Catatan:</b> ${f.note}</p></div>`:''}
         <div class="fnav" data-fid="${f.id}"></div>
       </div>`;
     content.appendChild(card);
@@ -708,7 +777,7 @@ function applyRoleFilter(){
   const vis=visibleFeatures();
   if(statFitur) statFitur.textContent=String(vis.length);
   if(statKategori) statKategori.textContent=String(new Set(vis.map(f=>f.cat)).size);
-  if(statStory) statStory.textContent=String(vis.filter(f=>f.id!=='arenabelajar').length);
+  if(statStory) statStory.textContent=String(vis.filter(f=>f.id!=='arenabelajar' && f.id!=='arenamisi' && f.id!=='arenatren').length);
   if(roleEmpty) roleEmpty.style.display=vis.length?'none':'block';
   rebuildNavLinks();
   filterToc(document.getElementById('tocSearch').value, toc, document.getElementById('tocEmpty'));

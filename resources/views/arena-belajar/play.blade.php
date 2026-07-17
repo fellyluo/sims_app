@@ -39,8 +39,9 @@
             <div class="space-y-4" :key="questions[current].uuid">
                 <div class="arena-anim-pop rounded-2xl bg-white/5 border border-white/10 p-4 sm:p-5">
                     <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2"
-                       x-text="questions[current].type === 'true_false' ? 'Benar / Salah' : (questions[current].type === 'short_answer' ? 'Isian' : (questions[current].type === 'match' ? 'Pasangkan' : 'Pilihan ganda'))"></p>
+                       x-text="typeLabel(questions[current].type)"></p>
                     <p class="text-lg sm:text-xl font-black leading-snug text-white" x-text="questions[current].question_text"></p>
+                    <p class="text-xs text-amber-200/90 mt-2 font-semibold" x-show="questions[current].type === 'mcq_complex'">Pilih semua jawaban yang benar</p>
                 </div>
 
                 <div class="space-y-2.5" x-show="questions[current].type === 'mcq' || questions[current].type === 'true_false'">
@@ -55,6 +56,23 @@
                             <span class="flex-1" x-text="opt.option_text"></span>
                         </button>
                     </template>
+                </div>
+
+                <div class="space-y-2.5" x-show="questions[current].type === 'mcq_complex'">
+                    <template x-for="(opt, oi) in questions[current].options" :key="opt.uuid">
+                        <button type="button"
+                                @click="toggleComplex(opt.uuid)"
+                                class="arena-opt arena-anim-in"
+                                :style="'animation-delay:' + (oi * 50) + 'ms'"
+                                :class="(multiAnswers[questions[current].uuid] || []).includes(opt.uuid) ? 'is-selected' : ''"
+                                :disabled="locking">
+                            <span class="arena-opt-letter" x-text="['A','B','C','D','E','F'][oi] || (oi+1)"></span>
+                            <span class="flex-1" x-text="opt.option_text"></span>
+                        </button>
+                    </template>
+                    <button type="button" class="arena-cta arena-cta-ghost w-full" @click="persistComplex()" :disabled="locking">
+                        Simpan pilihan
+                    </button>
                 </div>
 
                 <div x-show="questions[current].type === 'short_answer'" class="space-y-2">
@@ -102,11 +120,14 @@
     <form id="arena-submit-form" method="POST" action="{{ route('classroom.arena.submit', [$classroom, $quiz, $attempt]) }}" class="hidden">
         @csrf
         <input type="hidden" name="duration_ms" :value="Date.now() - startedAt">
-        <template x-for="(qid, idx) in Object.keys(answers)" :key="qid">
+        <template x-for="(q, idx) in questions" :key="q.uuid">
             <div>
-                <input type="hidden" :name="'answers['+idx+'][question_id]'" :value="qid">
-                <input type="hidden" :name="'answers['+idx+'][selected_option_id]'" :value="answers[qid] || ''">
-                <input type="hidden" :name="'answers['+idx+'][answer_text]'" :value="answerTexts[qid] || (matchMaps[qid] ? JSON.stringify(matchMaps[qid]) : '')">
+                <input type="hidden" :name="'answers['+idx+'][question_id]'" :value="q.uuid">
+                <input type="hidden" :name="'answers['+idx+'][selected_option_id]'" :value="answers[q.uuid] || ''">
+                <input type="hidden" :name="'answers['+idx+'][answer_text]'"
+                       :value="q.type === 'mcq_complex'
+                            ? JSON.stringify(multiAnswers[q.uuid] || [])
+                            : (answerTexts[q.uuid] || (matchMaps[q.uuid] ? JSON.stringify(matchMaps[q.uuid]) : ''))">
             </div>
         </template>
     </form>
@@ -120,6 +141,7 @@ function arenaPlay(questions, saved, instantFeedback) {
     const answers = {};
     const answerTexts = {};
     const matchMaps = {};
+    const multiAnswers = {};
     Object.keys(saved || {}).forEach(k => {
         const v = saved[k];
         if (v && typeof v === 'object') {
@@ -128,7 +150,9 @@ function arenaPlay(questions, saved, instantFeedback) {
                 answerTexts[k] = v.answer_text;
                 try {
                     const parsed = JSON.parse(v.answer_text);
-                    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                    if (Array.isArray(parsed)) {
+                        multiAnswers[k] = parsed;
+                    } else if (parsed && typeof parsed === 'object') {
                         matchMaps[k] = parsed;
                     }
                 } catch (e) {}
@@ -139,6 +163,7 @@ function arenaPlay(questions, saved, instantFeedback) {
     });
     questions.forEach(q => {
         if (q.type === 'match' && !matchMaps[q.uuid]) matchMaps[q.uuid] = {};
+        if (q.type === 'mcq_complex' && !multiAnswers[q.uuid]) multiAnswers[q.uuid] = [];
     });
     const storageKey = @js('arena-offline-'.$attempt->uuid);
     try {
@@ -146,10 +171,11 @@ function arenaPlay(questions, saved, instantFeedback) {
         Object.assign(answers, cached.answers || {});
         Object.assign(answerTexts, cached.texts || {});
         Object.assign(matchMaps, cached.maps || {});
+        Object.assign(multiAnswers, cached.multi || {});
     } catch (e) {}
     return {
         ...window.arenaFullscreenMixin(),
-        questions, answers, answerTexts, matchMaps,
+        questions, answers, answerTexts, matchMaps, multiAnswers,
         current: 0,
         startedAt: Date.now(),
         instantFeedback: !!instantFeedback,
@@ -161,13 +187,68 @@ function arenaPlay(questions, saved, instantFeedback) {
         submitting: false,
         init() { this.initFs(); },
         destroy() { this.destroyFs(); },
+        typeLabel(type) {
+            return ({
+                mcq_complex: 'Pilihan Ganda Kompleks',
+                mcq: 'Pilihan Ganda',
+                true_false: 'Benar/Salah',
+                short_answer: 'Isian',
+                match: 'Mencocokkan',
+            })[type] || 'Soal';
+        },
         get progressPct() {
             return this.questions.length ? Math.round(((this.current + 1) / this.questions.length) * 100) : 0;
         },
         persistLocal() {
             try {
-                localStorage.setItem(storageKey, JSON.stringify({ answers: this.answers, texts: this.answerTexts, maps: this.matchMaps }));
+                localStorage.setItem(storageKey, JSON.stringify({
+                    answers: this.answers,
+                    texts: this.answerTexts,
+                    maps: this.matchMaps,
+                    multi: this.multiAnswers,
+                }));
             } catch (e) {}
+        },
+        toggleComplex(optId) {
+            const qid = this.questions[this.current].uuid;
+            if (!this.multiAnswers[qid]) this.multiAnswers[qid] = [];
+            const idx = this.multiAnswers[qid].indexOf(optId);
+            if (idx >= 0) this.multiAnswers[qid].splice(idx, 1);
+            else this.multiAnswers[qid].push(optId);
+            this.answerTexts[qid] = JSON.stringify(this.multiAnswers[qid]);
+            this.persistLocal();
+            this.clearFeedback();
+        },
+        async persistComplex() {
+            const q = this.questions[this.current];
+            const qid = q.uuid;
+            const selected = this.multiAnswers[qid] || [];
+            this.answerTexts[qid] = JSON.stringify(selected);
+            this.persistLocal();
+            if (!navigator.onLine) { this.offline = true; return; }
+            if (this.locking) return;
+            this.locking = true;
+            try {
+                const res = await fetch(@js(route('classroom.arena.answer', [$classroom, $quiz, $attempt])), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ question_id: qid, answer_text: JSON.stringify(selected) }),
+                });
+                const data = await res.json();
+                if (this.instantFeedback && typeof data.is_correct === 'boolean') {
+                    this.feedbackOk = data.is_correct;
+                    this.feedbackMsg = data.is_correct ? 'Benar!' : 'Belum tepat — pastikan semua kunci terpilih';
+                    this.feedbackExplain = data.explanation || '';
+                }
+            } catch (e) {
+                this.offline = true;
+            } finally {
+                this.locking = false;
+            }
         },
         async select(optId) {
             const q = this.questions[this.current];
@@ -213,12 +294,10 @@ function arenaPlay(questions, saved, instantFeedback) {
                 if (!(q.uuid in this.answers)) this.answers[q.uuid] = null;
                 if (q.type === 'match') {
                     const map = this.matchMaps[q.uuid] || {};
-                    const hasPairs = Object.values(map).some(v => v);
-                    if (hasPairs) {
-                        this.answerTexts[q.uuid] = JSON.stringify(map);
-                    } else if (!this.answerTexts[q.uuid]) {
-                        this.answerTexts[q.uuid] = JSON.stringify(map);
-                    }
+                    this.answerTexts[q.uuid] = JSON.stringify(map);
+                }
+                if (q.type === 'mcq_complex') {
+                    this.answerTexts[q.uuid] = JSON.stringify(this.multiAnswers[q.uuid] || []);
                 }
             });
             this.persistLocal();
@@ -235,7 +314,9 @@ function arenaPlay(questions, saved, instantFeedback) {
                 answers: this.questions.map(q => ({
                     question_id: q.uuid,
                     selected_option_id: this.answers[q.uuid] || null,
-                    answer_text: this.answerTexts[q.uuid] || (this.matchMaps[q.uuid] ? JSON.stringify(this.matchMaps[q.uuid]) : null),
+                    answer_text: q.type === 'mcq_complex'
+                        ? JSON.stringify(this.multiAnswers[q.uuid] || [])
+                        : (this.answerTexts[q.uuid] || (this.matchMaps[q.uuid] ? JSON.stringify(this.matchMaps[q.uuid]) : null)),
                 })),
                 duration_ms: Date.now() - this.startedAt,
                 submit: !!submit,

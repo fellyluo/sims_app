@@ -247,6 +247,109 @@ TXT;
         $this->assertTrue(collect($parsed[0]['options'])->contains(fn ($o) => $o['option_text'] === 'Jakarta' && $o['is_correct']));
     }
 
+    public function test_importer_applies_kunci_jawaban_section_from_asisten_guru(): void
+    {
+        $raw = <<<TXT
+SOAL EVALUASI [MATEMATIKA]
+Bagian A - Pilihan Ganda
+
+1. Hasil 3 + 5 adalah?
+A. 7
+B. 8
+C. 9
+D. 10
+
+2. Bumi berbentuk bola.
+A. Benar
+B. Salah
+
+Kunci Jawaban & Pedoman Penilaian
+1. B
+2. Benar
+TXT;
+        $parsed = (new GameQuizImporter)->parse($raw);
+        $this->assertCount(2, $parsed);
+        $this->assertTrue(collect($parsed[0]['options'])->contains(fn ($o) => $o['option_text'] === '8' && $o['is_correct']));
+        $this->assertTrue(collect($parsed[1]['options'])->contains(fn ($o) => $o['option_text'] === 'Benar' && $o['is_correct']));
+    }
+
+    public function test_importer_parses_isian_mencocokkan_and_pg_kompleks(): void
+    {
+        $raw = <<<TXT
+1. Fotosintesis menghasilkan?
+A. Oksigen
+B. Karbon dioksida
+C. Glukosa
+D. Nitrogen
+Petunjuk: pilih semua jawaban yang benar.
+
+2. Cocokkan pernyataan pada Kolom A dengan jawaban pada Kolom B.
+Kolom A:
+1. Ibu kota Indonesia
+2. Mata uang Indonesia
+Kolom B:
+A. Rupiah
+B. Jakarta
+
+3. Proses tumbuhan membuat makanan disebut ____.
+Jawaban: ______________________________
+
+Kunci Jawaban & Pedoman Penilaian
+1. A, C
+2. 1-B, 2-A
+3. fotosintesis
+TXT;
+        $parsed = (new GameQuizImporter)->parse($raw);
+        $this->assertCount(3, $parsed);
+
+        $this->assertSame('mcq_complex', $parsed[0]['type']);
+        $correct = collect($parsed[0]['options'])->where('is_correct', true)->pluck('option_text')->values()->all();
+        $this->assertSame(['Oksigen', 'Glukosa'], $correct);
+
+        $this->assertSame('match', $parsed[1]['type']);
+        $this->assertCount(2, $parsed[1]['meta']['pairs']);
+        $this->assertSame('Ibu kota Indonesia', $parsed[1]['meta']['pairs'][0]['left']);
+        $this->assertSame('Jakarta', $parsed[1]['meta']['pairs'][0]['right']);
+
+        $this->assertSame('short_answer', $parsed[2]['type']);
+        $this->assertSame(['fotosintesis'], $parsed[2]['meta']['answers']);
+    }
+
+    public function test_create_form_loads_soal_dari_session_asisten_guru(): void
+    {
+        $raw = "1. Ibu kota?\nA. Bandung\nB. Jakarta\n\nKunci Jawaban\n1. B";
+
+        $response = $this->actingAs($this->guruUser)
+            ->withSession([
+                'arena_ai_import' => [
+                    'raw_text' => $raw,
+                    'title' => 'Kuis: Geografi',
+                ],
+            ])
+            ->get(route('classroom.arena.create', $this->classroom));
+
+        $response->assertOk();
+        $response->assertSee('Kuis: Geografi', false);
+        $response->assertSee('Ibu kota?', false);
+        $response->assertSee('Generate / impor soal (Asisten Guru)', false);
+    }
+
+    public function test_asisten_guru_kirim_ke_arena_redirects_ke_form_create(): void
+    {
+        $raw = "1. Ibu kota?\nA. Bandung\nB. Jakarta\n\nKunci Jawaban\n1. B";
+
+        $response = $this->actingAs($this->guruUser)
+            ->post(route('ai.teacher.quiz.send-arena'), [
+                'classroom_id' => $this->classroom->uuid,
+                'raw_text' => $raw,
+                'title' => 'Kuis: Geografi',
+            ]);
+
+        $response->assertRedirect(route('classroom.arena.create', $this->classroom));
+        $response->assertSessionHas('arena_ai_import.raw_text', $raw);
+        $response->assertSessionHas('arena_ai_import.title', 'Kuis: Geografi');
+    }
+
     private function makePublishedQuiz(): GameQuiz
     {
         $quiz = GameQuiz::create([

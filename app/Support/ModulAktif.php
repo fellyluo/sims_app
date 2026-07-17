@@ -28,7 +28,7 @@ class ModulAktif
             ],
             'asisten_guru' => [
                 'label' => 'Asisten Guru',
-                'deskripsi' => 'Generator soal, RPM Learning, rangkuman, dan draft feedback.',
+                'deskripsi' => 'Nalar Guru, generator soal, RPM Learning, rangkuman, dan draft feedback.',
                 'ikon' => 'sparkles',
             ],
             'analisis_ai' => [
@@ -38,7 +38,7 @@ class ModulAktif
             ],
             'arena_belajar' => [
                 'label' => 'Arena Belajar',
-                'deskripsi' => 'Kuis interaktif di Ruang Kelas (async, live, template).',
+                'deskripsi' => 'Kuis interaktif dan misi edukatif di Ruang Kelas (async, live, template).',
                 'ikon' => 'gamepad-2',
             ],
             'agenda' => [
@@ -103,6 +103,24 @@ class ModulAktif
     public static function aktif(string $kode): bool
     {
         if (! array_key_exists($kode, self::semua())) {
+            return true;
+        }
+
+        // Transisi merge: jagat_misi digabung ke arena_belajar.
+        // Aktif jika arena ON, atau (belum ada row arena) dan legacy jagat ON.
+        if ($kode === 'arena_belajar') {
+            $arenaKey = self::settingKey('arena_belajar');
+            $legacyKey = 'fitur_jagat_misi_aktif';
+            $arenaRow = Setting::where('key', $arenaKey)->first();
+            $legacyRow = Setting::where('key', $legacyKey)->first();
+
+            if ($arenaRow !== null) {
+                return $arenaRow->value === '1';
+            }
+            if ($legacyRow !== null) {
+                return $legacyRow->value === '1';
+            }
+
             return true;
         }
 

@@ -37,6 +37,7 @@ class AiTeacherHistoryTest extends TestCase
             'username' => 'ai_hist_guru',
             'password' => Hash::make('password'),
             'access'   => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         // Jawaban & judul jauh lebih panjang dari kolom untuk memaksa pemangkasan.
@@ -70,6 +71,7 @@ class AiTeacherHistoryTest extends TestCase
             'username' => 'ai_hist_guru2',
             'password' => Hash::make('password'),
             'access'   => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $result = $this->invokeStoreHistory($user->uuid, [

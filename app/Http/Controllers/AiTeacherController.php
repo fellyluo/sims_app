@@ -4,14 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\InteractsWithAi;
 use App\Models\AiTeacherHistory;
+use App\Models\Classroom;
+use App\Models\Setting;
+use App\Models\TeacherPresentation;
 use App\Services\GeminiService;
 use App\Support\LearningDocument;
 use App\Support\LearningDocxBuilder;
+use App\Support\ModulAktif;
+use App\Support\PresentationSlides;
 use App\Support\QuizDocument;
 use App\Support\QuizDocxBuilder;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -57,11 +63,487 @@ class AiTeacherController extends Controller
 
         $user = auth()->user();
 
+        $arenaClassrooms = collect();
+        if (ModulAktif::aktif('arena_belajar')) {
+            $arenaClassrooms = Classroom::query()
+                ->where('status', 'published')
+                ->latest()
+                ->limit(80)
+                ->get()
+                ->filter(fn (Classroom $c) => $user->can('manage', $c))
+                ->values()
+                ->map(fn (Classroom $c) => [
+                    'uuid' => $c->uuid,
+                    'title' => $c->title,
+                ]);
+        }
+
+        $hasApiKey = $user->hasGeminiApiKey();
+
         return view('ai.teacher', [
             'histories' => $histories,
             'quotaUsage' => $this->aiPublicQuotaUsage(true),
             'canViewQuotaUsage' => false,
+            'arenaClassrooms' => $arenaClassrooms,
+            'arenaBelajarAktif' => ModulAktif::aktif('arena_belajar'),
+            'launcherAktif' => (Setting::get('tp_launcher_aktif', '1') ?? '1') === '1',
+            'needsApiKeySetup' => ! $hasApiKey,
+            'externalAccounts' => [
+                'has_gemini_api_key' => $hasApiKey,
+                'gemini_api_key_masked' => $user->geminiApiKeyMasked(),
+            ],
         ]);
+    }
+
+    /**
+     * POST /ai/teacher/external-prompt — susun prompt berformat untuk ditempel di Gemini web.
+     * Tidak memanggil GeminiService; generate memakai akun Google guru di gemini.google.com.
+     */
+    public function externalPrompt(Request $request): JsonResponse
+    {
+        $tool = $request->validate([
+            'tool' => ['required', 'in:quiz,learning,summary,feedback,chat'],
+        ])['tool'];
+
+        $built = match ($tool) {
+            'quiz' => $this->composeQuiz($request),
+            'learning' => $this->composeLearningForExternal($request),
+            'summary' => $this->composeSummary($request),
+            'feedback' => $this->composeFeedback($request),
+            'chat' => $this->composeChat($request),
+        };
+
+        if ($built instanceof JsonResponse) {
+            return $built;
+        }
+
+        return response()->json([
+            'ok' => true,
+            'prompt' => $this->buildExternalPastePrompt($built),
+            'gemini_url' => 'https://gemini.google.com/app',
+            'tool' => $tool,
+            'title' => (string) ($built['title'] ?? $built['history']['title'] ?? 'Asisten Guru'),
+        ]);
+    }
+
+    /**
+     * POST /ai/teacher/external-result — terima jawaban yang ditempel dari Gemini web.
+     */
+    public function externalResult(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'tool' => ['required', 'in:quiz,learning,summary,feedback,chat'],
+            'title' => ['nullable', 'string', 'max:180'],
+            'answer' => ['required', 'string', 'min:1', 'max:100000'],
+        ]);
+
+        $meta = match ($data['tool']) {
+            'quiz' => ['type' => 'quiz', 'type_label' => 'Generator Soal'],
+            'learning' => ['type' => 'rpp', 'type_label' => 'RPM Learning'],
+            'summary' => ['type' => 'summary', 'type_label' => 'Perangkum Materi'],
+            'feedback' => ['type' => 'feedback', 'type_label' => 'Draft Feedback'],
+            'chat' => ['type' => 'gemini_chat', 'type_label' => 'Nalar Guru'],
+        };
+
+        $title = trim((string) ($data['title'] ?? '')) ?: $meta['type_label'];
+        $answer = trim($data['answer']);
+
+        $history = $this->storeHistory($request->user()->uuid, [
+            'type' => $meta['type'],
+            'type_label' => $meta['type_label'],
+            'title' => $title,
+            'metadata' => [
+                'via' => 'gemini_web',
+            ],
+        ], $answer);
+
+        return response()->json([
+            'ok' => true,
+            'answer' => $answer,
+            'history' => $history,
+        ]);
+    }
+
+    /** POST /ai/teacher/chat — cadangan API sekolah (UI utama memakai external-prompt). */
+    public function chat(Request $request): JsonResponse
+    {
+        $built = $this->composeChat($request);
+        if ($built instanceof JsonResponse) {
+            return $built;
+        }
+
+        $options = [
+            'thinking_level' => 'low',
+        ];
+        if (! empty($built['history_turns'])) {
+            $options['history'] = $built['history_turns'];
+        }
+        if (! empty($built['answer_style'])) {
+            $options['answer_style'] = $built['answer_style'];
+        }
+        if (! empty($built['long_timeout'])) {
+            $options['timeout'] = (int) config('ai.long_timeout');
+        }
+
+        return $this->respond(
+            $request,
+            'teacher_chat',
+            $built['system'],
+            $built['prompt'],
+            (int) ($built['max_output_tokens'] ?? 4096),
+            $options,
+            $built['history'],
+        );
+    }
+
+    /**
+     * @return array{system:string,prompt:string,answer_style?:string,title:string,history:array,history_turns?:list<array{role:string,text:string}>,max_output_tokens?:int,long_timeout?:bool}|JsonResponse
+     */
+    private function composeChat(Request $request): array|JsonResponse
+    {
+        $data = $request->validate([
+            'message' => ['required', 'string', 'max:'.config('ai.max_input_chars')],
+            'history' => ['nullable', 'array', 'max:20'],
+            'history.*.role' => ['required_with:history', 'in:user,assistant'],
+            'history.*.text' => ['required_with:history', 'string', 'max:8000'],
+        ]);
+
+        $historyTurns = collect($data['history'] ?? [])
+            ->map(fn (array $turn) => [
+                'role' => $turn['role'],
+                'text' => $turn['text'],
+            ])
+            ->take(-12)
+            ->values()
+            ->all();
+
+        $message = trim($data['message']);
+
+        if ($this->messageLooksLikeQuizRequest($message)) {
+            $params = $this->inferQuizParamsFromMessage($message);
+            $formatInstruction = $this->quizFormatInstruction(
+                $params['jumlah'],
+                $params['jenis_soal'],
+                $params['tingkat'],
+                $params['jenjang'],
+                $params['topik'],
+            );
+            $jenis = $this->quizTypeSummary($params['jenis_soal']);
+            $jenjangLine = $params['jenjang'] ? " untuk jenjang {$params['jenjang']}" : '';
+
+            $prompt = "Buat {$params['jumlah']} soal ({$jenis}) dengan tingkat kesulitan "
+                ."{$params['tingkat']}{$jenjangLine} tentang topik: \"{$params['topik']}\".\n\n"
+                ."PERMINTAAN ASLI GURU:\n{$message}\n\n"
+                .$formatInstruction;
+
+            return [
+                'system' => (string) config('ai.teacher.quiz'),
+                'prompt' => $prompt,
+                'answer_style' => 'Tulis sebagai dokumen soal teks polos siap cetak sesuai format yang diminta. JANGAN memakai Markdown, heading #, atau bullet dekoratif.',
+                'title' => Str::limit($params['topik'] !== '' ? $params['topik'] : $message, 90),
+                'history_turns' => $historyTurns,
+                'max_output_tokens' => $this->quizMaxOutputTokens($params['jumlah'], $params['tingkat']),
+                'long_timeout' => true,
+                'history' => [
+                    'type' => 'gemini_chat',
+                    'type_label' => 'Nalar Guru',
+                    'title' => Str::limit($params['topik'] !== '' ? $params['topik'] : $message, 90),
+                    'metadata' => [
+                        'prompt' => Str::limit($message, 2000, ''),
+                        'turns' => count($historyTurns) + 1,
+                        'mode' => 'quiz_format',
+                        'jumlah' => $params['jumlah'],
+                        'jenis_soal' => $params['jenis_soal'],
+                        'tingkat' => $params['tingkat'],
+                        'jenjang' => $params['jenjang'],
+                    ],
+                ],
+            ];
+        }
+
+        $quizFormatReminder = "\n\nPENTING: Jika pengguna meminta soal, kuis, atau soal evaluasi, "
+            .'jawab HANYA dengan dokumen soal teks polos mengikuti format Generator Soal '
+            .'(kop sekolah, SOAL EVALUASI, identitas, Petunjuk Pengerjaan, Bagian soal, '
+            .'Kunci Jawaban & Pedoman Penilaian). Jangan pakai Markdown.';
+
+        return [
+            'system' => (string) config('ai.teacher.chat').$quizFormatReminder,
+            'prompt' => $message,
+            'title' => Str::limit($message, 90),
+            'history_turns' => $historyTurns,
+            'history' => [
+                'type' => 'gemini_chat',
+                'type_label' => 'Nalar Guru',
+                'title' => Str::limit($message, 90),
+                'metadata' => [
+                    'prompt' => Str::limit($message, 2000, ''),
+                    'turns' => count($historyTurns) + 1,
+                    'mode' => 'chat',
+                ],
+            ],
+        ];
+    }
+
+    /** Compose learning tanpa bentrok field `tool` eksternal (quiz|learning|…). */
+    private function composeLearningForExternal(Request $request): array|JsonResponse
+    {
+        $learningTool = $request->input('learning_tool', $request->input('learning.tool', 'rpp'));
+        $dup = $request->duplicate();
+        $dup->merge(['tool' => $learningTool]);
+
+        return $this->composeLearning($dup);
+    }
+
+    /** Gabungkan system + gaya + permintaan jadi satu teks siap tempel di Gemini web. */
+    private function buildExternalPastePrompt(array $built): string
+    {
+        $parts = [];
+        $system = trim((string) ($built['system'] ?? ''));
+        $answerStyle = trim((string) ($built['answer_style'] ?? ''));
+        $prompt = trim((string) ($built['prompt'] ?? ''));
+
+        if ($system !== '') {
+            $parts[] = "PERAN / INSTRUKSI SISTEM:\n{$system}";
+        }
+        if ($answerStyle !== '') {
+            $parts[] = "GAYA JAWABAN:\n{$answerStyle}";
+        }
+        if (! empty($built['history_turns']) && is_array($built['history_turns'])) {
+            $lines = [];
+            foreach ($built['history_turns'] as $turn) {
+                $role = (($turn['role'] ?? '') === 'assistant') ? 'Asisten' : 'Guru';
+                $text = trim((string) ($turn['text'] ?? ''));
+                if ($text !== '') {
+                    $lines[] = "{$role}: {$text}";
+                }
+            }
+            if ($lines !== []) {
+                $parts[] = "RIWAYAT PERCAKAPAN:\n".implode("\n\n", $lines);
+            }
+        }
+        $parts[] = "PERMINTAAN:\n{$prompt}";
+        $parts[] = 'Jawab langsung sesuai instruksi di atas. Jangan menambah pembuka atau penjelasan di luar format yang diminta.';
+
+        return implode("\n\n---\n\n", $parts);
+    }
+
+    /** Deteksi permintaan pembuatan soal/kuis di chat Gemini. */
+    private function messageLooksLikeQuizRequest(string $message): bool
+    {
+        return (bool) preg_match(
+            '/\b(soal|kuis|quiz|evaluasi|ulangan|pilihan\s*ganda|benar\s*\/?\s*salah|isian|mencocokkan|pg\b)/iu',
+            $message,
+        );
+    }
+
+    /**
+     * Infer parameter soal dari teks chat (fallback ke default Generator Soal).
+     *
+     * @return array{jumlah:int,jenis_soal:list<string>,tingkat:string,jenjang:?string,topik:string}
+     */
+    private function inferQuizParamsFromMessage(string $message): array
+    {
+        $jumlah = 5;
+        if (preg_match('/\b(\d{1,2})\s*(soal|butir|nomor|item)\b/iu', $message, $m)
+            || preg_match('/\b(buat|bikin|generate)\s+(\d{1,2})\b/iu', $message, $m2)) {
+            $n = (int) ($m[1] ?? $m2[2] ?? 5);
+            $jumlah = max(1, min(20, $n));
+        }
+
+        $tingkat = 'sedang';
+        if (preg_match('/\b(mudah|sedang|sulit|sukar)\b/iu', $message, $tm)) {
+            $tingkat = strtolower($tm[1]) === 'sukar' ? 'sulit' : strtolower($tm[1]);
+        }
+
+        $jenjang = null;
+        if (preg_match('/\b(kelas\s*[0-9IVX]+(?:\s*[A-Z])?|\bSD\b|\bSMP\b|\bSMA\b|\bSMK\b)(?:\s*[\/,]?\s*semester\s*\d+)?/iu', $message, $jm)) {
+            $jenjang = trim($jm[0]);
+        }
+
+        $jenisSoal = [];
+        $map = [
+            'pg_kompleks' => '/pilihan\s*ganda\s*kompleks|pg\s*kompleks|multi\s*kunci/iu',
+            'pg' => '/pilihan\s*ganda(?!\s*kompleks)|\bpg\b(?!\s*kompleks)/iu',
+            'benar_salah' => '/benar\s*\/?\s*salah|true\s*\/?\s*false|\bB\/S\b/iu',
+            'mencocokkan' => '/mencocokkan|menjodohkan|matching/iu',
+            'isian' => '/\bisian\b|essay|esai|uraian/iu',
+        ];
+        foreach ($map as $type => $pattern) {
+            if (preg_match($pattern, $message)) {
+                $jenisSoal[] = $type;
+            }
+        }
+        if ($jenisSoal === []) {
+            // Default sama dengan form Generator Soal (PG).
+            $jenisSoal = ['pg'];
+        }
+
+        // Topik: buang frasa perintah umum, sisakan inti.
+        $topik = preg_replace(
+            '/\b(buatkan|buat|bikin|generate|tolong|mohon|segera)\b/iu',
+            ' ',
+            $message,
+        );
+        $topik = preg_replace(
+            '/\b(\d{1,2}\s*)?(soal|kuis|quiz|evaluasi|ulangan|butir)\b/iu',
+            ' ',
+            (string) $topik,
+        );
+        $topik = preg_replace(
+            '/\b(pilihan\s*ganda\s*kompleks|pilihan\s*ganda|benar\s*\/?\s*salah|mencocokkan|isian|mudah|sedang|sulit|sukar)\b/iu',
+            ' ',
+            (string) $topik,
+        );
+        $topik = preg_replace('/\s+/u', ' ', trim((string) $topik));
+        if ($topik === '' || mb_strlen($topik) < 3) {
+            $topik = Str::limit($message, 120, '');
+        }
+
+        return [
+            'jumlah' => $jumlah,
+            'jenis_soal' => array_values(array_unique($jenisSoal)),
+            'tingkat' => $tingkat,
+            'jenjang' => $jenjang,
+            'topik' => Str::limit($topik, 200, ''),
+        ];
+    }
+
+    /** POST /ai/teacher/presentasi-from-chat — buat Studio Presentasi dari jawaban Gemini. */
+    public function presentasiFromChat(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:200'],
+            'outline' => ['required', 'string', 'max:50000'],
+            'subject' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        $slides = PresentationSlides::fromOutline($data['outline']);
+
+        $item = TeacherPresentation::create([
+            'user_uuid' => $request->user()->uuid,
+            'title' => $data['title'],
+            'subject' => $data['subject'] ?? null,
+            'status' => 'draft',
+            'outline' => $data['outline'],
+            'slides' => $slides !== [] ? $slides : null,
+            'last_opened_at' => now(),
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Outline dikirim ke Studio Presentasi.',
+            'redirect' => route('ai.teacher.presentasi.show', $item),
+            'presentation' => [
+                'uuid' => $item->uuid,
+                'title' => $item->title,
+                'subject' => $item->subject,
+                'status' => $item->status,
+                'updated_at' => optional($item->updated_at)->toIso8601String(),
+            ],
+        ]);
+    }
+
+    /**
+     * PUT/POST /ai/teacher/gemini-key — simpan API key Gemini pribadi (terenkripsi).
+     */
+    public function updateGeminiKey(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'gemini_api_key' => ['required', 'string', 'min:20', 'max:512'],
+        ], [
+            'gemini_api_key.required' => 'API key wajib diisi.',
+            'gemini_api_key.min' => 'API key terlalu pendek. Salin ulang dari Google AI Studio.',
+        ]);
+
+        $plain = trim($data['gemini_api_key']);
+
+        try {
+            $this->gemini->probeApiKey($plain);
+        } catch (RuntimeException $e) {
+            return response()->json([
+                'ok' => false,
+                'message' => $e->getMessage() ?: 'API key tidak valid atau belum aktif.',
+            ], 422);
+        }
+
+        $user = $request->user();
+        $user->setGeminiApiKey($plain);
+        $user->refresh();
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'API key disimpan. Generate berjalan di dalam SIMS memakai akun Gemini Anda.',
+            'accounts' => [
+                'has_gemini_api_key' => true,
+                'gemini_api_key_masked' => $user->geminiApiKeyMasked(),
+            ],
+        ]);
+    }
+
+    /** DELETE /ai/teacher/gemini-key — hapus API key pribadi. */
+    public function destroyGeminiKey(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $user->clearGeminiApiKey();
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'API key dihapus. Generate akan terkunci sampai key baru disimpan.',
+            'accounts' => [
+                'has_gemini_api_key' => false,
+                'gemini_api_key_masked' => null,
+            ],
+            'needs_api_key' => true,
+        ]);
+    }
+
+    /** Blok generate bila guru belum menyimpan API key Gemini pribadi. */
+    private function requireTeacherGeminiKey(Request $request): ?JsonResponse
+    {
+        $user = $request->user();
+        if ($user->hasGeminiApiKey() && $user->plainGeminiApiKey() !== null) {
+            return null;
+        }
+
+        return response()->json([
+            'ok' => false,
+            'message' => 'Simpan API key Gemini dari Google AI Studio terlebih dahulu untuk generate di SIMS.',
+            'needs_api_key' => true,
+        ], 422);
+    }
+
+    /** API key pribadi wajib untuk generate di dalam SIMS. */
+    private function requireTeacherReady(Request $request): ?JsonResponse
+    {
+        return $this->requireTeacherGeminiKey($request);
+    }
+
+    /**
+     * POST /ai/teacher/quiz/send-arena — simpan teks soal ke session lalu buka form Arena.
+     */
+    public function sendToArena(Request $request): RedirectResponse
+    {
+        abort_unless(ModulAktif::aktif('arena_belajar'), 403, 'Modul Arena Belajar nonaktif.');
+
+        $data = $request->validate([
+            'classroom_id' => ['required', 'uuid', 'exists:classrooms,uuid'],
+            'raw_text' => ['required', 'string', 'max:50000'],
+            'title' => ['nullable', 'string', 'max:200'],
+        ]);
+
+        $classroom = Classroom::where('uuid', $data['classroom_id'])->firstOrFail();
+        $this->authorize('manage', $classroom);
+
+        session([
+            'arena_ai_import' => [
+                'raw_text' => $data['raw_text'],
+                'title' => $data['title'] ?? null,
+            ],
+        ]);
+
+        return redirect()
+            ->route('classroom.arena.create', $classroom)
+            ->with('success', 'Soal dari Asisten Guru siap diimpor. Periksa kunci jawaban lalu simpan.');
     }
 
     /** GET /ai/teacher/quota — snapshot kuota live (dipoll UI). */
@@ -89,74 +571,44 @@ class AiTeacherController extends Controller
     /** POST /ai/teacher/quiz - generator soal/kuis. */
     public function quiz(Request $request): JsonResponse
     {
-        if (! $request->has('jenis_soal') && $request->filled('jenis')) {
-            $legacyJenis = (string) $request->input('jenis');
-            $request->merge([
-                'jenis_soal' => self::LEGACY_QUIZ_TYPES[$legacyJenis] ?? [$legacyJenis],
-            ]);
+        $built = $this->composeQuiz($request);
+        if ($built instanceof JsonResponse) {
+            return $built;
         }
 
-        $allowedQuizTypes = implode(',', array_keys(self::QUIZ_TYPES));
-        $data = $request->validate([
-            'topik' => ['nullable', 'required_without:file', 'string', 'max:500'],
-            'jumlah' => ['required', 'integer', 'min:1', 'max:20'],
-            'jenis_soal' => ['required', 'array', 'min:1', 'max:5'],
-            'jenis_soal.*' => ['required', 'string', 'distinct', 'in:'.$allowedQuizTypes],
-            'tingkat' => ['required', 'in:mudah,sedang,sulit'],
-            'jenjang' => ['nullable', 'string', 'max:100'],
-            'file' => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:10240'],
-        ]);
-        $data['jenis_soal'] = array_values(array_unique($data['jenis_soal']));
+        $jumlah = (int) ($built['history']['metadata']['jumlah'] ?? 10);
+        $tingkat = (string) ($built['history']['metadata']['tingkat'] ?? 'sedang');
 
-        $documentText = '';
-        if ($request->hasFile('file')) {
-            $file = $request->file('file');
-            $documentText = $this->extractQuizDocumentText($file->getRealPath(), $file->getClientOriginalExtension());
-
-            if ($documentText === '') {
-                return response()->json([
-                    'ok' => false,
-                    'message' => 'Teks tidak dapat diekstrak dari file. Pastikan PDF bukan hasil scan/gambar dan file Word berisi teks.',
-                ], 422);
-            }
-        }
-
-        $jenis = $this->quizTypeSummary($data['jenis_soal']);
-        $topik = trim((string) ($data['topik'] ?? ''));
-        $jenjang = ! empty($data['jenjang']) ? "untuk jenjang {$data['jenjang']}" : '';
-
-        $formatInstruction = $this->quizFormatInstruction((int) $data['jumlah'], $data['jenis_soal'], $data['tingkat'], $data['jenjang'] ?? null, $topik);
-
-        if ($documentText !== '') {
-            $maxChars = (int) config('ai.max_input_chars');
-            $material = mb_substr($documentText, 0, $maxChars);
-            $topicLine = $topik !== '' ? "Fokus topik: \"{$topik}\".\n" : '';
-
-            $prompt = "Buat {$data['jumlah']} soal ({$jenis}) dengan tingkat kesulitan "
-                ."{$data['tingkat']} {$jenjang} berdasarkan materi dari file berikut.\n"
-                .$topicLine
-                ."MATERI FILE:\n{$material}\n\n"
-                .$formatInstruction;
-        } else {
-            $prompt = "Buat {$data['jumlah']} soal ({$jenis}) dengan tingkat kesulitan "
-                ."{$data['tingkat']} tentang topik: \"{$topik}\" {$jenjang}.\n\n"
-                .$formatInstruction;
-        }
-
-        return $this->respond($request, 'teacher_quiz', config('ai.teacher.quiz'), $prompt, 4096, [
-            'answer_style' => 'Tulis sebagai dokumen soal teks polos siap cetak sesuai format yang diminta. JANGAN memakai Markdown, heading #, atau bullet dekoratif.',
-        ], [
-            'type' => 'quiz',
-            'type_label' => 'Generator Soal',
-            'title' => $topik !== '' ? $topik : 'Soal dari file '.$request->file('file')?->getClientOriginalName(),
-            'metadata' => [
-                'jumlah' => $data['jumlah'],
-                'jenis_soal' => $data['jenis_soal'],
-                'tingkat' => $data['tingkat'],
-                'jenjang' => $data['jenjang'] ?? null,
-                'file' => $request->file('file')?->getClientOriginalName(),
+        return $this->respond(
+            $request,
+            'teacher_quiz',
+            $built['system'],
+            $built['prompt'],
+            $this->quizMaxOutputTokens($jumlah, $tingkat),
+            [
+                'answer_style' => $built['answer_style'],
+                // thinking low: jatah maxOutputTokens tidak habis untuk "pikir" internal model
+                'thinking_level' => 'low',
+                'timeout' => (int) config('ai.long_timeout'),
             ],
-        ]);
+            $built['history'],
+        );
+    }
+
+    /**
+     * Estimasi jatah keluaran generator soal.
+     * Tingkat sulit + banyak nomor mudah kena finishReason MAX_TOKENS di 4096
+     * (terutama model yang memakai thinking tokens di dalam maxOutputTokens).
+     */
+    private function quizMaxOutputTokens(int $jumlah, string $tingkat): int
+    {
+        $perItem = match ($tingkat) {
+            'sulit' => 480,
+            'sedang' => 340,
+            default => 260,
+        };
+
+        return min(8192, max(4096, ($jumlah * $perItem) + 1600));
     }
 
     /**
@@ -232,78 +684,28 @@ class AiTeacherController extends Controller
     /** POST /ai/teacher/learning - generator RPM Learning. */
     public function learning(Request $request): JsonResponse
     {
-        $data = $request->validate([
-            'tool' => ['required', 'in:rpp'],
-            'topik' => ['nullable', 'required_without:file', 'string', 'max:500'],
-            'mapel' => ['nullable', 'string', 'max:100'],
-            'jenjang' => ['nullable', 'string', 'max:100'],
-            'durasi' => ['nullable', 'string', 'max:100'],
-            'file' => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:10240'],
-        ]);
-
-        $documentText = '';
-        if ($request->hasFile('file')) {
-            $file = $request->file('file');
-            $documentText = $this->extractQuizDocumentText($file->getRealPath(), $file->getClientOriginalExtension(), true);
-
-            if ($documentText === '') {
-                return response()->json([
-                    'ok' => false,
-                    'message' => 'Teks tidak dapat diekstrak dari file. Pastikan PDF bukan hasil scan/gambar dan file Word berisi teks.',
-                ], 422);
-            }
+        $built = $this->composeLearning($request);
+        if ($built instanceof JsonResponse) {
+            return $built;
         }
 
-        $toolLabel = $this->learningToolLabel($data['tool']);
-        $topik = trim((string) ($data['topik'] ?? ''));
-        $title = $topik !== '' ? $topik : 'RPM dari file '.$request->file('file')?->getClientOriginalName();
-        $details = array_filter([
-            ! empty($data['mapel']) ? "Mata pelajaran: {$data['mapel']}" : null,
-            ! empty($data['jenjang']) ? "Jenjang/kelas: {$data['jenjang']}" : null,
-            ! empty($data['durasi']) ? "Alokasi waktu: {$data['durasi']}" : null,
-        ]);
-        $detailText = $details ? implode("\n", $details)."\n" : '';
-
-        if ($documentText !== '') {
-            $maxChars = (int) config('ai.max_input_chars');
-            $material = mb_substr($documentText, 0, $maxChars);
-            $topicLine = $topik !== '' ? "Fokus/topik RPM: \"{$topik}\".\n" : '';
-
-            $prompt = "Buat {$toolLabel} siap pakai untuk guru berdasarkan materi dari file berikut.\n"
-                .$topicLine
-                .$detailText
-                ."Gunakan Bahasa Indonesia baku, praktis, dan langsung bisa direview guru.\n"
-                ."JANGAN keluar dari cakupan MATERI FILE. Jika ada informasi yang belum ada di file, gunakan placeholder yang jelas, bukan mengarang.\n\n"
-                ."MATERI FILE:\n{$material}\n\n"
-                .$this->learningFormatInstruction($data['tool']);
-        } else {
-            $prompt = "Buat {$toolLabel} siap pakai untuk guru dengan topik: \"{$topik}\".\n"
-                .$detailText
-                ."Gunakan Bahasa Indonesia baku, praktis, dan langsung bisa direview guru.\n\n"
-                .$this->learningFormatInstruction($data['tool']);
-        }
-        // Dokumen RPM utuh (+3 lampiran) butuh ~3.500 token dan ~45 detik. Jatah token
-        // dibagi dengan token "berpikir" model, jadi porsi berpikir ditekan agar dokumen
-        // tidak terpotong di tengah; batas eksekusi PHP dinaikkan agar tak fatal duluan.
+        // Dokumen RPM utuh (+3 lampiran) butuh ~3.500 token dan ~45 detik.
         @set_time_limit((int) config('ai.long_timeout') + 60);
 
-        return $this->respond($request, 'teacher_learning_'.$data['tool'], config('ai.teacher.learning'), $prompt, 8192, [
-            'thinking_level' => 'low',
-            'timeout' => (int) config('ai.long_timeout'),
-            'retries' => 1,
-            'answer_style' => 'Tulis sebagai dokumen teks polos siap cetak. JANGAN memakai Markdown '
-                .'(tanpa **tebal**, tanpa heading #, tanpa tabel pipa selain yang diminta format).',
-        ], [
-            'type' => $data['tool'],
-            'type_label' => $toolLabel,
-            'title' => $title,
-            'metadata' => [
-                'mapel' => $data['mapel'] ?? null,
-                'jenjang' => $data['jenjang'] ?? null,
-                'durasi' => $data['durasi'] ?? null,
-                'file' => $request->file('file')?->getClientOriginalName(),
+        return $this->respond(
+            $request,
+            'teacher_learning_'.$built['learning_tool'],
+            $built['system'],
+            $built['prompt'],
+            8192,
+            [
+                'thinking_level' => 'low',
+                'timeout' => (int) config('ai.long_timeout'),
+                'retries' => 1,
+                'answer_style' => $built['answer_style'],
             ],
-        ]);
+            $built['history'],
+        );
     }
 
     /**
@@ -374,24 +776,213 @@ class AiTeacherController extends Controller
     /** POST /ai/teacher/summary - perangkum materi. */
     public function summary(Request $request): JsonResponse
     {
+        $built = $this->composeSummary($request);
+        if ($built instanceof JsonResponse) {
+            return $built;
+        }
+
+        return $this->respond($request, 'teacher_summary', $built['system'], $built['prompt'], 2048, [], $built['history']);
+    }
+
+    /** POST /ai/teacher/feedback - draft komentar/feedback siswa. */
+    public function feedback(Request $request): JsonResponse
+    {
+        $built = $this->composeFeedback($request);
+        if ($built instanceof JsonResponse) {
+            return $built;
+        }
+
+        return $this->respond($request, 'teacher_feedback', $built['system'], $built['prompt'], 2048, [], $built['history']);
+    }
+
+    /**
+     * @return array{system:string,prompt:string,answer_style:string,history:array,title:string}|JsonResponse
+     */
+    private function composeQuiz(Request $request): array|JsonResponse
+    {
+        if (! $request->has('jenis_soal') && $request->filled('jenis')) {
+            $legacyJenis = (string) $request->input('jenis');
+            $request->merge([
+                'jenis_soal' => self::LEGACY_QUIZ_TYPES[$legacyJenis] ?? [$legacyJenis],
+            ]);
+        }
+
+        $allowedQuizTypes = implode(',', array_keys(self::QUIZ_TYPES));
+        $data = $request->validate([
+            'topik' => ['nullable', 'required_without:file', 'string', 'max:500'],
+            'jumlah' => ['required', 'integer', 'min:1', 'max:20'],
+            'jenis_soal' => ['required', 'array', 'min:1', 'max:5'],
+            'jenis_soal.*' => ['required', 'string', 'distinct', 'in:'.$allowedQuizTypes],
+            'tingkat' => ['required', 'in:mudah,sedang,sulit'],
+            'jenjang' => ['nullable', 'string', 'max:100'],
+            'file' => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:10240'],
+        ]);
+        $data['jenis_soal'] = array_values(array_unique($data['jenis_soal']));
+
+        $documentText = '';
+        if ($request->hasFile('file')) {
+            $file = $request->file('file');
+            $documentText = $this->extractQuizDocumentText($file->getRealPath(), $file->getClientOriginalExtension());
+
+            if ($documentText === '') {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'Teks tidak dapat diekstrak dari file. Pastikan PDF bukan hasil scan/gambar dan file Word berisi teks.',
+                ], 422);
+            }
+        }
+
+        $jenis = $this->quizTypeSummary($data['jenis_soal']);
+        $topik = trim((string) ($data['topik'] ?? ''));
+        $jenjang = ! empty($data['jenjang']) ? "untuk jenjang {$data['jenjang']}" : '';
+        $formatInstruction = $this->quizFormatInstruction((int) $data['jumlah'], $data['jenis_soal'], $data['tingkat'], $data['jenjang'] ?? null, $topik);
+
+        if ($documentText !== '') {
+            $maxChars = (int) config('ai.max_input_chars');
+            $material = mb_substr($documentText, 0, $maxChars);
+            $topicLine = $topik !== '' ? "Fokus topik: \"{$topik}\".\n" : '';
+            $prompt = "Buat {$data['jumlah']} soal ({$jenis}) dengan tingkat kesulitan "
+                ."{$data['tingkat']} {$jenjang} berdasarkan materi dari file berikut.\n"
+                .$topicLine
+                ."MATERI FILE:\n{$material}\n\n"
+                .$formatInstruction;
+        } else {
+            $prompt = "Buat {$data['jumlah']} soal ({$jenis}) dengan tingkat kesulitan "
+                ."{$data['tingkat']} tentang topik: \"{$topik}\" {$jenjang}.\n\n"
+                .$formatInstruction;
+        }
+
+        $title = $topik !== '' ? $topik : 'Soal dari file '.$request->file('file')?->getClientOriginalName();
+
+        return [
+            'system' => (string) config('ai.teacher.quiz'),
+            'prompt' => $prompt,
+            'answer_style' => 'Tulis sebagai dokumen soal teks polos siap cetak sesuai format yang diminta. JANGAN memakai Markdown, heading #, atau bullet dekoratif.',
+            'title' => (string) $title,
+            'history' => [
+                'type' => 'quiz',
+                'type_label' => 'Generator Soal',
+                'title' => $title,
+                'metadata' => [
+                    'jumlah' => $data['jumlah'],
+                    'jenis_soal' => $data['jenis_soal'],
+                    'tingkat' => $data['tingkat'],
+                    'jenjang' => $data['jenjang'] ?? null,
+                    'file' => $request->file('file')?->getClientOriginalName(),
+                    'via' => 'sims',
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @return array{system:string,prompt:string,answer_style:string,history:array,title:string,learning_tool:string}|JsonResponse
+     */
+    private function composeLearning(Request $request): array|JsonResponse
+    {
+        $data = $request->validate([
+            'tool' => ['required', 'in:rpp'],
+            'topik' => ['nullable', 'required_without:file', 'string', 'max:500'],
+            'mapel' => ['nullable', 'string', 'max:100'],
+            'jenjang' => ['nullable', 'string', 'max:100'],
+            'durasi' => ['nullable', 'string', 'max:100'],
+            'file' => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:10240'],
+        ]);
+
+        $documentText = '';
+        if ($request->hasFile('file')) {
+            $file = $request->file('file');
+            $documentText = $this->extractQuizDocumentText($file->getRealPath(), $file->getClientOriginalExtension(), true);
+
+            if ($documentText === '') {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'Teks tidak dapat diekstrak dari file. Pastikan PDF bukan hasil scan/gambar dan file Word berisi teks.',
+                ], 422);
+            }
+        }
+
+        $toolLabel = $this->learningToolLabel($data['tool']);
+        $topik = trim((string) ($data['topik'] ?? ''));
+        $title = $topik !== '' ? $topik : 'RPM dari file '.$request->file('file')?->getClientOriginalName();
+        $details = array_filter([
+            ! empty($data['mapel']) ? "Mata pelajaran: {$data['mapel']}" : null,
+            ! empty($data['jenjang']) ? "Jenjang/kelas: {$data['jenjang']}" : null,
+            ! empty($data['durasi']) ? "Alokasi waktu: {$data['durasi']}" : null,
+        ]);
+        $detailText = $details ? implode("\n", $details)."\n" : '';
+
+        if ($documentText !== '') {
+            $maxChars = (int) config('ai.max_input_chars');
+            $material = mb_substr($documentText, 0, $maxChars);
+            $topicLine = $topik !== '' ? "Fokus/topik RPM: \"{$topik}\".\n" : '';
+            $prompt = "Buat {$toolLabel} siap pakai untuk guru berdasarkan materi dari file berikut.\n"
+                .$topicLine
+                .$detailText
+                ."Gunakan Bahasa Indonesia baku, praktis, dan langsung bisa direview guru.\n"
+                ."JANGAN keluar dari cakupan MATERI FILE. Jika ada informasi yang belum ada di file, gunakan placeholder yang jelas, bukan mengarang.\n\n"
+                ."MATERI FILE:\n{$material}\n\n"
+                .$this->learningFormatInstruction($data['tool']);
+        } else {
+            $prompt = "Buat {$toolLabel} siap pakai untuk guru dengan topik: \"{$topik}\".\n"
+                .$detailText
+                ."Gunakan Bahasa Indonesia baku, praktis, dan langsung bisa direview guru.\n\n"
+                .$this->learningFormatInstruction($data['tool']);
+        }
+
+        return [
+            'system' => (string) config('ai.teacher.learning'),
+            'prompt' => $prompt,
+            'answer_style' => 'Tulis sebagai dokumen teks polos siap cetak. JANGAN memakai Markdown '
+                .'(tanpa **tebal**, tanpa heading #, tanpa tabel pipa selain yang diminta format).',
+            'title' => (string) $title,
+            'learning_tool' => $data['tool'],
+            'history' => [
+                'type' => $data['tool'],
+                'type_label' => $toolLabel,
+                'title' => $title,
+                'metadata' => [
+                    'mapel' => $data['mapel'] ?? null,
+                    'jenjang' => $data['jenjang'] ?? null,
+                    'durasi' => $data['durasi'] ?? null,
+                    'file' => $request->file('file')?->getClientOriginalName(),
+                    'via' => 'sims',
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @return array{system:string,prompt:string,history:array,title:string}|JsonResponse
+     */
+    private function composeSummary(Request $request): array|JsonResponse
+    {
         $data = $request->validate([
             'materi' => ['required', 'string', 'max:'.config('ai.max_input_chars')],
         ]);
 
         $prompt = "Rangkum materi berikut menjadi poin-poin ringkas untuk siswa:\n\n".$data['materi'];
 
-        return $this->respond($request, 'teacher_summary', config('ai.teacher.summary'), $prompt, 2048, [], [
-            'type' => 'summary',
-            'type_label' => 'Perangkum Materi',
+        return [
+            'system' => (string) config('ai.teacher.summary'),
+            'prompt' => $prompt,
             'title' => Str::limit($data['materi'], 90),
-            'metadata' => [
-                'panjang_materi' => mb_strlen($data['materi']),
+            'history' => [
+                'type' => 'summary',
+                'type_label' => 'Perangkum Materi',
+                'title' => Str::limit($data['materi'], 90),
+                'metadata' => [
+                    'panjang_materi' => mb_strlen($data['materi']),
+                    'via' => 'sims',
+                ],
             ],
-        ]);
+        ];
     }
 
-    /** POST /ai/teacher/feedback - draft komentar/feedback siswa. */
-    public function feedback(Request $request): JsonResponse
+    /**
+     * @return array{system:string,prompt:string,history:array,title:string}|JsonResponse
+     */
+    private function composeFeedback(Request $request): array|JsonResponse
     {
         $data = $request->validate([
             'konteks' => ['required', 'string', 'max:'.config('ai.max_input_chars')],
@@ -400,21 +991,34 @@ class AiTeacherController extends Controller
 
         $nama = $data['nama'] ? "untuk siswa bernama {$data['nama']}" : '';
         $prompt = "Susun draf umpan balik {$nama} berdasarkan konteks berikut:\n\n".$data['konteks'];
+        $title = ! empty($data['nama']) ? 'Feedback untuk '.$data['nama'] : Str::limit($data['konteks'], 90);
 
-        return $this->respond($request, 'teacher_feedback', config('ai.teacher.feedback'), $prompt, 2048, [], [
-            'type' => 'feedback',
-            'type_label' => 'Draft Feedback',
-            'title' => ! empty($data['nama']) ? 'Feedback untuk '.$data['nama'] : Str::limit($data['konteks'], 90),
-            'metadata' => [
-                'nama' => $data['nama'] ?? null,
+        return [
+            'system' => (string) config('ai.teacher.feedback'),
+            'prompt' => $prompt,
+            'title' => $title,
+            'history' => [
+                'type' => 'feedback',
+                'type_label' => 'Draft Feedback',
+                'title' => $title,
+                'metadata' => [
+                    'nama' => $data['nama'] ?? null,
+                    'via' => 'sims',
+                ],
             ],
-        ]);
+        ];
     }
 
-    /** Pipeline bersama: rate limit -> Gemini -> audit -> JSON. */
+    /** Pipeline bersama: rate limit -> Gemini (key pribadi) -> audit -> JSON. */
     private function respond(Request $request, string $feature, string $system, string $prompt, int $maxOutputTokens = 2048, array $options = [], ?array $historyData = null): JsonResponse
     {
-        $userId = $request->user()->uuid;
+        if ($blocked = $this->requireTeacherReady($request)) {
+            return $blocked;
+        }
+
+        $user = $request->user();
+        $userId = $user->uuid;
+        $apiKey = $user->plainGeminiApiKey();
 
         if ($limited = $this->aiRateLimited($feature, $userId)) {
             return $limited;
@@ -424,6 +1028,7 @@ class AiTeacherController extends Controller
             $result = $this->gemini->generate($prompt, $options + [
                 'system' => $system,
                 'max_output_tokens' => $maxOutputTokens, // keluaran guru cenderung lebih panjang
+                'api_key' => $apiKey,
             ]);
         } catch (RuntimeException $e) {
             $this->logAiUsage($userId, $feature, config('ai.model'), 0, 0, 'error');

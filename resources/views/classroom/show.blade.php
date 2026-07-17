@@ -9,7 +9,7 @@
 @endphp
 
 @section('content')
-<div class="space-y-5" x-data="{ tab: '{{ request('tab','materi') }}' }">
+<div class="space-y-5" x-data="{ tab: '{{ request('tab', 'materi') }}' }">
     {{-- Header --}}
     <div class="card overflow-hidden">
         <div class="min-h-[7.5rem] sm:min-h-[8.5rem] p-5 sm:p-6 relative flex flex-col justify-end" style="background:{{ $classroom->cover_color }}">
@@ -40,8 +40,15 @@
     @endif
 
     {{-- Tabs --}}
+    @php
+        $tabs = ['materi' => 'Materi', 'tugas' => 'Latihan & Tugas'];
+        if (\App\Support\ModulAktif::aktif('arena_belajar')) {
+            $tabs['arena'] = 'Arena Belajar';
+        }
+        $tabs['anggota'] = 'Anggota';
+    @endphp
     <div class="flex gap-1 border-b border-slate-200 dark:border-slate-700 overflow-x-auto">
-        @foreach(['materi'=>'Materi','tugas'=>'Latihan & Tugas','arena'=>'Arena Belajar','anggota'=>'Anggota'] as $k=>$label)
+        @foreach($tabs as $k=>$label)
         <button @click="tab='{{ $k }}'" :class="tab==='{{ $k }}' ? 'border-primary text-primary' : 'border-transparent text-slate-500'" class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition whitespace-nowrap" style="--tw-text-opacity:1" :style="tab==='{{ $k }}' ? 'color:var(--cp);border-color:var(--cp)' : ''">{{ $label }}</button>
         @endforeach
     </div>
@@ -103,16 +110,27 @@
     {{-- ===== TAB ARENA BELAJAR ===== --}}
     <div x-show="tab==='arena'" x-cloak class="space-y-4">
         <a href="{{ route('classroom.arena.index', $classroom) }}"
-           class="relative overflow-hidden block rounded-2xl p-5 sm:p-6 text-white"
-           style="background:radial-gradient(ellipse 80% 60% at 15% 0%,color-mix(in srgb,var(--cp) 55%,transparent),transparent 55%),linear-gradient(155deg,#0c1a24,#152836 55%,#0f2430)">
-            <div class="relative z-[1] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-300 mb-1">Mode game</p>
-                    <h3 class="text-xl font-black">Arena Belajar</h3>
-                    <p class="text-sm text-slate-300 mt-1">Kuis interaktif, live podium, skor otomatis.</p>
+           class="group relative overflow-hidden block rounded-[1.4rem] border-[3px] border-slate-200/80 dark:border-slate-600 p-5 sm:p-7 transition hover:-translate-y-1 active:translate-y-1"
+           style="background:linear-gradient(180deg,#9ad4ff 0%,#c9ebff 40%,#e8f4ff 100%);box-shadow:0 8px 0 rgba(18,52,91,.12),0 18px 36px rgba(18,52,91,.12)">
+            <span class="absolute left-[8%] top-[18%] w-5 h-5 rounded-md rotate-12 opacity-90 pointer-events-none"
+                  style="background:linear-gradient(145deg,#00c2b2,#008f84);box-shadow:0 4px 0 rgba(0,0,0,.12)" aria-hidden="true"></span>
+            <span class="absolute right-[22%] top-[22%] w-3.5 h-3.5 rounded-md -rotate-6 opacity-90 pointer-events-none"
+                  style="background:linear-gradient(145deg,#ffb020,#e09410);box-shadow:0 3px 0 rgba(0,0,0,.12)" aria-hidden="true"></span>
+            <span class="absolute right-[12%] bottom-[22%] w-4 h-4 rounded-full pointer-events-none"
+                  style="background:radial-gradient(circle at 35% 30%,#ffe9a8,#ffb020);box-shadow:0 0 0 3px rgba(255,176,32,.25)" aria-hidden="true"></span>
+            <div class="relative z-[1] flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+                <div class="flex items-center gap-4 min-w-0">
+                    <div class="w-[4.25rem] h-[4.25rem] rounded-2xl grid place-items-center text-xl font-black text-white shrink-0 transition group-hover:-translate-y-0.5"
+                         style="background:linear-gradient(155deg,#00c2b2,#0b3d6e);box-shadow:inset 0 2px 0 rgba(255,255,255,.3),0 6px 0 rgba(11,61,110,.35)" aria-hidden="true">AB</div>
+                    <div class="min-w-0">
+                        <p class="text-[10px] font-black uppercase tracking-[0.14em] text-sky-800/80 mb-1">Game lobby · Online</p>
+                        <h3 class="text-2xl sm:text-3xl font-black tracking-tight text-slate-900" style="font-family:'Plus Jakarta Sans',sans-serif;text-shadow:0 2px 0 rgba(255,255,255,.5)">Arena Belajar</h3>
+                        <p class="text-sm font-semibold text-slate-600 mt-1 max-w-md leading-relaxed">Pilih world, rebut podium — skor masuk rapor.</p>
+                    </div>
                 </div>
-                <span class="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-black text-[#0c1a24] bg-white min-h-[48px] shrink-0">
-                    <i data-lucide="gamepad-2" class="w-4 h-4"></i> Masuk Arena
+                <span class="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl text-base font-black text-white min-h-[52px] shrink-0 transition group-hover:brightness-105 group-active:translate-y-1"
+                      style="background:linear-gradient(180deg,#22e06b,#00c853 55%,#00a844);box-shadow:inset 0 2px 0 rgba(255,255,255,.35),0 6px 0 #00963e,0 12px 22px rgba(0,168,68,.35)">
+                    <i data-lucide="play" class="w-5 h-5"></i> PLAY
                 </span>
             </div>
         </a>
