@@ -7,6 +7,9 @@
 
 @section('content')
 <div class="space-y-5 arena-stage">
+    <a href="{{ route('jagat-misi.index') }}" class="text-xs text-slate-500 hover:text-primary inline-flex items-center gap-1">
+        <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> Arena Belajar
+    </a>
     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-3">
         <div>
             <p class="arena-eyebrow" style="color:var(--arena-teal)">Arena Belajar</p>
