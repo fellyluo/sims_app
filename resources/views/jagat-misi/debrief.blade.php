@@ -3,7 +3,7 @@
 
 @section('content')
 <div class="max-w-3xl mx-auto space-y-5">
-    <a href="{{ route('jagat-misi.index') }}" class="text-xs text-slate-500">← Katalog</a>
+    <a href="{{ route('jagat-misi.index') }}" class="text-xs text-slate-500">← Katalog Misi</a>
     <div class="rounded-2xl border p-5 bg-white dark:bg-slate-900">
         <p class="text-xs text-slate-500">Misi selesai — skor {{ $attempt->score }}%</p>
         <h1 class="text-2xl font-black">{{ $attempt->mission->title }}</h1>

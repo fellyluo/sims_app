@@ -10,6 +10,9 @@ use App\Models\GameQuiz;
 use App\Models\GameQuizAssignment;
 use App\Models\Kelas;
 use App\Models\Materi;
+use App\Models\Mission;
+use App\Models\MissionAssignment;
+use App\Models\MissionAttempt;
 use App\Models\NilaiFormatif;
 use App\Models\NilaiSumatif;
 use App\Models\RaporKonfirmasi;
@@ -52,16 +55,71 @@ class GameQuizController extends Controller implements HasMiddleware
 
         $canManage = auth()->user()->can('manage', $classroom);
 
-        return view('arena-belajar.index', compact('classroom', 'quizzes', 'canManage'));
+        $missionAssignments = MissionAssignment::query()
+            ->where('classroom_id', $classroom->uuid)
+            ->with('mission')
+            ->latest()
+            ->get();
+
+        if (auth()->user()->access === 'siswa') {
+            $missionAssignments = $missionAssignments
+                ->filter(fn ($a) => $a->mission?->isPublished() && $a->isOpen())
+                ->values();
+        }
+
+        $availableMissions = collect();
+        if ($canManage) {
+            $availableMissions = Mission::query()
+                ->where('is_published', true)
+                ->where(function ($q) use ($classroom) {
+                    $q->where('classroom_id', $classroom->uuid)
+                        ->orWhere('visible_to_teachers', true)
+                        ->orWhereNull('classroom_id');
+                })
+                ->orderBy('title')
+                ->get()
+                ->reject(fn ($m) => $missionAssignments->contains(fn ($a) => $a->mission_id === $m->uuid));
+        }
+
+        $myMissionAttempts = [];
+        if (auth()->user()->access === 'siswa') {
+            $myMissionAttempts = MissionAttempt::query()
+                ->where('user_id', auth()->id())
+                ->whereIn('assignment_id', $missionAssignments->pluck('uuid'))
+                ->orderByDesc('completed_at')
+                ->orderByDesc('created_at')
+                ->get()
+                ->unique('assignment_id')
+                ->keyBy('assignment_id');
+        }
+
+        $jenjangRekomendasi = \App\Support\ArenaJenjang::rekomendasi();
+        $trenRekomendasi = \App\Support\ArenaJenjang::trenRekomendasi();
+
+        return view('arena-belajar.index', compact(
+            'classroom',
+            'quizzes',
+            'canManage',
+            'missionAssignments',
+            'availableMissions',
+            'myMissionAttempts',
+            'jenjangRekomendasi',
+            'trenRekomendasi'
+        ));
     }
 
     public function create(Classroom $classroom)
     {
         $this->authorize('manage', $classroom);
 
+        $aiImport = session()->pull('arena_ai_import');
+
         return view('arena-belajar.form', [
             'classroom' => $classroom,
-            'quiz'      => null,
+            'quiz' => null,
+            'aiImportText' => is_array($aiImport) ? ($aiImport['raw_text'] ?? null) : null,
+            'aiImportTitle' => is_array($aiImport) ? ($aiImport['title'] ?? null) : null,
+            'asistenGuruAktif' => \App\Support\ModulAktif::aktif('asisten_guru'),
         ]);
     }
 
@@ -139,7 +197,10 @@ class GameQuizController extends Controller implements HasMiddleware
 
         return view('arena-belajar.form', [
             'classroom' => $classroom,
-            'quiz'      => $quiz,
+            'quiz' => $quiz,
+            'aiImportText' => null,
+            'aiImportTitle' => null,
+            'asistenGuruAktif' => \App\Support\ModulAktif::aktif('asisten_guru'),
         ]);
     }
 
@@ -418,7 +479,7 @@ class GameQuizController extends Controller implements HasMiddleware
                 'meta'          => $this->normalizeQuestionMeta($qData),
             ]);
 
-            if (in_array($qData['type'], ['mcq', 'true_false'], true)) {
+            if (in_array($qData['type'], ['mcq', 'mcq_complex', 'true_false'], true)) {
                 foreach ($qData['options'] ?? [] as $j => $opt) {
                     if (trim((string) ($opt['option_text'] ?? '')) === '') {
                         continue;

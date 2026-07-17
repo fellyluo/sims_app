@@ -47,11 +47,27 @@ class PanduanSimsTest extends TestCase
             ->assertOk()
             ->assertHeader('Content-Type', 'text/html; charset=UTF-8')
             ->assertSee('Arena Belajar', false)
+            ->assertSee('Misi Edukatif', false)
+            ->assertSee('mode=misi', false)
+            ->assertSee('SD / SMP / SMA-SMK', false)
+            ->assertSee('Tren 2025–2026', false)
+            ->assertSee('Deepfake di Dunia Kerja', false)
+            ->assertSee('Prompt Cerdas', false)
+            ->assertSee('arenatren', false)
             ->assertSee('/images/panduan/', false)
             ->assertSee('/videos/panduan/', false)
+            ->assertSee('Asisten Guru', false)
+            ->assertSee('Hubungkan API key', false)
+            ->assertSee('/ai/teacher', false)
+            ->assertSee('asisten-ai-s1.png', false)
+            ->assertSee('asisten-ai-s5.png', false)
+            ->assertSee('Urutan Screenshot Storyboard', false)
             ->assertSee('PANDUAN_CTX', false)
             ->assertSee('"access":"siswa"', false)
-            ->assertSee('"isAdmin":false', false);
+            ->assertSee('"isAdmin":false', false)
+            ->assertSee('html.dark', false)
+            ->assertSee('theme_mode', false)
+            ->assertSee('sims-theme', false);
     }
 
     public function test_konten_admin_mendapat_flag_is_admin(): void
@@ -80,5 +96,6 @@ class PanduanSimsTest extends TestCase
     {
         $this->assertFileExists(public_path('videos/panduan/login.mp4'));
         $this->assertFileExists(public_path('videos/panduan/dashboard.mp4'));
+        $this->assertFileExists(public_path('videos/panduan/ai.mp4'));
     }
 }

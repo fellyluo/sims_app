@@ -16,6 +16,7 @@ use App\Models\Semester;
 use App\Models\Setting;
 use App\Models\Siswa;
 use App\Models\User;
+use App\Support\ModulAktif;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -115,12 +116,44 @@ class MissionClassroomTest extends TestCase
             'mission_id' => $this->mission->uuid,
         ]);
 
-        $response->assertRedirect(route('classroom.jagat.index', $this->classroom));
+        $response->assertRedirect(route('classroom.arena.index', [
+            'classroom' => $this->classroom,
+            'mode' => 'misi',
+        ]));
         $this->assertDatabaseHas('mission_assignments', [
             'mission_id' => $this->mission->uuid,
             'classroom_id' => $this->classroom->uuid,
             'status' => 'open',
         ]);
+    }
+
+    public function test_reassign_mission_updates_schedule_dates(): void
+    {
+        MissionAssignment::create([
+            'mission_id' => $this->mission->uuid,
+            'classroom_id' => $this->classroom->uuid,
+            'assigned_by' => $this->guruUser->uuid,
+            'status' => 'open',
+            'opens_at' => now()->subDay(),
+            'due_at' => now()->addDay(),
+        ]);
+
+        $opens = now()->addDays(2)->startOfMinute();
+        $due = now()->addDays(5)->startOfMinute();
+
+        $this->actingAs($this->guruUser)->post(route('classroom.jagat.assign', $this->classroom), [
+            'mission_id' => $this->mission->uuid,
+            'opens_at' => $opens->format('Y-m-d\TH:i'),
+            'due_at' => $due->format('Y-m-d\TH:i'),
+        ])->assertRedirect();
+
+        $assignment = MissionAssignment::where('mission_id', $this->mission->uuid)
+            ->where('classroom_id', $this->classroom->uuid)
+            ->first();
+
+        $this->assertNotNull($assignment);
+        $this->assertSame($opens->format('Y-m-d H:i'), $assignment->opens_at?->format('Y-m-d H:i'));
+        $this->assertSame($due->format('Y-m-d H:i'), $assignment->due_at?->format('Y-m-d H:i'));
     }
 
     public function test_siswa_sees_assigned_mission_in_classroom_index(): void
@@ -132,11 +165,18 @@ class MissionClassroomTest extends TestCase
             'status' => 'open',
         ]);
 
-        $response = $this->actingAs($this->siswaUser)->get(route('classroom.jagat.index', $this->classroom));
+        $response = $this->actingAs($this->siswaUser)->get(route('classroom.arena.index', $this->classroom));
 
         $response->assertOk()
             ->assertSee($this->mission->title)
-            ->assertSee('Jagat Misi');
+            ->assertSee('Arena Belajar')
+            ->assertSee('Menurut jenjang')
+            ->assertSee('Menjodohkan — Angka &amp; Operasi', false)
+            ->assertSee('Recall Quiz — Gaya &amp; Gerak', false)
+            ->assertSee('Keputusan — Modal Usaha Siswa', false)
+            ->assertSee('Tren 2025–2026')
+            ->assertSee('Kenalan dengan AI', false)
+            ->assertSee('Deepfake di Dunia Kerja', false);
     }
 
     public function test_siswa_can_play_assigned_mission_from_classroom(): void
@@ -227,12 +267,78 @@ class MissionClassroomTest extends TestCase
             ->assertSee('85%');
     }
 
-    public function test_classroom_show_has_jagat_misi_tab(): void
+    public function test_classroom_show_has_arena_belajar_tab(): void
     {
         $response = $this->actingAs($this->guruUser)->get(route('classroom.show', $this->classroom));
 
         $response->assertOk()
-            ->assertSee('Jagat Misi')
-            ->assertSee(route('classroom.jagat.index', $this->classroom));
+            ->assertSee('Arena Belajar')
+            ->assertDontSee('Jagat Misi')
+            ->assertSee(route('classroom.arena.index', $this->classroom));
+    }
+
+    public function test_jagat_index_redirects_to_arena_hub(): void
+    {
+        $response = $this->actingAs($this->guruUser)->get(route('classroom.jagat.index', $this->classroom));
+
+        $response->assertRedirect(route('classroom.arena.index', [
+            'classroom' => $this->classroom,
+            'mode' => 'misi',
+        ]));
+    }
+
+    public function test_legacy_tab_jagat_redirects_to_arena_misi(): void
+    {
+        $response = $this->actingAs($this->guruUser)->get(
+            route('classroom.show', $this->classroom).'?tab=jagat'
+        );
+
+        $response->assertRedirect(route('classroom.arena.index', [
+            'classroom' => $this->classroom,
+            'mode' => 'misi',
+        ]));
+    }
+
+    public function test_arena_hub_forbidden_when_modul_off(): void
+    {
+        Setting::set(ModulAktif::settingKey('arena_belajar'), '0');
+
+        $this->actingAs($this->siswaUser)
+            ->get(route('classroom.arena.index', $this->classroom))
+            ->assertForbidden();
+    }
+
+    public function test_hub_shows_latest_mission_attempt_status(): void
+    {
+        $assignment = MissionAssignment::create([
+            'mission_id' => $this->mission->uuid,
+            'classroom_id' => $this->classroom->uuid,
+            'assigned_by' => $this->guruUser->uuid,
+            'status' => 'open',
+        ]);
+
+        MissionAttempt::create([
+            'mission_id' => $this->mission->uuid,
+            'assignment_id' => $assignment->uuid,
+            'user_id' => $this->siswaUser->uuid,
+            'status' => 'in_progress',
+            'score' => 0,
+            'created_at' => now()->subHour(),
+        ]);
+
+        MissionAttempt::create([
+            'mission_id' => $this->mission->uuid,
+            'assignment_id' => $assignment->uuid,
+            'user_id' => $this->siswaUser->uuid,
+            'status' => 'completed',
+            'score' => 92,
+            'completed_at' => now(),
+            'created_at' => now(),
+        ]);
+
+        $this->actingAs($this->siswaUser)
+            ->get(route('classroom.arena.index', ['classroom' => $this->classroom, 'mode' => 'misi']))
+            ->assertOk()
+            ->assertSee('Clear 92%');
     }
 }

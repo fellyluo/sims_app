@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
+use App\Support\MissionStepPayloadPresenter;
 
 class MissionNalarController extends Controller
 {
@@ -58,10 +59,10 @@ class MissionNalarController extends Controller
             'responses.interactive_narrative.final_node' => ['required', 'string'],
             'responses.strategic_decision.choices' => ['required', 'array'],
             'responses.strategic_decision.choices.*' => ['string'],
-            'responses.strategic_decision.stats' => ['required', 'array'],
-            'responses.strategic_decision.stats.stability' => ['required', 'integer', 'min:0', 'max:100'],
-            'responses.strategic_decision.stats.trust' => ['required', 'integer', 'min:0', 'max:100'],
-            'responses.strategic_decision.stats.budget' => ['required', 'integer', 'min:0', 'max:100'],
+            'responses.strategic_decision.stats' => ['nullable', 'array'],
+            'responses.strategic_decision.stats.stability' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'responses.strategic_decision.stats.trust' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'responses.strategic_decision.stats.budget' => ['nullable', 'integer', 'min:0', 'max:100'],
             'responses.puzzle_sequencing.order' => ['required', 'array'],
             'responses.puzzle_sequencing.order.*' => ['string'],
             'duration_seconds' => ['nullable', 'integer', 'min:0'],
@@ -170,7 +171,7 @@ class MissionNalarController extends Controller
             'title' => $step->title,
             'prompt' => $step->prompt,
             'body' => $step->body,
-            'payload' => $step->payload,
+            'payload' => MissionStepPayloadPresenter::forClient($step),
             'max_points' => $step->max_points,
         ];
     }

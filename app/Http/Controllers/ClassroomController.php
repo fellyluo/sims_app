@@ -100,6 +100,15 @@ class ClassroomController extends Controller implements \Illuminate\Routing\Cont
     public function show(Request $request, Classroom $classroom)
     {
         $this->authorize('view', $classroom);
+
+        // Bookmark lama ?tab=jagat → hub Arena tab Misi
+        if ($request->query('tab') === 'jagat') {
+            return redirect()->route('classroom.arena.index', [
+                'classroom' => $classroom,
+                'mode' => 'misi',
+            ]);
+        }
+
         $user = $request->user();
 
         $classroom->load([

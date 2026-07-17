@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\MissionReflection;
+use App\Models\Mission;
 use App\Models\User;
 use App\Services\MissionAnalyticsService;
 use Illuminate\Http\JsonResponse;
@@ -41,6 +41,7 @@ class MissionAnalyticsController extends Controller
     public function student(Request $request, User $user, MissionAnalyticsService $service): JsonResponse
     {
         Gate::authorize('viewAnalytics', Mission::class);
+        Gate::authorize('viewStudentAnalytics', $user);
 
         return response()->json(['data' => $service->studentDetail($user)]);
     }
@@ -48,6 +49,7 @@ class MissionAnalyticsController extends Controller
     public function report(Request $request, User $user, MissionAnalyticsService $service): View
     {
         Gate::authorize('viewAnalytics', Mission::class);
+        Gate::authorize('viewStudentAnalytics', $user);
 
         $report = $service->report($user, $request->query('format', 'parent'));
 

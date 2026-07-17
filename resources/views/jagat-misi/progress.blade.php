@@ -1,9 +1,9 @@
 @extends('layouts.app')
-@section('title', 'Progres Jagat Misi')
+@section('title', 'Progres Arena Belajar')
 
 @push('styles')
-<link rel="stylesheet" href="{{ asset('jagat-misi/styles.css') }}">
-<link rel="stylesheet" href="{{ asset('jagat-misi/progress.css') }}">
+<link rel="stylesheet" href="{{ asset('assets/jagat-misi/styles.css') }}">
+<link rel="stylesheet" href="{{ asset('assets/jagat-misi/progress.css') }}">
 @endpush
 
 @section('content')

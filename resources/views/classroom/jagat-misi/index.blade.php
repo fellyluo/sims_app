@@ -1,16 +1,16 @@
 @extends('layouts.app')
-@section('title', 'Jagat Misi — ' . $classroom->title)
+@section('title', 'Arena Belajar — Misi — ' . $classroom->title)
 
 @section('content')
 <div class="space-y-5 max-w-4xl mx-auto">
     <div class="rounded-2xl p-5 sm:p-7 text-white relative overflow-hidden"
-         style="background:radial-gradient(ellipse 70% 50% at 10% 0%,color-mix(in srgb,#7c3aed 50%,transparent),transparent 60%),linear-gradient(155deg,#1a0f2e,#2d1b4e 55%,#1a1030)">
+         style="background:radial-gradient(ellipse 70% 50% at 10% 0%,color-mix(in srgb,var(--cp) 50%,transparent),transparent 60%),linear-gradient(155deg,#0c1a24,#152836 55%,#0f2430)">
         <div class="relative z-[1]">
-            <a href="{{ route('classroom.show', $classroom) }}" class="text-xs text-violet-200/90 hover:text-white inline-flex items-center gap-1 mb-3">
-                <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> {{ $classroom->title }}
+            <a href="{{ route('classroom.arena.index', $classroom) }}" class="text-xs text-slate-300/90 hover:text-white inline-flex items-center gap-1 mb-3">
+                <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> Arena Belajar
             </a>
-            <h1 class="text-2xl sm:text-3xl font-black tracking-tight">Jagat Misi</h1>
-            <p class="text-sm text-violet-100/80 mt-1.5">Misi edukatif interaktif untuk kelas ini.</p>
+            <h1 class="text-2xl sm:text-3xl font-black tracking-tight">Misi</h1>
+            <p class="text-sm text-slate-300 mt-1.5">Misi edukatif interaktif untuk kelas ini.</p>
         </div>
     </div>
 
@@ -82,7 +82,7 @@
             <i data-lucide="compass" class="w-10 h-10 mx-auto mb-2 opacity-30"></i>
             <p>Belum ada misi ditugaskan ke kelas ini.</p>
             @if($canManage)
-            <p class="text-sm mt-1">Pilih misi dari katalog di atas atau buat di <a href="{{ route('jagat-misi.builder.index') }}" class="text-primary font-semibold">Mission Builder</a>.</p>
+            <p class="text-sm mt-1">Pilih misi dari katalog di atas atau buat di <a href="{{ route('jagat-misi.builder.index') }}" class="text-primary font-semibold">Builder Misi</a>.</p>
             @endif
         </div>
         @endforelse

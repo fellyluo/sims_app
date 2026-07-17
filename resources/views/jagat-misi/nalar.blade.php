@@ -1,9 +1,9 @@
 @extends('layouts.app')
-@section('title', $mission->title . ' — Jagat Misi')
+@section('title', $mission->title . ' — Arena Belajar')
 
 @push('styles')
-<link rel="stylesheet" href="{{ asset('jagat-misi/styles.css') }}">
-<link rel="stylesheet" href="{{ asset('jagat-misi/nalar.css') }}">
+<link rel="stylesheet" href="{{ asset('assets/jagat-misi/styles.css') }}">
+<link rel="stylesheet" href="{{ asset('assets/jagat-misi/nalar.css') }}">
 @endpush
 
 @section('content')
@@ -59,7 +59,7 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('jagat-misi/nalar.js') }}"></script>
+<script src="{{ asset('assets/jagat-misi/nalar.js') }}"></script>
 <script>
 document.getElementById('submitMission')?.addEventListener('click', async () => {
     const root = document.getElementById('missionPlayer');

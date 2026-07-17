@@ -792,34 +792,39 @@
  {
   "n": 26,
   "id": "ai",
-  "title": "Asisten AI (Guru & Analisis)",
+  "title": "Asisten Guru",
   "img": "asisten-ai.png",
-  "path": "/ai/chat • /ai/teacher • /ai/analyze",
-  "users": "Guru, Wali Kelas, Kepala, Kurikulum, Kesiswaan",
-  "dur": 40,
+  "path": "/ai/teacher",
+  "users": "Guru, Wali Kelas, Kepala, Kurikulum, Kesiswaan, Sarpras",
+  "dur": 50,
   "shots": [
    [
     "1",
-    "Menu Analisis AI",
-    "Buka submenu"
+    "Modal Hubungkan API key",
+    "Layar pertama: Buka Google AI Studio + kolom Tempel API key"
    ],
    [
     "2",
-    "Asisten Guru",
-    "Ketik permintaan materi/soal"
+    "Google AI Studio — API Keys",
+    "Create API key atau salin key yang sudah ada"
    ],
    [
     "3",
-    "Jawaban AI",
-    "Perlihatkan hasil"
+    "Tempel & Simpan di SIMS",
+    "Kembali ke modal, tempel key, klik Simpan API key"
    ],
    [
     "4",
-    "Kuota di Dashboard",
-    "Sorot sisa kuota"
+    "Asisten Guru siap",
+    "Kartu Nalar Guru + kuota LIVE + deretan tab"
+   ],
+   [
+    "5",
+    "Nalar Guru",
+    "Tanya Nalar Guru / saran prompt / kirim chat"
    ]
   ],
-  "narr": "“Analisis AI membantu guru menyiapkan materi dan membantu pimpinan membaca data sekolah. Pemakaian dibatasi kuota yang tampil di dashboard.”"
+  "narr": "“Asisten Guru memakai API key Gemini pribadi Anda. Buka Google AI Studio, buat atau salin API key, tempel di SIMS, lalu pakai Nalar Guru dan generator langsung di dalam aplikasi. Selalu periksa hasil sebelum dibagikan ke siswa.”"
  },
  {
   "n": 27,

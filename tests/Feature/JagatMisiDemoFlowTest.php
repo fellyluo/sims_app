@@ -92,7 +92,7 @@ class JagatMisiDemoFlowTest extends TestCase
 
         // Re-assign ke classroom fixture kita (seeder pakai classroom pertama di DB kosong = fixture kita)
         $this->actingAs($siswaUser)
-            ->get(route('classroom.jagat.index', $classroom))
+            ->get(route('classroom.arena.index', $classroom))
             ->assertOk()
             ->assertSee('[DEMO] Ekspedisi Rantai Makanan');
 

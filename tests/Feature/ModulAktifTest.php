@@ -88,4 +88,23 @@ class ModulAktifTest extends TestCase
             ->get(route('ai.teacher.index'))
             ->assertOk();
     }
+
+    public function test_arena_belajar_falls_back_to_legacy_jagat_toggle(): void
+    {
+        Setting::where('key', ModulAktif::settingKey('arena_belajar'))->delete();
+        Setting::set('fitur_jagat_misi_aktif', '0');
+
+        $this->assertFalse(ModulAktif::aktif('arena_belajar'));
+
+        Setting::set('fitur_jagat_misi_aktif', '1');
+        $this->assertTrue(ModulAktif::aktif('arena_belajar'));
+    }
+
+    public function test_arena_belajar_row_overrides_legacy_jagat_toggle(): void
+    {
+        Setting::set(ModulAktif::settingKey('arena_belajar'), '0');
+        Setting::set('fitur_jagat_misi_aktif', '1');
+
+        $this->assertFalse(ModulAktif::aktif('arena_belajar'));
+    }
 }

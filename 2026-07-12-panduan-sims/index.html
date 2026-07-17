@@ -72,6 +72,10 @@ nav.toc a.active{background:var(--soft);border-left-color:var(--brand);color:var
 .desc{margin:2px 0 18px;font-size:16px;color:#263449}
 .shot{margin:0;border-radius:14px;overflow:hidden;border:1px solid var(--line);box-shadow:0 8px 24px rgba(16,32,64,.08);background:#f7f9fc;cursor:zoom-in}
 .shot img{display:block;width:100%;height:auto}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin:12px 0 4px}
+.gshot{margin:0;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#f7f9fc;cursor:zoom-in}
+.gshot img{display:block;width:100%;height:120px;object-fit:cover;object-position:top}
+.gshot figcaption{padding:8px 10px;font-size:11.5px;line-height:1.35;color:var(--sub);border-top:1px solid var(--line)}
 .shot .ph{display:none;flex-direction:column;align-items:center;justify-content:center;padding:44px 20px;text-align:center;color:var(--sub);cursor:default}
 .ph .b{font-weight:700;color:var(--ink);margin-bottom:4px;font-size:15px}
 .ph code{background:#eef2f7;padding:2px 8px;border-radius:6px;font-size:12.5px}
@@ -359,12 +363,27 @@ const F = [
  steps:["Buka Akademik ' Ruang Kelas.","Pilih kartu kelas yang dituju.","Di dalam ruang, akses materi, tugas, diskusi, dan Arena Belajar per mapel.","Guru mengunggah materi/tugas; siswa mengumpulkan & berdiskusi."],
  sb:{dur:"~40 detik", shots:[["1","Grid kartu kelas","Panning kartu berwarna"],["2","Klik satu kelas","Masuk ruang digital"],["3","Tab Materi/Tugas","Perlihatkan konten"],["4","Diskusi mapel","Balasan siswa"]], narr:"'Ruang Kelas adalah kelas digital tiap rombel. Pilih kelas untuk mengakses materi, tugas, diskusi, dan Arena Belajar tiap mata pelajaran.'"}},
 
-{cat:"Akademik", role:false, id:"arenabelajar", title:"Arena Belajar (Kuis Interaktif)", path:"/ruang-kelas/{kode}/arena-belajar", img:"ruang-kelas.png",
- users:"Guru (buat dan host), Siswa (mengerjakan)",
- cap:"Arena Belajar: daftar kuis di Ruang Kelas, mode async atau live, leaderboard, dan transfer nilai.",
- desc:"Modul kuis interaktif di dalam Ruang Kelas. Guru menyusun soal (pilihan ganda, benar/salah, isian, pasangkan), menerbitkan kuis, menjalankan sesi live, atau menugaskan latihan async. Skor dapat ditransfer ke nilai formatif/sumatif.",
- steps:["Buka Ruang Kelas, pilih ruang mapel, lalu tab Arena Belajar.","Guru: Buat Kuis, isi judul dan soal, lalu terbitkan.","Siswa (async): klik Mulai, jawab soal, kumpulkan skor.","Guru (live): Mulai Live, maju soal, siswa jawab, Akhiri; cek podium.","Guru: buka Hasil untuk pantau skor dan Transfer Nilai ke buku nilai."],
- sb:{dur:"~50 detik", shots:[["1","Tab Arena Belajar","Daftar kuis"],["2","Buat/edit kuis","Builder soal"],["3","Mode live","Lobi dan soal aktif"],["4","Hasil dan transfer","Podium skor"]], narr:"'Arena Belajar membawa kuis interaktif ke Ruang Kelas. Guru bisa latihan async atau sesi live, lalu mentransfer skor ke buku nilai.'"}},
+{cat:"Akademik", role:false, id:"arenabelajar", title:"Arena Belajar (Kuis & Misi)", path:"/ruang-kelas/{kode}/arena-belajar", img:"ruang-kelas.png",
+ users:"Guru (buat, host, tugaskan), Siswa (main & kumpulkan)",
+ cap:"Arena Belajar: satu hub di Ruang Kelas — tab Kuis (async/live) dan tab Misi (narasi, puzzle, recall); skor bisa masuk rapor.",
+ desc:"Modul permainan edukatif di Ruang Kelas. Guru membuat kuis interaktif (pilihan ganda, benar/salah, isian, pasangkan), menjalankan sesi live, atau menugaskan misi (narasi, keputusan, puzzle, recall, menjodohkan). Siswa masuk lewat satu tab Arena Belajar. Skor dapat ditransfer ke nilai formatif/sumatif. Modul diaktifkan di Pengaturan Sistem → Fitur → Arena Belajar.",
+ steps:["Buka Akademik → Ruang Kelas, pilih ruang mapel, lalu tab Arena Belajar.","Di hub, pilih mode Kuis atau Misi.","Guru (kuis): Buat Kuis → isi soal → Terbitkan. Siswa: Mulai → jawab → Kumpulkan.","Guru (live): dari kartu kuis, Mulai Live → maju soal → Akhiri → cek podium.","Guru (misi): di tab Misi, pilih misi dari daftar → Tugaskan (atau buat di Builder Misi).","Siswa (misi): buka kartu misi → Mulai → selesaikan → skor tersimpan.","Guru: buka Hasil / Monitor → Transfer Nilai ke buku nilai bila siap."],
+ sb:{dur:"~70 detik", shots:[["1","Tab Arena Belajar","Hero masuk Arena"],["2","Hub: tab Kuis / Misi","Switch mode"],["3","Buat kuis atau tugaskan misi","Builder / form tugaskan"],["4","Siswa main & skor","Hasil + transfer nilai"]], narr:"'Arena Belajar menyatukan kuis interaktif dan misi edukatif di satu tempat. Guru bisa latihan async, sesi live, atau menugaskan misi, lalu mentransfer skor ke buku nilai.'"}},
+
+{cat:"Akademik", role:false, id:"arenamisi", title:"Arena Belajar — Misi Edukatif", path:"/ruang-kelas/{kode}/arena-belajar?mode=misi", img:"ruang-kelas.png",
+ users:"Guru (tugaskan & pantau), Siswa (main misi)",
+ cap:"Misi di Arena: narasi interaktif, keputusan strategis, puzzle sequencing, recall quiz, dan menjodohkan — ditugaskan per kelas.",
+ desc:"Bagian misi dari Arena Belajar (sebelumnya Jagat Misi). Guru menugaskan misi dari katalog ke ruang mapel; siswa memainkan lewat tab Misi di hub Arena. Setiap misi punya mark jenjang (SD / SMP / SMA-SMK). Rekomendasi klasik + panel Tren 2025–2026 (AI, media/deepfake, iklim, green computing, wellbeing). Hasil bisa dipantau dan ditransfer ke rapor seperti kuis.",
+ steps:["Buka Ruang Kelas → tab Arena Belajar → mode Misi (atau URL …/arena-belajar?mode=misi).","Lihat panel Rekomendasi: SD / SMP / SMA-SMK — klik chip untuk filter.","Gunakan chip Tren 25–26 untuk fokus ke misi tren.","Guru: pilih misi di form Tugaskan, set jadwal opsional, klik Tugaskan misi.","Siswa: buka kartu misi (badge jenjang / Tren) → Mulai misi → selesaikan → kumpulkan.","Guru: Monitor hasil misi → Transfer Nilai ke formatif/sumatif bila siap."],
+ sb:{dur:"~55 detik", shots:[["1","Hub Arena tab Misi","Panel rekomendasi jenjang"],["2","Filter SD/SMP/SMA/Tren","Chip + badge kartu"],["3","Siswa main misi","Narasi / quiz / puzzle"],["4","Monitor & transfer","Tabel hasil kelas"]], narr:"'Misi edukatif di Arena Belajar ditandai per jenjang dan tren. Guru pilih rekomendasi SD, SMP, SMA/SMK, atau Tren 25–26, siswa main di kelas, skor bisa masuk rapor.'"}},
+
+{cat:"Akademik", role:false, id:"arenatren", title:"Arena Belajar — Tren 2025–2026", path:"/ruang-kelas/{kode}/arena-belajar?mode=misi", img:"ruang-kelas.png",
+ users:"Guru (tugaskan), Siswa (main)",
+ cap:"Katalog misi tren: literasi AI, cek fakta/deepfake, iklim, green computing, dan digital wellbeing — ditandai per jenjang SD/SMP/SMA-SMK.",
+ desc:"Koleksi permainan edukatif yang mengikuti tren pembelajaran 2025–2026: AI-enhanced literacy, critical media (anti-hoaks/deepfake), climate literacy, green computing, dan digital wellbeing. Setiap misi punya badge Tren 25–26 + mark jenjang. Cocok untuk pengayaan Informatika, PPKn, IPA/IPS, dan PJOK tanpa platform eksternal.",
+ steps:["Buka Ruang Kelas → Arena Belajar → mode Misi.","Di panel Rekomendasi, klik chip Tren 25–26 (atau biarkan Semua untuk melihat klasik + tren).","Pilih jenjang: SD / SMP / SMA-SMK agar daftar rekomendasi & kartu ikut tersaring.","Guru: tugaskan misi bertanda [Tren] ke kelas (jadwal opsional).","Siswa: main misi → selesaikan → skor tersimpan; guru pantau & transfer nilai bila perlu.","Diskusi singkat pasca-main: apa yang dipelajari (mis. cek sumber, etika prompt, hemat energi lab)."],
+ sb:{dur:"~60 detik", shots:[["1","Chip Tren 25–26","Panel tren per jenjang"],["2","Kartu badge Tren","Mark SD/SMP/SMA"],["3","Siswa main AI/iklim","Recall / keputusan / narasi"],["4","Debrief kelas","Diskusi singkat + nilai"]], narr:"'Tren 2025–2026 di Arena: literasi AI, cek fakta, iklim, green computing, dan wellbeing. Guru menugaskan, siswa bermain, lalu diskusi singkat di kelas.'"},
+ note:"Mark rekomendasi tren — SD: Jeda Layar Sehat, Bumi Sehat, Fakta vs Dongeng Online. SMP: Cek Fakta Sebelum Share, Kenalan dengan AI, Gelombang Panas di Sekolah. SMA/SMK: Prompt Cerdas Bukan Nyolong, Green Computing di Lab, Deepfake di Dunia Kerja."},
 
 {cat:"Akademik", role:false, id:"jadwal", title:"Editor Jadwal Pelajaran", path:"/jadwal", img:"editor-jadwal.png",
  users:"Admin, Kurikulum",
@@ -401,6 +420,16 @@ const F = [
  steps:["Buka Akademik ' Perangkat Ajar.","Tambahkan Jenis Dokumen (mis. RPP) bila belum ada.","Lihat kartu tiap guru beserta jumlah file terupload.","Klik kartu guru untuk melihat detail unggahan.","Pantau kelengkapan dokumen tiap guru."],
  sb:{dur:"~35 detik", shots:[["1","Halaman Perangkat Ajar","Sorot Jenis Dokumen"],["2","Tambah jenis dokumen","Ketik 'RPP'"],["3","Kartu per guru","Tunjuk '0 file terupload'"],["4","Buka detail guru","Daftar file"]], narr:"'Perangkat Ajar memantau kelengkapan dokumen mengajar tiap guru. Tentukan jenis dokumen, lalu pantau siapa yang sudah mengunggah.'"}},
 
+/* ============ ASISTEN GURU ============ */
+{cat:"Akademik", role:true, id:"ai", title:"Asisten Guru", path:"/ai/teacher", img:"asisten-ai.png",
+ users:"Guru, Wali Kelas, Kepala Sekolah, semua Waka (Kurikulum/Kesiswaan/Sarpras)  -  bukan Siswa/Orang Tua",
+ cap:"Asisten Guru siap pakai: kartu Nalar Guru (key tersimpan), Generate Kuota LIVE, tab Nalar Guru / Generator Soal / RPM / Perangkum / Draft Feedback.",
+ desc:"Pusat bantuan mengajar berbasis Gemini di dalam SIMS. Pertama kali muncul modal Hubungkan API key Gemini — buka Google AI Studio, buat/salin API key, tempel di SIMS, lalu Simpan. Setelah key aktif, pakai Nalar Guru (chat) atau tab generator tanpa membuka tab baru. Ganti/hapus key lewat tombol di kartu Nalar Guru. Hasil AI wajib diperiksa sebelum dibagikan ke siswa.",
+ steps:["Buka Akademik → Asisten Guru. Modal Hubungkan API key Gemini muncul jika belum ada key.","Klik Buka Google AI Studio → Create API key (atau salin key yang sudah ada).","Kembali ke SIMS, tempel API key, klik Simpan API key.","Lihat kartu Nalar Guru (key tersamarkan) dan Generate Kuota.","Buka tab Nalar Guru, pilih saran prompt atau ketik pertanyaan, lalu Kirim. Tab lain: Generator Soal, RPM Learning, Perangkum Materi, Draft Feedback."],
+ sb:{dur:"~50 detik", shots:[["1","Modal Hubungkan API key","Layar pertama: Buka Google AI Studio + kolom Tempel API key"],["2","Google AI Studio — API Keys","Create API key atau salin key yang sudah ada"],["3","Tempel & Simpan di SIMS","Kembali ke modal, tempel key, klik Simpan API key"],["4","Asisten Guru siap","Kartu Nalar Guru + kuota LIVE + deretan tab"],["5","Nalar Guru","Tanya Nalar Guru / saran prompt / kirim chat"]], narr:"'Asisten Guru memakai API key Gemini pribadi Anda. Buka Google AI Studio, buat atau salin API key, tempel di SIMS, lalu pakai Nalar Guru dan generator langsung di dalam aplikasi. Selalu periksa hasil sebelum dibagikan ke siswa.'"},
+ note:"Wajib API key Gemini pribadi (bukan email). Jangan bagikan API key. Screenshot AI Studio di panduan sudah di-redaksi (email/key). Siswa & Orang Tua tidak mendapat menu ini.",
+ gallery:["asisten-ai-s1.png","asisten-ai-s2.png","asisten-ai-s3.png","asisten-ai-s4.png","asisten-ai-s5.png"]},
+
 {cat:"Akademik", role:false, id:"cetakrapor", title:"Cetak Rapor", path:"/cetak-rapor", img:"cetak-rapor.png",
  users:"Admin, Wali Kelas",
  cap:"Cetak Rapor: pilih Kelas + Tampilkan; daftar peserta didik (Nama, NIS) dengan tombol Cetak per siswa; tombol Cetak Satu Kelas.",
@@ -433,14 +462,6 @@ const F = [
  sb:{dur:"~40 detik", shots:[["1","Login sebagai wali kelas","Dashboard wali"],["2","Siswa perwalian","Daftar siswa kelas"],["3","Rekap nilai kelas","Evaluasi kelas"],["4","Catatan wali","Isi catatan rapor"]], narr:"'Menu Wali Kelas hanya tampil untuk wali kelas. Di sini Anda mengelola siswa perwalian, rekap nilai, dan catatan untuk rapor.'"},
  note:"Fitur role-gated  -  saat direkam sebagai admin, sistem menolak dengan pesan 'Anda bukan wali kelas.' Rekam menggunakan akun wali kelas."},
 
-/* ============ ANALISIS AI ============ */
-{cat:"Analisis AI", role:true, id:"ai", title:"Asisten AI (Guru & Analisis)", path:"/ai/chat  -  /ai/teacher  -  /ai/analyze", img:"asisten-ai.png",
- users:"Guru, Kepala Sekolah, semua Waka (Kurikulum/Kesiswaan/Sarpras)  -  bukan Siswa/Orang Tua",
- cap:"Panel Analisis AI: Asisten Guru (bantu tugas mengajar), analisis data sekolah, dan tanya-jawab berbasis data (RAG). Kuota AI tampil di Dashboard.",
- desc:"Kumpulan asisten berbasis AI: Asisten Guru membantu menyusun materi/soal untuk Guru, Kepala Sekolah, dan semua Wakil Kepala (Waka). Modul Analisis membantu pimpinan membaca data sekolah. Tidak tersedia untuk Siswa dan Orang Tua. Pemakaian dibatasi kuota (terlihat di Dashboard).",
- steps:["Buka menu Asisten AI / Analisis AI (submenu sesuai peran).","Guru/Kepala/Waka: gunakan Asisten Guru untuk bantuan mengajar.","Kepala/Kurikulum: gunakan modul Analisis untuk membaca data.","Ketik pertanyaan/perintah, tinjau jawaban AI.","Pantau sisa kuota AI di Dashboard."],
- sb:{dur:"~40 detik", shots:[["1","Menu Analisis AI","Buka submenu"],["2","Asisten Guru","Ketik permintaan materi/soal"],["3","Jawaban AI","Perlihatkan hasil"],["4","Kuota di Dashboard","Sorot sisa kuota"]], narr:"'Asisten Guru membantu Guru, Kepala Sekolah, dan semua Waka menyiapkan materi. Siswa dan orang tua tidak memakai fitur ini. Pemakaian dibatasi kuota di dashboard.'"},
- note:"Role-gated  -  Siswa & Orang Tua tidak mendapat menu ini. Rekam menggunakan akun guru/kepala/waka."},
 
 /* ============ SARANA & PRASARANA ============ */
 {cat:"Sarana & Prasarana", role:false, id:"sarpras", title:"Dashboard Sarpras", path:"/sarpras", img:"sarpras-dashboard.png",
@@ -499,7 +520,7 @@ const FEATURE_ROLES = {
   pelajaran:['admin','kurikulum'], kartu:['admin','siswa'],
   absensi:['admin','guru','walikelas'], absenqr:['siswa','guru'],
   presensiguru:['admin','kepala'], kalender:['admin','kurikulum'],
-  ruangkelas:['guru','siswa'], arenabelajar:['guru','siswa'],
+  ruangkelas:['guru','siswa'], arenabelajar:['guru','siswa'], arenamisi:['guru','siswa'], arenatren:['guru','siswa'],
   jadwal:['admin','kurikulum'], penilaian:['guru'],
   rekapnilai:['guru','walikelas','kurikulum'], ekskul:['admin','guru'],
   perangkat:['admin','kurikulum','kepala'], cetakrapor:['admin','walikelas'],
@@ -622,6 +643,11 @@ catOrder.forEach(cat=>{
 
     const card=document.createElement('div');card.className='feature'+(f.role?' role':'');card.id=f.id;card.dataset.fid=f.id;
     const shotRows=f.sb.shots.map(s=>`<tr><td>${s[0]}</td><td>${s[1]}</td><td>${s[2]}</td></tr>`).join('');
+    const galleryHtml=(f.gallery&&f.gallery.length)?`<div class="sec"><b>Urutan Screenshot Storyboard</b></div>
+        <div class="gallery">${f.gallery.map((g,i)=>`<figure class="gshot" onclick="var img=this.querySelector('img');if(img)zoom(img.src)">
+          <img src="/images/panduan/${g}" alt="${f.title} shot ${i+1}" loading="lazy">
+          <figcaption>Shot ${i+1}${f.sb.shots[i]?': '+f.sb.shots[i][1]:''}</figcaption>
+        </figure>`).join('')}</div>`:'';
     card.innerHTML=`
       <div class="fhead">
         <span class="num">${n}</span>
@@ -638,9 +664,9 @@ catOrder.forEach(cat=>{
             <div class="cap">Isi gambar: ${f.cap}</div>
           </div>
         </figure>
-        ${f.note?`<div class="callout warn" style="margin:16px 0 0"><p><b>Catatan:</b> ${f.note}</p></div>`:''}
         <div class="sec"><b>Langkah Penggunaan</b></div>
         <ol class="steps">${f.steps.map(s=>`<li>${s}</li>`).join('')}</ol>
+        ${galleryHtml}
         <details class="story"><summary>Storyboard Video (${f.sb.dur})</summary>
           <div class="sb">
             <div class="dur">Durasi target: ${f.sb.dur}. Rekam layar mengikuti urutan shot berikut.</div>
@@ -652,6 +678,7 @@ catOrder.forEach(cat=>{
           <video controls preload="metadata" src="/videos/panduan/${f.id}.mp4" onerror="this.closest('.vid').style.display='none'"></video>
           <div class="vcap">Video storyboard - durasi ${f.sb.dur}</div>
         </div>
+        ${f.note?`<div class="callout warn" style="margin:16px 0 0"><p><b>Catatan:</b> ${f.note}</p></div>`:''}
         <div class="fnav" data-fid="${f.id}"></div>
       </div>`;
     content.appendChild(card);
@@ -708,7 +735,7 @@ function applyRoleFilter(){
   const vis=visibleFeatures();
   if(statFitur) statFitur.textContent=String(vis.length);
   if(statKategori) statKategori.textContent=String(new Set(vis.map(f=>f.cat)).size);
-  if(statStory) statStory.textContent=String(vis.filter(f=>f.id!=='arenabelajar').length);
+  if(statStory) statStory.textContent=String(vis.filter(f=>f.id!=='arenabelajar' && f.id!=='arenamisi' && f.id!=='arenatren').length);
   if(roleEmpty) roleEmpty.style.display=vis.length?'none':'block';
   rebuildNavLinks();
   filterToc(document.getElementById('tocSearch').value, toc, document.getElementById('tocEmpty'));

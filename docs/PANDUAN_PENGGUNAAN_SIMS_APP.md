@@ -215,10 +215,23 @@ Buka menu **Chat / Inbox** di daftar menu sebelah kiri.
 
 Buka menu **Akademik > Asisten Guru**. Menu ini muncul untuk guru mapel, wali kelas, Kepala Sekolah, dan semua Waka.
 
-Fitur ini membantu guru menyusun bahan pembelajaran lebih cepat. Namun, hasilnya tetap harus diperiksa dulu sebelum dibagikan ke siswa.
+Fitur ini membantu guru menyusun bahan pembelajaran lebih cepat lewat Gemini di dalam SIMS. Hasilnya tetap harus diperiksa dulu sebelum dibagikan ke siswa.
+
+![Tampilan Asisten Guru](/images/panduan/asisten-ai.png)
+
+**Persiapan sekali (API key Gemini):**
+
+Generate memakai API key akun Google Anda sendiri. SIMS tidak membuat key otomatis.
+
+1. Buka menu **Akademik > Asisten Guru**.
+2. Pada layar **Hubungkan API key Gemini**, klik **Buka Google AI Studio**.
+3. Di AI Studio, buat **API key**, lalu salin.
+4. Tempel key di kolom SIMS, lalu klik **Simpan API key**.
+5. Setelah tersimpan, Anda bisa memakai Nalar Guru dan generator. Ganti atau hapus key lewat tombol di kartu Nalar Guru.
 
 **Yang bisa dibuat di sini:**
 
+- Chat **Nalar Guru** (tanya materi, rubrik, ide soal).
 - Membuat soal dari sebuah topik atau dari berkas materi.
 - Menyusun rancangan pembelajaran (RPM Learning).
 - Merangkum bahan ajar menjadi poin-poin penting.
@@ -226,6 +239,14 @@ Fitur ini membantu guru menyusun bahan pembelajaran lebih cepat. Namun, hasilnya
 - Melihat pratinjau hasil sebelum diunduh.
 - Mengunduh hasil soal atau rancangan ke Word/PDF.
 - Membuka kembali hasil yang pernah dibuat lewat riwayat.
+- Cadangan: buka Gemini web bila generate di SIMS sedang bermasalah.
+
+**Cara memakai Nalar Guru:**
+
+1. Buka **Asisten Guru**, pastikan API key sudah tersimpan.
+2. Klik **Buka Nalar Guru** atau pilih tab chat.
+3. Ketik permintaan (misalnya minta soal atau penjelasan materi).
+4. Tinjau jawaban, lalu salin atau lanjutkan percakapan.
 
 **Cara membuat soal:**
 
@@ -270,8 +291,10 @@ Fitur ini membantu guru menyusun bahan pembelajaran lebih cepat. Namun, hasilnya
 **Yang perlu diperhatikan:**
 
 - Jangan memasukkan data pribadi yang tidak diperlukan.
+- Jangan membagikan API key Gemini Anda ke orang lain.
 - Hasil AI bisa keliru. Guru wajib memeriksa ulang isi, angka, kunci jawaban, dan kesesuaian dengan kurikulum.
 - Untuk soal atau rancangan resmi, perbaiki dulu secara manual sebelum dicetak atau dibagikan.
+- Panduan visual + video pendek ada di menu **Bantuan > Panduan Visual** (bagian Asisten Guru).
 
 ### Analisis AI
 
@@ -709,12 +732,12 @@ Buka menu **Akademik > Ruang Kelas**.
 
 ### Arena Belajar
 
-Arena Belajar adalah modul kuis interaktif di dalam Ruang Kelas (per ruang mapel).
+Arena Belajar adalah modul kuis interaktif **dan misi edukatif** di dalam Ruang Kelas (per ruang mapel). Keduanya masuk lewat satu tab yang sama.
 
 Untuk mengakses fitur ini, buka **`Akademik > Ruang Kelas`**, pilih kelas dan mapel, lalu tab **Arena Belajar**.
 
-- Guru: membuat, mengedit, menerbitkan kuis; host sesi live; melihat hasil; transfer skor ke buku nilai.
-- Siswa: mengerjakan kuis async atau bergabung sesi live.
+- Guru: membuat/menerbitkan kuis; menugaskan misi dari katalog; host sesi live; melihat hasil; transfer skor ke buku nilai.
+- Siswa: mengerjakan kuis async, bergabung sesi live, atau memainkan misi yang ditugaskan.
 - Orang tua tidak masuk menu ini.
 
 Fitur utama:
@@ -722,6 +745,7 @@ Fitur utama:
 - Builder soal (pilihan ganda, benar/salah, isian, pasangkan).
 - Mode latihan async (mengerjakan kapan saja selama jendela kuis terbuka).
 - Mode live (guru memandu soal secara real-time, siswa jawab dari perangkat).
+- Misi edukatif (narasi/nalar, puzzle, recall) — ditugaskan ke kelas dari hub Arena.
 - Hasil, leaderboard/podium, dan transfer nilai ke formatif/sumatif.
 - Template permainan (flashcard, dll.) untuk guru yang punya akses kelola.
 
@@ -732,11 +756,16 @@ Langkah-langkah bagi Guru membuat kuis:
 3. Tambah soal dan kunci jawaban.
 4. Terbitkan kuis agar siswa bisa melihatnya.
 
+Langkah-langkah bagi Guru menugaskan misi:
+
+1. Di hub Arena Belajar, bagian **Misi**, pilih misi dari daftar lalu Tugaskan (atau buat dulu di Builder Misi).
+2. Pantau hasil lewat Monitor hasil; transfer nilai ke buku nilai bila siap.
+
 Langkah-langkah bagi Siswa (async):
 
 1. Buka tab Arena Belajar di ruang mapel.
-2. Pilih kuis yang tersedia, klik Mulai.
-3. Jawab soal, lalu kumpulkan.
+2. Pilih kuis atau misi yang tersedia, klik Mulai.
+3. Jawab soal / selesaikan misi, lalu kumpulkan.
 
 Langkah-langkah bagi Guru menjalankan live:
 

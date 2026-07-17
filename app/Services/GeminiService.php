@@ -81,6 +81,11 @@ class GeminiService
      */
     public function generate(string $prompt, array $options = []): array
     {
+        // Key pribadi guru (opsi eksplisit): selalu lewat Gemini langsung, tanpa fallback sekolah.
+        if (trim((string) ($options['api_key'] ?? '')) !== '') {
+            return $this->generateGemini($prompt, $options);
+        }
+
         if (! in_array($this->provider(), self::SUPPORTED_PROVIDERS, true)) {
             throw new RuntimeException('Provider AI tidak dikenali. Gunakan gemini, openrouter, atau ninerouter.');
         }
@@ -121,6 +126,50 @@ class GeminiService
         throw new AiProviderUnavailableException($this->routerFailureMessage($failures));
     }
 
+    /**
+     * Ping ringan untuk memvalidasi API key Gemini (dipakai saat guru menyimpan key).
+     */
+    public function probeApiKey(string $apiKey): void
+    {
+        $apiKey = trim($apiKey);
+        if ($apiKey === '') {
+            throw new RuntimeException('API key kosong.');
+        }
+
+        $model = (string) config('ai.model', 'gemini-2.0-flash');
+        $url = rtrim((string) config('ai.base_url'), '/')."/models/{$model}:generateContent";
+
+        try {
+            $response = Http::timeout(20)
+                ->withQueryParameters(['key' => $apiKey])
+                ->acceptJson()
+                ->post($url, [
+                    'contents' => [['role' => 'user', 'parts' => [['text' => 'ping']]]],
+                    'generationConfig' => [
+                        'maxOutputTokens' => 8,
+                        'temperature' => 0,
+                    ],
+                ]);
+        } catch (\Throwable) {
+            throw new RuntimeException('Gagal menghubungi Gemini untuk memvalidasi API key. Coba lagi.');
+        }
+
+        if ($response->successful()) {
+            return;
+        }
+
+        throw new RuntimeException($this->normalizeError($response->status(), $response->json())
+            ?: 'API key tidak valid atau belum aktif di Google AI Studio.');
+    }
+
+    /** Key efektif: opsi request (key pribadi) atau key sekolah dari config. */
+    private function resolveApiKey(array $options = []): string
+    {
+        $fromOptions = trim((string) ($options['api_key'] ?? ''));
+
+        return $fromOptions !== '' ? $fromOptions : trim((string) config('ai.api_key'));
+    }
+
     /** Gabungkan kegagalan tiap provider jadi satu pesan yang jujur untuk guru. */
     private function routerFailureMessage(array $failures): string
     {
@@ -148,8 +197,13 @@ class GeminiService
         $system = trim(($options['system'] ?? '')."\n\n".config('ai.system_prompt')."\n\n".$answerStyle);
         $contents = $this->buildContents($prompt, $options['history'] ?? []);
         $modelChain = $this->modelChain($options);
+        $apiKey = $this->resolveApiKey($options);
 
-        $this->ensureFreeTierQuotaIsOpen($modelChain);
+        if ($apiKey === '') {
+            throw new RuntimeException('Fitur AI belum dikonfigurasi (GEMINI_API_KEY kosong).');
+        }
+
+        $this->ensureFreeTierQuotaIsOpen($modelChain, $apiKey);
 
         $lastQuotaError = null;
         $allModelsHitDailyQuota = true;
@@ -189,7 +243,7 @@ class GeminiService
                         fn (\Throwable $e) => $this->isTransient($e),
                         throw: false,
                     )
-                    ->withQueryParameters(['key' => config('ai.api_key')])
+                    ->withQueryParameters(['key' => $apiKey])
                     ->acceptJson()
                     ->post(rtrim(config('ai.base_url'), '/')."/models/{$model}:generateContent", $body);
             } catch (\Throwable $e) {
@@ -218,7 +272,7 @@ class GeminiService
         }
 
         if ($this->freeTierOnly() && $lastQuotaError !== null && $allModelsHitDailyQuota) {
-            $this->rememberFreeTierQuotaExhausted($modelChain);
+            $this->rememberFreeTierQuotaExhausted($modelChain, $apiKey);
 
             throw new AiProviderUnavailableException($this->freeTierQuotaMessage());
         }
@@ -889,13 +943,13 @@ class GeminiService
     }
 
     /** @param string[] $modelChain */
-    private function ensureFreeTierQuotaIsOpen(array $modelChain): void
+    private function ensureFreeTierQuotaIsOpen(array $modelChain, string $apiKey = ''): void
     {
         if (! $this->freeTierOnly()) {
             return;
         }
 
-        $resetAt = Cache::get($this->freeTierQuotaCacheKey($modelChain));
+        $resetAt = Cache::get($this->freeTierQuotaCacheKey($modelChain, $apiKey));
         if (! $resetAt) {
             return;
         }
@@ -904,21 +958,23 @@ class GeminiService
     }
 
     /** @param string[] $modelChain */
-    private function rememberFreeTierQuotaExhausted(array $modelChain): void
+    private function rememberFreeTierQuotaExhausted(array $modelChain, string $apiKey = ''): void
     {
         $resetAt = $this->nextFreeTierResetAt();
 
         Cache::put(
-            $this->freeTierQuotaCacheKey($modelChain),
+            $this->freeTierQuotaCacheKey($modelChain, $apiKey),
             $resetAt->toIso8601String(),
             $resetAt,
         );
     }
 
     /** @param string[] $modelChain */
-    private function freeTierQuotaCacheKey(array $modelChain): string
+    private function freeTierQuotaCacheKey(array $modelChain, string $apiKey = ''): string
     {
-        return 'ai:gemini:free-tier-quota-exhausted:'.sha1((string) config('ai.api_key').'|'.implode('|', $modelChain));
+        $key = $apiKey !== '' ? $apiKey : (string) config('ai.api_key');
+
+        return 'ai:gemini:free-tier-quota-exhausted:'.sha1($key.'|'.implode('|', $modelChain));
     }
 
     private function nextFreeTierResetAt(): Carbon

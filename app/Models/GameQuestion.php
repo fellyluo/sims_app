@@ -40,10 +40,11 @@ class GameQuestion extends Model
     public function typeLabel(): string
     {
         return match ($this->type) {
-            'true_false'   => 'Benar / Salah',
-            'short_answer' => 'Isian singkat',
-            'match'        => 'Pasangkan',
-            default        => 'Pilihan ganda',
+            'mcq_complex'  => 'Pilihan Ganda Kompleks',
+            'true_false'   => 'Benar/Salah',
+            'short_answer' => 'Isian',
+            'match'        => 'Mencocokkan',
+            default        => 'Pilihan Ganda',
         };
     }
 }

@@ -405,6 +405,14 @@ class SettingController extends Controller
         return back()->with('success', 'Pengaturan fitur disimpan. Modul yang dimatikan disembunyikan dari menu dan tidak bisa diakses.');
     }
 
+    /** Toggle launcher di Asisten Guru. */
+    public function updateIntegrasi(Request $request)
+    {
+        Setting::set('tp_launcher_aktif', $request->boolean('tp_launcher_aktif') ? '1' : '0');
+
+        return back()->with('success', 'Pengaturan integrasi Gemini disimpan.');
+    }
+
     /** Simpan/hapus satu file aplikasi ke disk privat + catat nama asli untuk nama unduhan. */
     private function handleAppFile(Request $request, string $field, string $slug, string $pathKey, string $nameKey, ?string $forcedExtension = null): void
     {

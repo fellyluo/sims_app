@@ -18,7 +18,8 @@ class JagatMisiDemoSeeder extends Seeder
 {
     public function run(): void
     {
-        $classroom = Classroom::where('status', 'published')->first();
+        $classroom = Classroom::where('class_code', '2N3-ICS0')->first()
+            ?? Classroom::where('status', 'published')->first();
         if (! $classroom) {
             $this->command?->warn('Tidak ada classroom published — skip JagatMisiDemoSeeder.');
 
@@ -86,13 +87,13 @@ class JagatMisiDemoSeeder extends Seeder
             );
         }
 
-        $base = '/ruang-kelas/'.$classroom->class_code.'/jagat-misi';
+        $base = '/ruang-kelas/'.$classroom->class_code.'/arena-belajar?mode=misi';
         $this->command?->newLine();
-        $this->command?->info('═══ Jagat Misi DEMO siap dicoba ═══');
+        $this->command?->info('═══ Misi DEMO Arena Belajar siap dicoba ═══');
         $this->command?->info('Kelas: '.$classroom->title.' (kode: '.$classroom->class_code.')');
-        $this->command?->info('Index: '.$base);
-        $this->command?->info('Misi nalar: '.$base.'/'.$nalar->slug);
-        $this->command?->info('Misi quiz: '.$base.'/'.$quiz->slug);
+        $this->command?->info('Hub Arena (tab Misi): '.$base);
+        $this->command?->info('Misi nalar: '.$nalar->title);
+        $this->command?->info('Misi quiz: '.$quiz->title);
         $this->command?->newLine();
         $this->command?->line('<fg=cyan>── Kunci jawaban Recall Quiz ──</>');
         $this->command?->line('1. Produsen');
@@ -106,7 +107,7 @@ class JagatMisiDemoSeeder extends Seeder
         $this->command?->line('Keputusan: Bersihkan drainase, Buka forum warga, Buka jalur tambahan');
         $this->command?->line('Puzzle: survey → materials → foundation → bridge → test');
         $this->command?->newLine();
-        $this->command?->warn('Login siswa di SIMS, buka Ruang Kelas → tab Jagat Misi → Mulai misi.');
+        $this->command?->warn('Login siswa di SIMS, buka Ruang Kelas → tab Arena Belajar → Mulai misi.');
     }
 
     private function syncNalarSteps(Mission $mission): void

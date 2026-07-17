@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
+use App\Support\MissionStepPayloadPresenter;
 
 class MissionPlayerController extends Controller
 {
@@ -44,7 +45,7 @@ class MissionPlayerController extends Controller
                     'title' => $step->title,
                     'prompt' => $step->prompt,
                     'body' => $step->body,
-                    'payload' => $step->payload,
+                    'payload' => MissionStepPayloadPresenter::forClient($step),
                     'max_points' => $step->max_points,
                 ])->values(),
             ],

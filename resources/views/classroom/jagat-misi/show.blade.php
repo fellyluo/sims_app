@@ -4,8 +4,8 @@
 @section('content')
 <div class="space-y-5 max-w-3xl mx-auto">
     <div>
-        <a href="{{ route('classroom.jagat.index', $classroom) }}" class="text-sm text-slate-500 hover:text-slate-700 inline-flex items-center gap-1 mb-1">
-            <i data-lucide="arrow-left" class="w-4 h-4"></i> Jagat Misi
+        <a href="{{ route('classroom.arena.index', $classroom) }}" class="text-sm text-slate-500 hover:text-slate-700 inline-flex items-center gap-1 mb-1">
+            <i data-lucide="arrow-left" class="w-4 h-4"></i> Arena Belajar
         </a>
         <h1 class="text-xl sm:text-2xl font-black text-slate-800 dark:text-slate-100">{{ $mission->title }}</h1>
         <p class="text-sm text-slate-500 mt-1">{{ $mission->summary }}</p>
@@ -49,9 +49,11 @@
         <a href="{{ route('classroom.jagat.results', [$classroom, $mission]) }}" class="inline-flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold border border-slate-200 dark:border-slate-600 min-h-[48px]">
             <i data-lucide="bar-chart-2" class="w-4 h-4"></i> Monitor hasil
         </a>
+        @can('manage', $mission)
         <a href="{{ route('jagat-misi.builder.edit', $mission) }}" class="inline-flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold border border-slate-200 dark:border-slate-600 min-h-[48px]">
             <i data-lucide="pencil" class="w-4 h-4"></i> Edit misi
         </a>
+        @endcan
     </div>
     @endif
 </div>

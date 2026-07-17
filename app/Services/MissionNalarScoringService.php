@@ -94,11 +94,6 @@ class MissionNalarScoringService
         $payload = $step->payload ?? [];
         $rounds = array_values($payload['rounds'] ?? []);
         $choices = array_values($response['choices'] ?? []);
-        $stats = array_merge([
-            'stability' => 0,
-            'trust' => 0,
-            'budget' => 0,
-        ], is_array($response['stats'] ?? null) ? $response['stats'] : []);
         $thresholds = array_merge([
             'stability' => 0,
             'trust' => 0,
@@ -124,6 +119,7 @@ class MissionNalarScoringService
             ];
         }
 
+        $stats = $this->computeDecisionStats($payload, $choices);
         $thresholdMet =
             ($stats['stability'] ?? 0) >= ($thresholds['stability'] ?? 0) &&
             ($stats['trust'] ?? 0) >= ($thresholds['trust'] ?? 0) &&
@@ -134,7 +130,8 @@ class MissionNalarScoringService
         }
 
         $points = min($step->max_points, $points);
-        $allRoundsCorrect = count(array_filter($roundDetails, fn (array $detail) => $detail['is_correct'])) === count($rounds);
+        $allRoundsCorrect = count($roundDetails) > 0
+            && count(array_filter($roundDetails, fn (array $detail) => $detail['is_correct'])) === count($rounds);
 
         return [
             'module_key' => $step->module_key,
@@ -148,6 +145,53 @@ class MissionNalarScoringService
                 'threshold_met' => $thresholdMet,
             ],
         ];
+    }
+
+    /**
+     * @param  list<string>  $choices
+     * @return array{stability: int, trust: int, budget: int}
+     */
+    private function computeDecisionStats(array $payload, array $choices): array
+    {
+        $initial = array_merge(
+            ['stability' => 50, 'trust' => 50, 'budget' => 50],
+            is_array($payload['initial_stats'] ?? null) ? $payload['initial_stats'] : [],
+        );
+        $rounds = array_values($payload['rounds'] ?? []);
+        $stats = $initial;
+
+        foreach ($rounds as $index => $round) {
+            $selected = $choices[$index] ?? null;
+            if ($selected === null) {
+                continue;
+            }
+
+            $effects = $this->effectsForChoice($round, $selected);
+            if ($effects === null) {
+                continue;
+            }
+
+            foreach (['stability', 'trust', 'budget'] as $key) {
+                $stats[$key] = max(0, min(100, $stats[$key] + (int) ($effects[$key] ?? 0)));
+            }
+        }
+
+        return $stats;
+    }
+
+    /** @return array{stability?: int, trust?: int, budget?: int}|null */
+    private function effectsForChoice(array $round, string $selectedChoice): ?array
+    {
+        foreach ($round['choices'] ?? [] as $choice) {
+            if (! is_array($choice)) {
+                continue;
+            }
+            if (($choice['label'] ?? null) === $selectedChoice && is_array($choice['effects'] ?? null)) {
+                return $choice['effects'];
+            }
+        }
+
+        return null;
     }
 
     private function scorePuzzle(MissionStep $step, array $response): array

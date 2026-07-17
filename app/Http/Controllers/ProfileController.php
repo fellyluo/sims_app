@@ -52,7 +52,9 @@ class ProfileController extends Controller
             'nik.unique'      => 'NIK tersebut sudah digunakan guru lain.',
         ]);
 
-        $user->update(['username' => $data['username']]);
+        $user->update([
+            'username' => $data['username'],
+        ]);
 
         if ($user->guru) {
             $guruData = collect($data)->only([

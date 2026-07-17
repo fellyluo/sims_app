@@ -2,8 +2,8 @@
 @section('title', $mission->title . ' — Player')
 
 @push('styles')
-<link rel="stylesheet" href="{{ asset('jagat-misi/styles.css') }}">
-<link rel="stylesheet" href="{{ asset('jagat-misi/player.css') }}">
+<link rel="stylesheet" href="{{ asset('assets/jagat-misi/styles.css') }}">
+<link rel="stylesheet" href="{{ asset('assets/jagat-misi/player.css') }}">
 @endpush
 
 @section('content')
@@ -12,7 +12,7 @@
      data-submit="{{ route('jagat-misi.api.player.attempts', $mission) }}"
      data-csrf="{{ csrf_token() }}"
      @isset($assignment) data-assignment-id="{{ $assignment->uuid }}" @endisset>
-    <a href="{{ isset($classroom) ? route('classroom.jagat.show', [$classroom, $mission]) : route('jagat-misi.index') }}" class="text-xs text-slate-500 hover:text-primary">← {{ isset($classroom) ? $classroom->title : 'Katalog' }}</a>
+    <a href="{{ isset($classroom) ? route('classroom.jagat.show', [$classroom, $mission]) : route('jagat-misi.index') }}" class="text-xs text-slate-500 hover:text-primary">← {{ isset($classroom) ? $classroom->title : 'Katalog Misi' }}</a>
     <h1 class="text-2xl font-black">{{ $mission->title }}</h1>
     <p class="text-sm text-slate-500">{{ $mission->summary }}</p>
 

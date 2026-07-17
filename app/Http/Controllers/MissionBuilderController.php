@@ -7,12 +7,14 @@ use App\Models\MissionActivityLog;
 use App\Models\MissionItemBank;
 use App\Models\MissionReflectionPrompt;
 use App\Models\MissionStep;
+use App\Support\ArenaJenjang;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class MissionBuilderController extends Controller
@@ -22,14 +24,21 @@ class MissionBuilderController extends Controller
         Gate::authorize('create', Mission::class);
 
         $missions = Mission::query()
-            ->where('created_by', auth()->user()->uuid)
-            ->orWhere('visible_to_teachers', true)
+            ->where(function ($q) {
+                $q->where('created_by', auth()->user()->uuid)
+                    ->orWhere(function ($q2) {
+                        $q2->where('visible_to_teachers', true)
+                            ->whereNull('created_by');
+                    });
+            })
             ->orderByDesc('updated_at')
             ->get();
 
         $bankItems = MissionItemBank::query()
-            ->where('created_by', auth()->user()->uuid)
-            ->orWhere('is_shared', true)
+            ->where(function ($q) {
+                $q->where('created_by', auth()->user()->uuid)
+                    ->orWhere('is_shared', true);
+            })
             ->orderBy('title')
             ->get();
 
@@ -108,7 +117,9 @@ class MissionBuilderController extends Controller
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'subject' => ['required', 'string', 'max:100'],
-            'grade_level' => ['required', 'string', 'max:50'],
+            'jenjang' => ['required', Rule::in(['sd', 'smp', 'sma', 'umum'])],
+            'grade_detail' => ['nullable', 'string', 'max:50'],
+            'grade_level' => ['nullable', 'string', 'max:50'], // legacy fallback
             'mechanic_type' => ['required', 'string', 'max:50'],
             'duration_minutes' => ['required', 'integer', 'min:5', 'max:120'],
             'summary' => ['required', 'string'],
@@ -129,14 +140,25 @@ class MissionBuilderController extends Controller
 
         return DB::transaction(function () use ($request, $mission, $validated) {
             $isNew = ! $mission->exists;
-            $slug = $mission->slug ?? Str::slug($validated['title']) . '-' . Str::random(4);
+            $slug = $mission->slug ?? Str::slug($validated['title']).'-'.Str::random(4);
+
+            $jenjang = $validated['jenjang'];
+            $jenjangLabel = $jenjang === 'umum' ? 'Umum' : ArenaJenjang::label($jenjang);
+            $detail = trim((string) ($validated['grade_detail'] ?? ''));
+            $gradeLevel = $detail !== ''
+                ? trim($jenjangLabel.' '.$detail)
+                : ($validated['grade_level'] ?? $jenjangLabel);
+
+            $meta = array_merge($mission->meta ?? [], $validated['meta'] ?? [], [
+                'jenjang' => $jenjang,
+            ]);
 
             $mission->fill([
                 'created_by' => $mission->created_by ?? $request->user()->uuid,
                 'slug' => $slug,
                 'title' => $validated['title'],
                 'subject' => $validated['subject'],
-                'grade_level' => $validated['grade_level'],
+                'grade_level' => $gradeLevel,
                 'mechanic_type' => $validated['mechanic_type'],
                 'duration_minutes' => $validated['duration_minutes'],
                 'summary' => $validated['summary'],
@@ -146,7 +168,7 @@ class MissionBuilderController extends Controller
                 'status' => $mission->status ?? 'draft',
                 'is_published' => $mission->is_published ?? false,
                 'max_score' => $mission->max_score ?: 100,
-                'meta' => array_merge($mission->meta ?? [], $validated['meta'] ?? []),
+                'meta' => $meta,
             ])->save();
 
             if (isset($validated['steps'])) {

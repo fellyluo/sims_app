@@ -12,10 +12,21 @@ class MissionAttemptCompletionService
 {
     public function resolveAssignmentId(Mission $mission, User $user, ?string $assignmentId): ?string
     {
+        if ($user->access === 'siswa') {
+            abort_unless($assignmentId, 422, 'Misi harus dikerjakan lewat tugas kelas.');
+
+            return $this->validatedAssignmentId($mission, $assignmentId);
+        }
+
         if (! $assignmentId) {
             return null;
         }
 
+        return $this->validatedAssignmentId($mission, $assignmentId);
+    }
+
+    private function validatedAssignmentId(Mission $mission, string $assignmentId): string
+    {
         $assignment = MissionAssignment::query()
             ->where('uuid', $assignmentId)
             ->where('mission_id', $mission->uuid)

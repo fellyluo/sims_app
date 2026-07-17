@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\ArenaJenjang;
 use Database\Factories\MissionFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -89,6 +90,37 @@ class Mission extends Model
     public function isPublished(): bool
     {
         return $this->is_published || $this->status === 'published';
+    }
+
+    /** Kunci jenjang: sd | smp | sma | umum */
+    public function jenjangKey(): string
+    {
+        return ArenaJenjang::fromGradeLevel($this->grade_level, $this->meta);
+    }
+
+    public function jenjangLabel(): string
+    {
+        $key = $this->jenjangKey();
+
+        return $key === 'umum'
+            ? ($this->grade_level ?: 'Umum')
+            : ArenaJenjang::label($key);
+    }
+
+    public function isTren(): bool
+    {
+        $meta = $this->meta;
+
+        return is_array($meta) && ! empty($meta['tren']);
+    }
+
+    public function trenTag(): ?string
+    {
+        $meta = $this->meta;
+
+        return is_array($meta) && isset($meta['tren_tag']) && is_string($meta['tren_tag'])
+            ? $meta['tren_tag']
+            : null;
     }
 
     public function getRouteKeyName(): string

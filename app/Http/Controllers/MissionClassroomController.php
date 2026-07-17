@@ -20,48 +20,11 @@ use Illuminate\View\View;
 
 class MissionClassroomController extends Controller
 {
-    public function index(Classroom $classroom): View
+    public function index(Classroom $classroom): RedirectResponse
     {
         $this->authorize('view', $classroom);
 
-        $assignments = MissionAssignment::query()
-            ->where('classroom_id', $classroom->uuid)
-            ->with('mission')
-            ->latest()
-            ->get();
-
-        if (auth()->user()->access === 'siswa') {
-            $assignments = $assignments->filter(fn ($a) => $a->mission?->isPublished() && $a->isOpen())->values();
-        }
-
-        $canManage = auth()->user()->can('manage', $classroom);
-
-        $availableMissions = collect();
-        if ($canManage) {
-            $availableMissions = Mission::query()
-                ->where('is_published', true)
-                ->where(function ($q) use ($classroom) {
-                    $q->where('classroom_id', $classroom->uuid)
-                        ->orWhere('visible_to_teachers', true)
-                        ->orWhereNull('classroom_id');
-                })
-                ->orderBy('title')
-                ->get()
-                ->reject(fn ($m) => $assignments->contains(fn ($a) => $a->mission_id === $m->uuid));
-        }
-
-        $myAttempts = [];
-        if (auth()->user()->access === 'siswa') {
-            $myAttempts = MissionAttempt::query()
-                ->where('user_id', auth()->id())
-                ->whereIn('assignment_id', $assignments->pluck('uuid'))
-                ->get()
-                ->keyBy('assignment_id');
-        }
-
-        return view('classroom.jagat-misi.index', compact(
-            'classroom', 'assignments', 'canManage', 'availableMissions', 'myAttempts'
-        ));
+        return redirect()->route('classroom.arena.index', ['classroom' => $classroom, 'mode' => 'misi']);
     }
 
     public function assign(Request $request, Classroom $classroom): RedirectResponse
@@ -77,7 +40,7 @@ class MissionClassroomController extends Controller
         $mission = Mission::findOrFail($data['mission_id']);
         abort_unless($mission->isPublished(), 422, 'Misi belum diterbitkan.');
 
-        MissionAssignment::firstOrCreate(
+        MissionAssignment::updateOrCreate(
             ['mission_id' => $mission->uuid, 'classroom_id' => $classroom->uuid],
             [
                 'assigned_by' => $request->user()->uuid,
@@ -90,7 +53,7 @@ class MissionClassroomController extends Controller
         Audit::log('jagat_misi_assigned', $mission, ['classroom_id' => $classroom->uuid]);
 
         return redirect()
-            ->route('classroom.jagat.index', $classroom)
+            ->route('classroom.arena.index', ['classroom' => $classroom, 'mode' => 'misi'])
             ->with('success', 'Misi berhasil ditugaskan ke kelas.');
     }
 
@@ -219,7 +182,11 @@ class MissionClassroomController extends Controller
         DB::transaction(function () use ($data, $students, $attempts, &$count) {
             foreach ($students as $siswa) {
                 $attempt = $attempts->get($siswa->id_login);
-                $score = $attempt ? $attempt->score : 0;
+                if (! $attempt) {
+                    continue;
+                }
+
+                $score = $attempt->score;
 
                 if ($data['type'] === 'formatif') {
                     $idTupe = $data['id_tupe'];
