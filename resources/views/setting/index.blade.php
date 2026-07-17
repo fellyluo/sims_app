@@ -44,7 +44,7 @@
                         </div>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-1">
-                        <input type="checkbox" name="{{ $kode }}" value="1" class="sr-only peer" x-model="on">
+                        <input type="checkbox" name="{{ $kode }}" value="1" class="hidden peer" x-model="on">
                         <div class="relative w-11 h-6 bg-slate-200 dark:bg-slate-600 rounded-full peer-checked:bg-[color:var(--cp)] transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition peer-checked:after:translate-x-5"></div>
                     </label>
                 </div>
@@ -127,7 +127,7 @@
                     <p class="text-xs mt-1 font-semibold" :class="master ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'" x-text="master ? '● Aktif' : '○ Nonaktif'"></p>
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-1">
-                    <input type="checkbox" name="sosmed_aktif" value="1" class="sr-only peer" x-model="master">
+                    <input type="checkbox" name="sosmed_aktif" value="1" class="hidden peer" x-model="master">
                     <div class="relative w-11 h-6 bg-slate-200 dark:bg-slate-600 rounded-full peer-checked:bg-[color:var(--cp)] transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition peer-checked:after:translate-x-5"></div>
                 </label>
             </div>
@@ -148,7 +148,7 @@
                                placeholder="{{ $meta['ph'] }}" class="form-input mt-0.5 py-1.5 text-sm">
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer flex-shrink-0" title="Tampilkan di dashboard">
-                        <input type="checkbox" name="sosmed_{{ $key }}_on" value="1" class="sr-only peer" x-model="on">
+                        <input type="checkbox" name="sosmed_{{ $key }}_on" value="1" class="hidden peer" x-model="on">
                         <div class="relative w-9 h-5 bg-slate-200 dark:bg-slate-600 rounded-full peer-checked:bg-[color:var(--cp)] transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition peer-checked:after:translate-x-4"></div>
                     </label>
                 </div>
@@ -176,7 +176,7 @@
                     <p class="text-xs mt-1 font-semibold" :class="on ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'" x-text="on ? '● Aktif' : '○ Nonaktif'"></p>
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-1">
-                    <input type="checkbox" name="app_download_aktif" value="1" class="sr-only peer" x-model="on">
+                    <input type="checkbox" name="app_download_aktif" value="1" class="hidden peer" x-model="on">
                     <div class="relative w-11 h-6 bg-slate-200 dark:bg-slate-600 rounded-full peer-checked:bg-[color:var(--cp)] transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition peer-checked:after:translate-x-5"></div>
                 </label>
             </div>
@@ -268,7 +268,7 @@
                     <p class="text-xs mt-1.5 font-semibold" :class="on ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'" x-text="on ? '● Aktif' : '○ Nonaktif'"></p>
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-1">
-                    <input type="checkbox" name="tp_launcher_aktif" value="1" class="sr-only peer" x-model="on">
+                    <input type="checkbox" name="tp_launcher_aktif" value="1" class="hidden peer" x-model="on">
                     <div class="relative w-11 h-6 bg-slate-200 dark:bg-slate-600 rounded-full peer-checked:bg-[color:var(--cp)] transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition peer-checked:after:translate-x-5"></div>
                 </label>
             </div>
@@ -346,7 +346,7 @@
                     <p class="text-xs mt-2 font-semibold" :class="on ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'" x-text="on ? '● Aktif' : '○ Nonaktif'"></p>
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-1">
-                    <input type="checkbox" name="walikelas_lihat_nilai" value="1" class="sr-only peer" x-model="on" @change="$el.form.submit()">
+                    <input type="checkbox" name="walikelas_lihat_nilai" value="1" class="hidden peer" x-model="on" @change="$el.form.submit()">
                     <div class="relative w-11 h-6 bg-slate-200 dark:bg-slate-600 rounded-full peer-checked:bg-[color:var(--cp)] transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition peer-checked:after:translate-x-5"></div>
                 </label>
             </div>
@@ -399,7 +399,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 @foreach(['wajah'=>['Scan Wajah','Pengenalan wajah (kiosk)','scan-face'],'barcode'=>['Barcode / QR','Scan QR Code','qr-code']] as $val => [$lbl,$desc,$icon])
                 <label class="cursor-pointer">
-                    <input type="radio" name="cara_absensi" value="{{ $val }}" @checked($caraNow===$val) class="sr-only peer">
+                    <input type="radio" name="cara_absensi" value="{{ $val }}" @checked($caraNow===$val) class="hidden peer">
                     <div class="border-2 rounded-xl p-4 transition peer-checked:border-primary peer-checked:bg-primary-50 border-slate-200 dark:border-slate-600 h-full">
                         <i data-lucide="{{ $icon }}" class="w-5 h-5 text-slate-400 peer-checked:text-primary mb-1.5"></i>
                         <p class="font-bold text-sm text-slate-700 dark:text-slate-200">{{ $lbl }}</p>
@@ -447,7 +447,7 @@
                     <p class="text-xs mt-2 font-semibold" :class="on ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'" x-text="on ? '● Aktif' : '○ Nonaktif'"></p>
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-1">
-                    <input type="checkbox" name="agenda_wajib_pulang" value="1" class="sr-only peer" x-model="on" @change="$el.form.submit()">
+                    <input type="checkbox" name="agenda_wajib_pulang" value="1" class="hidden peer" x-model="on" @change="$el.form.submit()">
                     <div class="relative w-11 h-6 bg-slate-200 dark:bg-slate-600 rounded-full peer-checked:bg-[color:var(--cp)] transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition peer-checked:after:translate-x-5"></div>
                 </label>
             </div>
@@ -483,19 +483,21 @@
             </form>
         </div>
 
-        {{-- Lokasi & QR Absensi --}}
         <div class="card p-6" x-data="qrLokasi({ lat:@js($settings['sekolah_lat'] ?? ''), lng:@js($settings['sekolah_lng'] ?? '') })" x-init="init()">
-            <div class="flex items-center justify-between flex-wrap gap-2 mb-1">
-                <h2 class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2"><i data-lucide="map-pin" class="w-[18px] h-[18px] text-primary"></i> Lokasi & QR Absensi</h2>
-                <div class="flex items-center gap-3">
-                    <a href="{{ route('qr.absensi') }}" class="text-xs text-primary font-semibold flex items-center gap-1"><i data-lucide="qr-code" class="w-3.5 h-3.5"></i> Lihat QR</a>
-                    <a href="{{ route('qr.cetak') }}" target="_blank" class="text-xs text-primary font-semibold flex items-center gap-1"><i data-lucide="printer" class="w-3.5 h-3.5"></i> Cetak QR</a>
+            <div class="flex items-center gap-3 mb-5 pb-5 border-b border-slate-100 dark:border-slate-700">
+                <div class="w-10 h-10 rounded-xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary shrink-0"><span x-ignore><i data-lucide="map-pin" class="w-5 h-5"></i></span></div>
+                <div>
+                    <h2 class="font-bold text-slate-800 dark:text-slate-100">Lokasi & Absen QR</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Tentukan titik sekolah (lintang/bujur) & jarak maksimal absen siswa/guru.</p>
+                </div>
+                <div class="flex items-center gap-3 ml-auto">
+                    <a href="{{ route('qr.absensi') }}" class="text-xs text-primary font-semibold flex items-center gap-1"><span x-ignore><i data-lucide="qr-code" class="w-3.5 h-3.5"></i></span> Lihat QR</a>
+                    <a href="{{ route('qr.cetak') }}" target="_blank" class="text-xs text-primary font-semibold flex items-center gap-1"><span x-ignore><i data-lucide="printer" class="w-3.5 h-3.5"></i></span> Cetak QR</a>
                 </div>
             </div>
-            <p class="text-xs text-slate-400 mb-4">Tetapkan titik sekolah & radius. Absen QR hanya berhasil di dalam radius ini.</p>
-            <form method="POST" action="{{ route('setting.lokasiQr') }}" class="space-y-4" x-data="{ mode: @js($settings['qr_absensi_mode'] ?? 'harian') }">
+            <form method="POST" action="{{ route('setting.lokasiQr') }}" class="space-y-4">
                 @csrf
-                <div id="setMap" style="height:240px" class="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 z-0"></div>
+                <div id="setMap" x-ignore style="height:240px" class="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 z-0"></div>
                 <p class="text-xs text-slate-400">Klik di peta untuk menetapkan titik sekolah, atau gunakan tombol lokasi.</p>
                 <div class="grid sm:grid-cols-3 gap-3">
                     <div>
@@ -517,16 +519,16 @@
                     <label class="form-label">Mode QR Absensi</label>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <label class="cursor-pointer">
-                            <input type="radio" name="qr_absensi_mode" value="harian" x-model="mode" class="sr-only peer">
+                            <input type="radio" name="qr_absensi_mode" value="harian" @checked(($settings['qr_absensi_mode'] ?? 'harian') == 'harian') class="hidden peer">
                             <div class="border-2 rounded-xl p-3.5 transition peer-checked:border-primary peer-checked:bg-primary-50 border-slate-200 dark:border-slate-600 h-full">
-                                <p class="font-bold text-sm text-slate-700 dark:text-slate-200 flex items-center gap-1.5"><i data-lucide="refresh-cw" class="w-4 h-4 text-slate-400"></i> Ganti Setiap Hari</p>
+                                <p class="font-bold text-sm text-slate-700 dark:text-slate-200 flex items-center gap-1.5"><span x-ignore><i data-lucide="refresh-cw" class="w-4 h-4 text-slate-400"></i></span> Ganti Setiap Hari</p>
                                 <p class="text-xs text-slate-400 mt-1">QR otomatis berubah tiap hari — lebih aman dari QR lama yang difoto/disebarluaskan. Cetak/tampilkan ulang tiap pagi.</p>
                             </div>
                         </label>
                         <label class="cursor-pointer">
-                            <input type="radio" name="qr_absensi_mode" value="tetap" x-model="mode" class="sr-only peer">
+                            <input type="radio" name="qr_absensi_mode" value="tetap" @checked(($settings['qr_absensi_mode'] ?? 'harian') == 'tetap') class="hidden peer">
                             <div class="border-2 rounded-xl p-3.5 transition peer-checked:border-primary peer-checked:bg-primary-50 border-slate-200 dark:border-slate-600 h-full">
-                                <p class="font-bold text-sm text-slate-700 dark:text-slate-200 flex items-center gap-1.5"><i data-lucide="pin" class="w-4 h-4 text-slate-400"></i> Satu QR Tetap</p>
+                                <p class="font-bold text-sm text-slate-700 dark:text-slate-200 flex items-center gap-1.5"><span x-ignore><i data-lucide="pin" class="w-4 h-4 text-slate-400"></i></span> Satu QR Tetap</p>
                                 <p class="text-xs text-slate-400 mt-1">QR sama setiap hari — cetak sekali, tempel permanen. Buat ulang manual kalau dicurigai bocor.</p>
                             </div>
                         </label>
@@ -534,19 +536,19 @@
                 </div>
 
                 <div class="flex items-center justify-between flex-wrap gap-3">
-                    <button type="button" @click="useMyLocation()" class="text-sm font-semibold text-primary flex items-center gap-1.5"><i data-lucide="locate-fixed" class="w-4 h-4"></i> Gunakan lokasi saya sekarang</button>
+                    <button type="button" @click="useMyLocation()" class="text-sm font-semibold text-primary flex items-center gap-1.5"><span x-ignore><i data-lucide="locate-fixed" class="w-4 h-4"></i></span> Gunakan lokasi saya sekarang</button>
                     <label class="flex items-center gap-2 text-sm font-medium cursor-pointer">
                         <input type="checkbox" name="qr_absensi_aktif" value="1" @checked(($settings['qr_absensi_aktif'] ?? '1')=='1') class="accent-[color:var(--cp)] w-4 h-4"> Aktifkan Absen QR
                     </label>
                 </div>
-                <button type="submit" class="btn-primary px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2"><i data-lucide="save" class="w-4 h-4"></i> Simpan Lokasi</button>
+                <button type="submit" class="btn-primary px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2"><span x-ignore><i data-lucide="save" class="w-4 h-4"></i></span> Simpan Lokasi</button>
             </form>
 
             @if(($settings['qr_absensi_mode'] ?? 'harian') === 'tetap')
             <form method="POST" action="{{ route('setting.qrTokenTetap.regenerate') }}" onsubmit="return confirmAction(this, 'Buat ulang token QR tetap? QR lama yang sudah ditempel tidak akan berlaku lagi — Anda perlu mencetak & menempel QR baru.', 'orange')" class="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
                 @csrf
                 <button class="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold border border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:hover:bg-amber-900/30">
-                    <i data-lucide="refresh-cw" class="w-4 h-4"></i> Buat Ulang QR Tetap
+                    <span x-ignore><i data-lucide="refresh-cw" class="w-4 h-4"></i></span> Buat Ulang QR Tetap
                 </button>
             </form>
             @endif
@@ -561,7 +563,7 @@
             <p class="text-xs text-slate-400 -mt-2">Pilih satu sistem pencatatan kedisiplinan siswa yang aktif dipakai sekolah.</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label class="cursor-pointer">
-                    <input type="radio" name="jenis_aturan" value="p3" x-model="jenisAturan" class="sr-only peer">
+                    <input type="radio" name="jenis_aturan" value="p3" x-model="jenisAturan" class="hidden peer">
                     <div class="border-2 rounded-xl p-4 transition peer-checked:border-primary peer-checked:bg-primary-50 border-slate-200 dark:border-slate-600 h-full">
                         <i data-lucide="award" class="w-5 h-5 text-slate-400 peer-checked:text-primary mb-1.5"></i>
                         <p class="font-bold text-sm text-slate-700 dark:text-slate-200">P3 (Rekomendasi)</p>
@@ -569,7 +571,7 @@
                     </div>
                 </label>
                 <label class="cursor-pointer">
-                    <input type="radio" name="jenis_aturan" value="poin" x-model="jenisAturan" class="sr-only peer">
+                    <input type="radio" name="jenis_aturan" value="poin" x-model="jenisAturan" class="hidden peer">
                     <div class="border-2 rounded-xl p-4 transition peer-checked:border-primary peer-checked:bg-primary-50 border-slate-200 dark:border-slate-600 h-full">
                         <i data-lucide="gauge" class="w-5 h-5 text-slate-400 peer-checked:text-primary mb-1.5"></i>
                         <p class="font-bold text-sm text-slate-700 dark:text-slate-200">Poin/Aturan</p>

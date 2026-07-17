@@ -512,6 +512,13 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
         Route::post('/mode', 'mode')->name('mode');
     });
 
+    // ─── Presensi Saya (guru): riwayat sendiri + form keterlambatan + izin pulang awal (guard di controller) ───
+    Route::middleware('modul:absensi')->prefix('presensi-guru')->name('presensi-guru.')->controller(PresensiGuruController::class)->group(function () {
+        Route::get('/saya', 'self')->name('self');
+        Route::post('/saya/keterlambatan', 'keterlambatanStore')->middleware('throttle:10,1')->name('keterlambatan.store');
+        Route::post('/saya/izin-pulang', 'izinPulangStore')->middleware('throttle:10,1')->name('izinPulang.store');
+    });
+
     // ─── 7 KAIH (siswa isi harian sebelum absen; rekap walikelas/admin; soal admin/kurikulum) ───
     Route::middleware('modul:absensi')->prefix('kaih')->name('kaih.')->controller(KaihController::class)->group(function () {
         Route::get('/isi', 'isi')->name('isi');

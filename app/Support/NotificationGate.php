@@ -39,6 +39,11 @@ class NotificationGate
             $excluded[] = 'absensi_siswa';
         }
 
+        if (! in_array($user->access, ['kepala', 'admin', 'superadmin'], true)) {
+            $excluded[] = 'presensi_terlambat';
+            $excluded[] = 'presensi_izin_pulang';
+        }
+
         return $excluded;
     }
 
@@ -139,6 +144,7 @@ class NotificationGate
             'absensi_siswa' => self::canViewAbsensiSiswa($user, $data['siswa_id'] ?? null, $preload),
             'arena_live' => self::isClassroomMember($user, $data['classroom_id'] ?? null, $preload),
             'sarpras_kerusakan', 'sarpras_pemeliharaan' => self::canViewSarpras($user),
+            'presensi_terlambat', 'presensi_izin_pulang' => in_array($user->access, ['kepala', 'admin', 'superadmin'], true),
             default => self::canViewByUrl($user, $data),
         };
     }
