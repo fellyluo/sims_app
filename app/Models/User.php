@@ -3,13 +3,16 @@
 namespace App\Models;
 
 use App\Support\Forum;
+use App\Support\UserRole;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Crypt;
 use Laragear\WebAuthn\Contracts\WebAuthnAuthenticatable;
 use Laragear\WebAuthn\WebAuthnAuthentication;
 use Laragear\WebAuthn\WebAuthnData;
+use Throwable;
 
 class User extends Authenticatable implements WebAuthnAuthenticatable
 {
@@ -19,15 +22,31 @@ class User extends Authenticatable implements WebAuthnAuthenticatable
     protected $keyType = 'string';
     public $incrementing = false;
 
+    protected static function booted(): void
+    {
+        static::saving(function (User $user): void {
+            if (is_string($user->access) && $user->access !== '') {
+                $user->access = UserRole::canonicalize($user->access);
+            }
+        });
+    }
+
     protected $fillable = [
         'username',
         'identifier',
         'password',
         'access',
+        'leaderboard_visible',
+        'mission_avatar_config',
         'pin',
         'reset_token',
         'must_change_password',
         'username_customized',
+        'dismissed_update_id',
+        'gemini_account',
+        'gemini_api_key',
+        'gemini_api_key_hint',
+        'canva_belajar_id',
     ];
 
     protected $hidden = [
@@ -35,6 +54,7 @@ class User extends Authenticatable implements WebAuthnAuthenticatable
         'pin',
         'reset_token',
         'remember_token',
+        'gemini_api_key',
     ];
 
     protected function casts(): array
@@ -43,8 +63,62 @@ class User extends Authenticatable implements WebAuthnAuthenticatable
             'password' => 'hashed',
             'must_change_password' => 'boolean',
             'username_customized' => 'boolean',
+            'leaderboard_visible' => 'boolean',
+            'mission_avatar_config' => 'array',
             'last_seen_at' => 'datetime',
         ];
+    }
+
+    public function hasGeminiApiKey(): bool
+    {
+        return trim((string) ($this->gemini_api_key ?? '')) !== '';
+    }
+
+    public function geminiApiKeyMasked(): ?string
+    {
+        $hint = trim((string) ($this->gemini_api_key_hint ?? ''));
+        if ($hint === '' || ! $this->hasGeminiApiKey()) {
+            return null;
+        }
+
+        return '••••'.$hint;
+    }
+
+    public function plainGeminiApiKey(): ?string
+    {
+        $encrypted = trim((string) ($this->gemini_api_key ?? ''));
+        if ($encrypted === '') {
+            return null;
+        }
+
+        try {
+            $plain = Crypt::decryptString($encrypted);
+        } catch (Throwable) {
+            return null;
+        }
+
+        $plain = trim($plain);
+
+        return $plain !== '' ? $plain : null;
+    }
+
+    public function setGeminiApiKey(string $plainKey): void
+    {
+        $plain = trim($plainKey);
+        $hint = strlen($plain) >= 4 ? substr($plain, -4) : $plain;
+
+        $this->forceFill([
+            'gemini_api_key' => Crypt::encryptString($plain),
+            'gemini_api_key_hint' => $hint,
+        ])->save();
+    }
+
+    public function clearGeminiApiKey(): void
+    {
+        $this->forceFill([
+            'gemini_api_key' => null,
+            'gemini_api_key_hint' => null,
+        ])->save();
     }
 
     // ─────────────── Forum: izin (berbasis matriks, bukan hardcode role) ───────────────

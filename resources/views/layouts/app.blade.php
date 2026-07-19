@@ -426,6 +426,21 @@
                 // ModulAktif: on/off per sekolah dari Pengaturan → Fitur (default aktif).
                 $modulOn = fn (string $kode) => \App\Support\ModulAktif::aktif($kode);
                 $groups = [];
+
+                // ── Absensi Saya (self-service: absen QR + presensi guru pribadi) ──
+                if ($modulOn('absensi')) {
+                    $absensiSayaItems = [];
+                    if (auth()->user()?->siswa || auth()->user()?->guru) {
+                        $absensiSayaItems[] = ['absen.qr', ['absen.qr'], 'qr-code', 'Absen QR'];
+                    }
+                    if (auth()->user()?->guru) {
+                        $absensiSayaItems[] = ['presensi-guru.self', ['presensi-guru.self'], 'clock', 'Presensi Saya'];
+                    }
+                    if (!empty($absensiSayaItems)) {
+                        $groups['absensi_saya'] = ['Absensi Saya', 'qr-code', $absensiSayaItems];
+                    }
+                }
+
                 if ($isAdmin || auth()->user()?->canAccess('manage_users')) {
                     $masterItems = [];
                     if ($isAdmin || auth()->user()?->canAccess('manage_users')) {
@@ -477,6 +492,10 @@
                         $akademik[] = ['classroom.index', ['classroom.*'], 'graduation-cap', 'Ruang Kelas'];
                     }
 
+                    if ($modulOn('arena_belajar') && $access !== 'orangtua') {
+                        $akademik[] = ['jagat-misi.index', ['jagat-misi.*'], 'gamepad-2', 'Arena Belajar'];
+                    }
+
                     if ($isAdmin || auth()->user()?->canAccess('manage_jadwal')) {
                         $akademik[] = ['jadwal.index', ['jadwal.*'], 'calendar-clock', 'Jadwal Pelajaran'];
                     } elseif (auth()->user()?->guru) {
@@ -507,8 +526,8 @@
                     }
                 }
 
-                // Asisten Guru: guru mapel, wali kelas, Kepala Sekolah, semua Waka — bukan siswa/orang tua
-                if ($modulOn('asisten_guru') && in_array($access, ['guru', 'walikelas', 'kepala', 'kurikulum', 'kesiswaan', 'sapras'], true)) {
+                // Asisten Guru: guru mapel, wali kelas, Kepala Sekolah, semua Waka, admin — bukan siswa/orang tua
+                if ($modulOn('asisten_guru') && \App\Support\UserRole::matches($access, 'guru', 'walikelas', 'kepala', 'kurikulum', 'kesiswaan', 'sarpras', 'sapras', 'admin')) {
                     $akademik[] = ['ai.teacher.index', ['ai.teacher.*'], 'sparkles', 'Asisten Guru'];
                 }
 
@@ -603,8 +622,10 @@
                         ['walikelas.sekretaris.form', ['walikelas.sekretaris.*'], 'user-cog', 'Set Sekretaris'],
                     ];
                     if ($modulOn('absensi')) {
-                        $walikelasItems[] = ['absensi.index', ['absensi.index', 'absensi.store'], 'clipboard-check', 'Absensi Kelas Saya'];
-                        $walikelasItems[] = ['absensi.rekap', ['absensi.rekap'], 'calendar-check-2', 'Rekap Absensi Kelas'];
+                        // Digabung 1 menu (Absensi + Rekap + Daftar Wajah sudah saling ditautkan
+                        // lewat tombol di dalam halaman absensi.index), pola sama dgn menu admin
+                        // "Absensi Siswa" yang juga pakai wildcard absensi.*.
+                        $walikelasItems[] = ['absensi.index', ['absensi.*'], 'clipboard-check', 'Absensi Kelas Saya'];
                         $walikelasItems[] = ['kaih.rekap', ['kaih.rekap', 'kaih.override.*'], 'list-checks', 'Rekap 7 KAIH Kelas'];
                     }
                     if ($modulOn('disiplin')) {
@@ -651,7 +672,7 @@
 
                 // ── Keuangan ──
                 if ($modulOn('keuangan') && ($isAdmin || auth()->user()?->canAccess('manage_keuangan'))) {
-                    $groups['keuangan'] = ['Keuangan', 'wallet', [
+                    $groups['keuangan'] = ['Keuangan / SPP', 'wallet', [
                         ['keuangan.index',      ['keuangan.index','keuangan.kelas'], 'layout-dashboard', 'Pembayaran SPP'],
                         ['keuangan.verifikasi', ['keuangan.verifikasi'],             'badge-check',      'Verifikasi'],
                         ['keuangan.bank',       ['keuangan.bank'],                   'landmark',         'Bank & Metode'],
@@ -681,6 +702,7 @@
                     $groups['sistem'] = ['Sistem', 'sliders-horizontal', [
                         ['setting.index', ['setting.index', 'setting.kopRapor', 'setting.penjabaran', 'setting.tpRange'], 'settings-2', 'Pengaturan'],
                         ['setting.roles', ['setting.roles'], 'shield-check', 'Hak Akses (RBAC)'],
+                        ['pembaruan.index', ['pembaruan.*'], 'sparkles', 'Info Pembaruan'],
                     ]];
                     // Langganan (lisensi) — hanya superadmin
                     if ($access === 'superadmin') {
@@ -689,15 +711,21 @@
                 }
                 // (Akun Saya dipindah ke dropdown profil di navbar)
 
-                // Grup yang memuat halaman aktif → dibuka otomatis saat load
-                $activeGroup = '';
+                // Grup yang memuat halaman aktif → dibuka otomatis saat load. Beberapa route
+                // (mis. poin.siswa.index) sengaja dipakai bareng di 2 grup berbeda (Poin & Aturan
+                // milik kesiswaan + Wali Kelas milik walikelas, untuk user yang punya kedua peran) —
+                // jadi di sini kumpulkan SEMUA grup yang cocok, bukan cuma yang pertama ketemu.
+                // Pemilihan mana yang dibuka (kalau localStorage masih ingat grup mana yg sedang
+                // dibuka user) ditentukan di JS (lihat openGroup), supaya klik dari dalam menu
+                // Wali Kelas tidak "meloncat" membuka Poin & Aturan begitu saja.
+                $activeGroups = [];
                 foreach ($groups as $gk => $g) {
                     foreach ($g[2] as $it) {
-                        if (request()->routeIs(...$it[1])) { $activeGroup = $gk; break 2; }
+                        if (request()->routeIs(...$it[1])) { $activeGroups[] = $gk; break; }
                     }
                 }
                 if (request()->routeIs('panduan.*', 'feedback.*')) {
-                    $activeGroup = 'bantuan';
+                    $activeGroups[] = 'bantuan';
                 }
             @endphp
 
@@ -707,12 +735,6 @@
                 <i data-lucide="layout-dashboard" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
                 <span x-show="!mini" class="text-sm truncate">Dashboard</span>
             </a>
-            @if($modulOn('absensi') && (auth()->user()?->siswa || auth()->user()?->guru))
-            <a href="{{ route('absen.qr') }}" data-tip="Absen QR" class="nav-link flex items-center px-3 py-2.5 {{ request()->routeIs('absen.qr') ? 'active' : '' }}" :class="mini ? 'justify-center' : 'gap-3'">
-                <i data-lucide="qr-code" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
-                <span x-show="!mini" class="text-sm truncate">Absen QR</span>
-            </a>
-            @endif
             @if($modulOn('kartu_pelajar') && auth()->user()?->siswa)
             <a href="{{ route('kartu-pelajar.self') }}" data-tip="Kartu Pelajar" class="nav-link flex items-center px-3 py-2.5 {{ request()->routeIs('kartu-pelajar.self') ? 'active' : '' }}" :class="mini ? 'justify-center' : 'gap-3'">
                 <i data-lucide="id-card" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
@@ -781,7 +803,7 @@
             {{-- Mode lebar: tombol grup + submenu collapsible --}}
             <div x-show="!mini" class="pt-1">
                 <button type="button" @click="toggleGroup('{{ $gk }}')"
-                        class="nav-group w-full flex items-center gap-3 px-3 py-2.5 {{ $activeGroup===$gk ? 'has-active' : '' }}">
+                        class="nav-group w-full flex items-center gap-3 px-3 py-2.5 {{ in_array($gk, $activeGroups, true) ? 'has-active' : '' }}">
                     <i data-lucide="{{ $gicon }}" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
                     <span class="text-sm font-semibold truncate flex-1 text-left">{{ $glabel }}</span>
                     <span class="flex-shrink-0 transition-transform duration-200 inline-block" :class="openGroup==='{{ $gk }}' ? 'rotate-180' : ''">
@@ -811,7 +833,7 @@
             {{-- Bantuan: panduan pemakaian dan kanal feedback pengguna --}}
             <div x-show="!mini" class="mt-2 pt-2 border-t border-black/10 dark:border-white/10">
                 <button type="button" @click="toggleGroup('bantuan')"
-                        class="nav-group w-full flex items-center gap-3 px-3 py-2.5 {{ $activeGroup==='bantuan' ? 'has-active' : '' }}">
+                        class="nav-group w-full flex items-center gap-3 px-3 py-2.5 {{ in_array('bantuan', $activeGroups, true) ? 'has-active' : '' }}">
                     <i data-lucide="life-buoy" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
                     <span class="text-sm font-semibold truncate flex-1 text-left">Bantuan</span>
                     <span class="flex-shrink-0 transition-transform duration-200 inline-block" :class="openGroup==='bantuan' ? 'rotate-180' : ''">
@@ -819,6 +841,10 @@
                     </span>
                 </button>
                 <div x-show="openGroup==='bantuan'" x-collapse class="nav-submenu ml-[22px] pl-2.5 mt-0.5 space-y-0.5">
+                    <a href="{{ route('pembaruan.riwayat') }}" class="nav-link nav-sublink flex items-center gap-2.5 px-3 py-2 {{ request()->routeIs('pembaruan.riwayat') ? 'active' : '' }}">
+                        <i data-lucide="sparkles" class="nav-icon w-4 h-4 flex-shrink-0"></i>
+                        <span class="text-[13px] truncate">Info Pembaruan</span>
+                    </a>
                     <a href="{{ route('panduan.visual') }}" class="nav-link nav-sublink flex items-center gap-2.5 px-3 py-2 {{ request()->routeIs('panduan.*') ? 'active' : '' }}">
                         <i data-lucide="book-open-check" class="nav-icon w-4 h-4 flex-shrink-0"></i>
                         <span class="text-[13px] truncate">Panduan Visual</span>
@@ -838,6 +864,9 @@
                 </div>
             </div>
             <div x-show="mini" x-cloak class="mt-2 pt-2 border-t border-black/10 dark:border-white/10 space-y-0.5">
+                <a href="{{ route('pembaruan.riwayat') }}" data-tip="Info Pembaruan" class="nav-link flex items-center justify-center px-3 py-2.5 {{ request()->routeIs('pembaruan.riwayat') ? 'active' : '' }}">
+                    <i data-lucide="sparkles" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
+                </a>
                 <a href="{{ route('panduan.visual') }}" data-tip="Panduan Visual" class="nav-link flex items-center justify-center px-3 py-2.5 {{ request()->routeIs('panduan.*') ? 'active' : '' }}">
                     <i data-lucide="book-open-check" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
                 </a>
@@ -1317,6 +1346,8 @@
 @include('partials.ai-assistant')
 @endunless
 
+@include('partials.whats-new-modal')
+
 <script>
     function appShell() {
         return {
@@ -1328,7 +1359,17 @@
             get mini(){ return this.collapsed && !this.isMobile; },
             get sidebarStyle(){ return (!this.mini && !this.isMobile) ? 'width:' + this.sidebarWidth + 'px' : ''; },
             avatarZoom: false,
-            openGroup: ('{{ $activeGroup ?? '' }}' || localStorage.getItem('sb_group') || ''),
+            // Kalau halaman aktif cocok di >1 grup (mis. poin.siswa.index dipakai bareng oleh
+            // grup "Poin & Aturan" dan "Wali Kelas" utk user yg punya kedua peran), utamakan
+            // grup yang terakhir dibuka manual (localStorage) SELAMA grup itu tetap salah satu
+            // yang valid utk halaman ini — supaya klik link di dalam Wali Kelas tidak "meloncat"
+            // ke Poin & Aturan begitu saja. Kalau tak ada localStorage yg cocok, pakai match pertama.
+            openGroup: (() => {
+                const matches = @json($activeGroups ?? []);
+                const stored = localStorage.getItem('sb_group');
+                if (stored && matches.includes(stored)) return stored;
+                return matches[0] || '';
+            })(),
             toggleGroup(g){ this.openGroup = (this.openGroup === g ? '' : g); localStorage.setItem('sb_group', this.openGroup); this.$nextTick(()=>lucide.createIcons()); },
             darkMode: (localStorage.getItem('theme_mode') ?? '{{ $pref->theme_mode ?? 'light' }}') === 'dark',
             uiStyle: '{{ $pref->ui_style ?? 'soft' }}',

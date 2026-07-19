@@ -89,22 +89,39 @@ class FeedbackController extends Controller
 
     private function notifyDevelopmentTeam(UserFeedback $feedback): void
     {
-        $email = trim((string) config('feedback.development_email', ''));
+        $emails = $this->developmentEmails();
 
-        if ($email === '') {
+        if ($emails === []) {
             return;
         }
 
+        $route = count($emails) === 1 ? $emails[0] : $emails;
+
         try {
-            Notification::route('mail', $email)
+            Notification::route('mail', $route)
                 ->notify(new FeedbackSubmittedNotification($feedback));
         } catch (\Throwable $e) {
             Log::warning('Gagal mengirim notifikasi email feedback.', [
                 'feedback_uuid' => $feedback->uuid,
-                'email' => $email,
+                'email' => implode(', ', $emails),
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /** @return list<string> */
+    private function developmentEmails(): array
+    {
+        $raw = trim((string) config('feedback.development_email', ''));
+
+        if ($raw === '') {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(
+            static fn (string $email): string => trim($email),
+            explode(',', $raw)
+        )));
     }
 
     public function show(Request $request, UserFeedback $feedback)

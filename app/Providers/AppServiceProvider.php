@@ -2,9 +2,16 @@
 
 namespace App\Providers;
 
+use App\Models\Mission;
 use App\Models\Setting;
+use App\Models\User;
+use App\Policies\MissionPolicy;
+use App\Policies\MissionProgressPolicy;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
@@ -20,6 +27,9 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Gate::policy(User::class, MissionProgressPolicy::class);
+        Gate::policy(Mission::class, MissionPolicy::class);
+
         // Rate limiter login: cegah brute force username/password & PIN.
         // Di-key per (kredensial + IP) agar penyerang tak bisa men-stuff banyak
         // password ke satu akun, dan satu IP tak bisa menebak banyak akun.
@@ -68,6 +78,16 @@ class AppServiceProvider extends ServiceProvider
                  ->with('alamatSekolah', $alamat)
                  ->with('sekolahLogoUrl', $logoUrl)
                  ->with('sekolahLogoExt', $logoExt);
+        });
+
+        // Popup "Apa yang Baru": ditandai sekali per sesi login lewat semua metode
+        // login (password, PIN, WebAuthn) karena semuanya bermuara ke Auth::login().
+        // Sengaja BUKAN flash session — beberapa middleware (wajib ganti password,
+        // wajib daftar wajah) bisa redirect dulu sebelum halaman pertama benar-benar
+        // tampil, yang akan "memakan" flash sebelum modal sempat dicek. Partial modal
+        // sendiri yang menghapus flag ini begitu ia benar-benar dievaluasi di halaman.
+        Event::listen(Login::class, function () {
+            session()->put('show_whats_new', true);
         });
     }
 }

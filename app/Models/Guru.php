@@ -16,6 +16,7 @@ class Guru extends Model
         'tanggal_lahir', 'agama', 'alamat', 'tingkat_studi', 'program_studi',
         'universitas', 'tahun_tamat', 'tmt_ngajar', 'tmt_smp', 'no_telp', 'foto',
         'face_descriptor', 'face_registered_at', 'face_photo', 'sekretaris_rapat',
+        'jam_pulang_wajib',
     ];
 
     protected $casts = [

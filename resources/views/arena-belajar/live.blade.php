@@ -137,6 +137,26 @@
                             </template>
                         </div>
 
+                        <div class="space-y-2.5" x-show="session.question.type === 'mcq_complex'">
+                            <p class="text-xs font-semibold text-amber-200/90">Pilih semua jawaban yang benar, lalu kirim.</p>
+                            <template x-for="(opt, oi) in session.question.options" :key="opt.uuid">
+                                <button type="button"
+                                        @click="isSiswa && session.status==='question' && !answered && !submitting && toggleComplex(opt.uuid)"
+                                        class="arena-opt"
+                                        :class="{
+                                            'is-selected': selectedMulti.includes(opt.uuid),
+                                            'is-correct': session.status==='reveal' && opt.is_correct,
+                                        }"
+                                        x-bind:disabled="!isSiswa || session.status!=='question' || answered || submitting">
+                                    <span class="arena-opt-letter" x-text="['A','B','C','D','E','F'][oi]"></span>
+                                    <span x-text="opt.option_text"></span>
+                                </button>
+                            </template>
+                            <button type="button" x-show="isSiswa && session.status==='question' && !answered"
+                                    @click="answerComplex" :disabled="submitting || selectedMulti.length === 0"
+                                    class="arena-cta">Kirim jawaban</button>
+                        </div>
+
                         <div x-show="session.question.type === 'short_answer'" class="space-y-2">
                             <input type="text" x-model="shortText" :disabled="!isSiswa || session.status!=='question' || answered || submitting"
                                    class="w-full rounded-2xl border border-white/15 bg-white/10 px-4 py-3.5 text-white min-h-[52px] font-semibold"
@@ -213,6 +233,7 @@ function arenaLive(cfg) {
         leaderboard: [],
         me: null,
         selected: null,
+        selectedMulti: [],
         shortText: '',
         matchMap: {},
         answered: false,
@@ -258,6 +279,7 @@ function arenaLive(cfg) {
                 this.session = sData.session;
                 if (this.session?.current_question_id !== prevQ) {
                     this.selected = null;
+                    this.selectedMulti = [];
                     this.shortText = '';
                     this.matchMap = {};
                     this.answered = false;
@@ -321,6 +343,17 @@ function arenaLive(cfg) {
             this.postAnswer({
                 question_id: this.session.current_question_id,
                 selected_option_id: optId,
+            });
+        },
+        toggleComplex(optId) {
+            const idx = this.selectedMulti.indexOf(optId);
+            if (idx >= 0) this.selectedMulti.splice(idx, 1);
+            else this.selectedMulti.push(optId);
+        },
+        answerComplex() {
+            this.postAnswer({
+                question_id: this.session.current_question_id,
+                answer_text: JSON.stringify(this.selectedMulti),
             });
         },
         answerShort() {

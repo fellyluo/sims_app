@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Models\Setting;
 use App\Models\UserFeedback;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -26,16 +27,21 @@ class FeedbackSubmittedNotification extends Notification implements ShouldQueue
     {
         $this->feedback->loadMissing('user');
 
+        $schoolName = trim((string) Setting::get('nama_sekolah', config('app.name'))) ?: (string) config('app.name');
+        $instanceUrl = rtrim((string) config('app.url'), '/');
         $sender = $this->feedback->user?->displayName() ?? 'User dihapus';
         $role = $this->feedback->user?->roleLabel() ?? '-';
         $rating = $this->feedback->rating ? $this->feedback->rating.'/5' : '-';
         $contextUrl = $this->feedback->context_url ?: '-';
+        $category = $this->feedback->categoryLabel();
 
         return (new MailMessage)
-            ->subject('[Masukan Baru SIMS] '.$this->feedback->categoryLabel().' - '.$this->feedback->subject)
+            ->subject('[Masukan] '.$schoolName.' · '.$category.' - '.$this->feedback->subject)
             ->greeting('Masukan baru diterima')
             ->line('Ada saran atau masukan baru yang masuk dari pengguna SIMS.')
-            ->line('Kategori: '.$this->feedback->categoryLabel())
+            ->line('Sekolah: '.$schoolName)
+            ->line('URL instance: '.$instanceUrl)
+            ->line('Kategori: '.$category)
             ->line('Subjek: '.$this->feedback->subject)
             ->line('Pengirim: '.$sender.' ('.$role.')')
             ->line('Rating: '.$rating)

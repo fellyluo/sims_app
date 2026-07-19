@@ -14,7 +14,8 @@
     <div>
         <h1 class="page-title">Langganan SIMS</h1>
         <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Tetapkan dan pantau masa aktif lisensi dalam hari. Saat kadaluarsa, seluruh pengguna selain superadmin akan terkunci.
+            Tetapkan dan pantau masa aktif lisensi. Saat kadaluarsa, seluruh pengguna selain superadmin akan terkunci.
+            Checklist demo/jual: <code class="text-xs">docs/demo-school-checklist.md</code>.
         </p>
     </div>
 

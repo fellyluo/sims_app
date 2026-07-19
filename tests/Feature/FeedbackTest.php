@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\RolePermission;
+use App\Models\Setting;
 use App\Models\User;
 use App\Models\UserFeedback;
 use App\Notifications\FeedbackSubmittedNotification;
@@ -54,7 +55,12 @@ class FeedbackTest extends TestCase
     public function test_feedback_mengirim_email_ke_development_jika_dikonfigurasi(): void
     {
         Notification::fake();
-        config(['feedback.development_email' => 'btivesolution@gmail.com']);
+        config([
+            'feedback.development_email' => 'btivesolution@gmail.com',
+            'app.url' => 'https://smp-contoh.example',
+            'app.name' => 'SIMS',
+        ]);
+        Setting::set('nama_sekolah', 'SMP Contoh');
 
         $user = $this->makeUser('guru', 'feedback_email_sender');
 
@@ -74,9 +80,31 @@ class FeedbackTest extends TestCase
             return in_array('mail', $channels, true)
                 && $notifiable->routeNotificationFor('mail') === 'btivesolution@gmail.com'
                 && $notification->feedback->is($feedback)
-                && $mail->subject === '[Masukan Baru SIMS] Ide Fitur - Tambah filter nilai'
+                && $mail->subject === '[Masukan] SMP Contoh · Ide Fitur - Tambah filter nilai'
+                && in_array('Sekolah: SMP Contoh', $mail->introLines, true)
+                && in_array('URL instance: https://smp-contoh.example', $mail->introLines, true)
                 && $mail->actionText === 'Buka Detail Masukan'
                 && str_contains($mail->actionUrl, '/masukan/'.$feedback->uuid);
+        });
+    }
+
+    public function test_feedback_mengirim_email_ke_beberapa_penerima(): void
+    {
+        Notification::fake();
+        config(['feedback.development_email' => 'satu@example.com, dua@example.com']);
+        Setting::set('nama_sekolah', 'SMA Contoh');
+
+        $user = $this->makeUser('guru', 'feedback_multi_email');
+
+        $this->actingAs($user)->post('/masukan', [
+            'category' => 'bug',
+            'subject' => 'Error saat login',
+            'message' => 'Setelah ganti password, halaman login menampilkan error 500.',
+        ])->assertRedirect();
+
+        Notification::assertSentOnDemand(FeedbackSubmittedNotification::class, function ($notification, array $channels, object $notifiable) {
+            return in_array('mail', $channels, true)
+                && $notifiable->routeNotificationFor('mail') === ['satu@example.com', 'dua@example.com'];
         });
     }
 

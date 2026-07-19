@@ -29,7 +29,7 @@ class StoreGameQuizRequest extends FormRequest
             'assign_self'      => ['sometimes', 'boolean'],
 
             'questions'                         => ['required', 'array', 'min:1'],
-            'questions.*.type'                  => ['required', Rule::in(['mcq', 'true_false', 'short_answer', 'match'])],
+            'questions.*.type'                  => ['required', Rule::in(['mcq', 'mcq_complex', 'true_false', 'short_answer', 'match'])],
             'questions.*.question_text'         => ['required', 'string', 'max:5000'],
             'questions.*.points'                => ['nullable', 'integer', 'min:1', 'max:100'],
             'questions.*.explanation'           => ['nullable', 'string', 'max:5000'],
@@ -52,15 +52,18 @@ class StoreGameQuizRequest extends FormRequest
                 $type = $q['type'] ?? 'mcq';
                 $options = $q['options'] ?? [];
 
-                if (in_array($type, ['mcq', 'true_false'], true)) {
-                    $correct = collect($options)->filter(fn ($o) => !empty($o['is_correct']))->count();
-                    if ($type === 'mcq' && count($options) < 2) {
+                if (in_array($type, ['mcq', 'mcq_complex', 'true_false'], true)) {
+                    $correct = collect($options)->filter(fn ($o) => ! empty($o['is_correct']))->count();
+                    if (in_array($type, ['mcq', 'mcq_complex'], true) && count($options) < 2) {
                         $validator->errors()->add("questions.$i.options", 'Pilihan ganda minimal 2 opsi.');
                     }
                     if ($type === 'true_false' && count($options) !== 2) {
                         $validator->errors()->add("questions.$i.options", 'Benar/Salah harus tepat 2 opsi.');
                     }
-                    if ($correct !== 1) {
+                    if ($type === 'mcq_complex' && $correct < 2) {
+                        $validator->errors()->add("questions.$i.options", 'Pilihan Ganda Kompleks minimal 2 jawaban benar.');
+                    }
+                    if (in_array($type, ['mcq', 'true_false'], true) && $correct !== 1) {
                         $validator->errors()->add("questions.$i.options", 'Setiap soal MCQ/TF harus punya tepat 1 jawaban benar.');
                     }
                 }

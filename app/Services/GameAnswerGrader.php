@@ -98,7 +98,7 @@ class GameAnswerGrader
         $isCorrect = false;
         $points = 0;
 
-        if (in_array($question->type, ['mcq', 'true_false'], true)) {
+        if (in_array($question->type, ['mcq', 'mcq_complex', 'true_false'], true)) {
             $isCorrect = $this->isCorrect($question, $selectedOptionId, $answerText);
             if ($isCorrect) {
                 $points = $base;
@@ -125,8 +125,12 @@ class GameAnswerGrader
 
     public function isCorrect(GameQuestion $question, ?string $selectedOptionId, ?string $answerText = null): bool
     {
+        if ($question->type === 'mcq_complex') {
+            return $this->mcqComplexCorrect($question, $answerText, $selectedOptionId);
+        }
+
         if (in_array($question->type, ['mcq', 'true_false'], true)) {
-            if (!$selectedOptionId) {
+            if (! $selectedOptionId) {
                 return false;
             }
             $option = $question->relationLoaded('options')
@@ -145,6 +149,43 @@ class GameAnswerGrader
         }
 
         return false;
+    }
+
+    /** Set pilihan siswa harus sama persis dengan semua opsi benar. */
+    private function mcqComplexCorrect(GameQuestion $question, ?string $answerText, ?string $selectedOptionId): bool
+    {
+        $correctIds = $question->relationLoaded('options')
+            ? $question->options->where('is_correct', true)->pluck('uuid')->map(fn ($id) => (string) $id)->sort()->values()->all()
+            : $question->options()->where('is_correct', true)->pluck('uuid')->map(fn ($id) => (string) $id)->sort()->values()->all();
+
+        if (count($correctIds) < 1) {
+            return false;
+        }
+
+        $selected = $this->decodeJsonList($answerText);
+        if ($selected === [] && $selectedOptionId) {
+            $selected = [(string) $selectedOptionId];
+        }
+        $selected = collect($selected)->map(fn ($id) => (string) $id)->filter()->unique()->sort()->values()->all();
+
+        return $selected === $correctIds;
+    }
+
+    /** @return list<string> */
+    private function decodeJsonList(?string $raw): array
+    {
+        if ($raw === null || trim($raw) === '') {
+            return [];
+        }
+        $decoded = json_decode($raw, true);
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(
+            fn ($v) => is_scalar($v) ? (string) $v : '',
+            $decoded
+        )));
     }
 
     /** 0–1: proporsi pasangan benar. */

@@ -124,6 +124,23 @@ return [
     'long_timeout' => (int) env('AI_LONG_TIMEOUT', 120),
 
     /*
+    | Generate gambar soal (Gemini native image / "Nano Banana").
+    | Dipakai Generator Soal saat opsi "Soal bergambar" aktif: teks soal dulu,
+    | lalu tiap penanda [GAMBAR: ...] digambar dengan model image-capable.
+    */
+    'image' => [
+        'model' => env('AI_IMAGE_MODEL', 'gemini-2.5-flash-image'),
+        'fallback_models' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('AI_IMAGE_FALLBACK_MODELS', 'gemini-3.1-flash-image-preview,gemini-2.0-flash-preview-image-generation')),
+        ))),
+        'max_per_quiz' => (int) env('AI_IMAGE_MAX_PER_QUIZ', 5),
+        'timeout' => (int) env('AI_IMAGE_TIMEOUT', 90),
+        'disk' => env('AI_IMAGE_DISK', 'public'),
+        'directory' => env('AI_IMAGE_DIRECTORY', 'ai-quiz-images'),
+    ],
+
+    /*
     | Guard biaya — mencegah free tier jebol & abuse tagihan.
     | - rate_limit: maksimum request AI per user per menit.
     | - max_input_chars: batas panjang prompt yang diterima controller (validasi).
@@ -216,6 +233,17 @@ return [
             lampiran soal harus lengkap. Jangan mengarang identitas yang tidak diberikan;
             gunakan placeholder jelas bila data belum tersedia.
             TXT,
+        'chat' => <<<'TXT'
+            Kamu adalah Nalar Guru di dalam Asisten Guru SIMS. Bantu guru merancang materi,
+            soal, penjelasan konsep, rubrik, dan pertanyaan pengajaran sehari-hari.
+            Jawab dalam Bahasa Indonesia yang jelas.
+            Bila diminta outline presentasi atau slide, buat daftar slide bernomor
+            (judul + poin singkat) yang siap disalin guru — tanpa mengarah ke alat eksternal.
+            Bila diminta soal/kuis/evaluasi, JANGAN menjawab dengan Markdown — tulis dokumen
+            soal teks polos dengan format Generator Soal SIMS (kop, SOAL EVALUASI, identitas,
+            Petunjuk Pengerjaan, Bagian soal, Kunci Jawaban & Pedoman Penilaian).
+            Jangan mengarang data resmi sekolah (nilai, SPP, absensi) yang tidak diberikan.
+            TXT,
     ],
 
     /*
@@ -246,8 +274,13 @@ return [
         'embed_model' => env('AI_EMBED_MODEL', 'gemini-embedding-001'),
         'chunk_chars' => (int) env('AI_RAG_CHUNK', 900),   // ukuran target per chunk
         'chunk_overlap' => (int) env('AI_RAG_OVERLAP', 150),
-        'max_chunks' => (int) env('AI_RAG_MAX_CHUNKS', 300), // batas chunk per dokumen
+        'max_chunks' => (int) env('AI_RAG_MAX_CHUNKS', 120), // batas chunk per dokumen (pilot aman)
+        'max_extract_chars' => (int) env('AI_RAG_MAX_EXTRACT_CHARS', 200_000),
+        'max_upload_kb' => (int) env('AI_RAG_MAX_UPLOAD_KB', 5120), // 5 MB
         'top_k' => (int) env('AI_RAG_TOPK', 5),        // chunk termirip yang dipakai
+        // Batas kandidat yang di-score di PHP (hindari O(n) seluruh korpus).
+        'search_candidate_limit' => (int) env('AI_RAG_SEARCH_CANDIDATES', 400),
+        'queue_ingest' => (bool) env('AI_RAG_QUEUE_INGEST', true),
         'system' => <<<'TXT'
             Kamu asisten dokumen sekolah. Jawab pertanyaan HANYA berdasarkan KONTEKS
             kutipan dokumen yang diberikan di bawah. Jika jawabannya tidak ada di dalam

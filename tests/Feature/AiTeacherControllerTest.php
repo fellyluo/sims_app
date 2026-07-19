@@ -24,6 +24,20 @@ class AiTeacherControllerTest extends TestCase
         config()->set('ai.provider', 'gemini');
         config()->set('ai.api_key', 'gemini-test-key');
         config()->set('ai.fallback_providers', []);
+
+        // Asisten Guru wajib API key pribadi; isi otomatis untuk staf yang generate AI.
+        User::created(function (User $user) {
+            if ($user->hasGeminiApiKey()) {
+                return;
+            }
+            if (in_array($user->access, ['siswa', 'orangtua'], true)) {
+                return;
+            }
+            $user->forceFill([
+                'gemini_api_key' => \Illuminate\Support\Facades\Crypt::encryptString('AIzaSyTestPersonalKeyForFeatureTests01'),
+                'gemini_api_key_hint' => 'ts01',
+            ])->saveQuietly();
+        });
     }
 
     public function test_generator_soal_bisa_memakai_materi_dari_file_docx(): void
@@ -32,6 +46,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-ai',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $filePath = tempnam(sys_get_temp_dir(), 'quiz-docx');
@@ -50,6 +65,7 @@ class AiTeacherControllerTest extends TestCase
                         && str_contains($prompt, 'Petunjuk Pengerjaan')
                         && str_contains($prompt, 'Kunci Jawaban & Pedoman Penilaian')
                         && ($options['max_output_tokens'] ?? null) === 4096
+                        && ($options['thinking_level'] ?? null) === 'low'
                         && str_contains((string) ($options['answer_style'] ?? ''), 'dokumen soal teks polos');
                 })
                 ->andReturn([
@@ -95,6 +111,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-ai-checkbox',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $capturedPrompt = '';
@@ -110,7 +127,8 @@ class AiTeacherControllerTest extends TestCase
                         && str_contains($prompt, 'Bagian B - Benar/Salah')
                         && str_contains($prompt, 'Jenis soal yang dibuat hanya: Pilihan Ganda Kompleks, Benar/Salah')
                         && ! str_contains($prompt, 'Bagian C - Mencocokkan')
-                        && ($options['max_output_tokens'] ?? null) === 4096;
+                        && ($options['max_output_tokens'] ?? null) === 4096
+                        && ($options['thinking_level'] ?? null) === 'low';
                 })
                 ->andReturn([
                     'text' => 'Soal campuran baru.',
@@ -134,12 +152,47 @@ class AiTeacherControllerTest extends TestCase
         $this->assertStringContainsString('Buat 4 soal (Pilihan Ganda Kompleks, Benar/Salah)', $capturedPrompt);
     }
 
+    public function test_generator_soal_tingkat_sulit_memakai_jatah_token_lebih_besar(): void
+    {
+        $user = User::create([
+            'username' => 'guru-ai-sulit',
+            'password' => 'password',
+            'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
+        ]);
+
+        $this->mock(GeminiService::class, function (MockInterface $mock) {
+            $mock->shouldReceive('generate')
+                ->once()
+                ->withArgs(function (string $prompt, array $options) {
+                    // 10 soal sulit: (10 * 480) + 1600 = 6400, thinking ditekan.
+                    return ($options['max_output_tokens'] ?? null) === 6400
+                        && ($options['thinking_level'] ?? null) === 'low'
+                        && str_contains($prompt, 'sulit');
+                })
+                ->andReturn([
+                    'text' => 'Soal sulit siap.',
+                    'model' => 'gemini-test',
+                    'prompt_tokens' => 20,
+                    'completion_tokens' => 40,
+                ]);
+        });
+
+        $this->actingAs($user)->postJson(route('ai.teacher.quiz'), [
+            'topik' => 'Fotosintesis tingkat tinggi',
+            'jumlah' => 10,
+            'jenis_soal' => ['pg'],
+            'tingkat' => 'sulit',
+        ])->assertOk()->assertJsonPath('ok', true);
+    }
+
     public function test_generator_soal_wajib_memilih_minimal_satu_jenis_soal(): void
     {
         $user = User::create([
             'username' => 'guru-ai-no-type',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $response = $this->actingAs($user)->postJson(route('ai.teacher.quiz'), [
@@ -167,6 +220,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-quota-page',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         AiUsageLog::create([
@@ -220,6 +274,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'admin-quota-page',
             'password' => 'password',
             'access' => 'superadmin',
+            'gemini_account' => 'admin@belajar.id',
         ]);
 
         AiUsageLog::create([
@@ -268,6 +323,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-quota-json',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $this->mock(GeminiService::class, function (MockInterface $mock) {
@@ -307,6 +363,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'admin-quota-json',
             'password' => 'password',
             'access' => 'superadmin',
+            'gemini_account' => 'admin@belajar.id',
         ]);
 
         $this->mock(GeminiService::class, function (MockInterface $mock) {
@@ -367,6 +424,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-quota-live',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         AiUsageLog::create([
@@ -397,6 +455,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-word',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $content = implode("\n", [
@@ -455,6 +514,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-summary',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $this->mock(GeminiService::class, function (MockInterface $mock) {
@@ -487,6 +547,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-feedback',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $this->mock(GeminiService::class, function (MockInterface $mock) {
@@ -521,6 +582,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-learning',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $capturedPrompt = '';
@@ -581,6 +643,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-learning-file',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $filePath = tempnam(sys_get_temp_dir(), 'learning-docx');
@@ -642,6 +705,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-learning-disabled',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         foreach (['lkpd', 'modul_ajar'] as $tool) {
@@ -659,6 +723,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-learning-word',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $response = $this->actingAs($user)->postJson(route('ai.teacher.learning.export-word'), [
@@ -691,6 +756,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-learning-pdf',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $response = $this->actingAs($user)->postJson(route('ai.teacher.learning.export-pdf'), [
@@ -710,6 +776,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-learning-tabel',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $response = $this->actingAs($user)->postJson(route('ai.teacher.learning.export-word'), [
@@ -749,6 +816,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-learning-preview',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $response = $this->actingAs($user)->postJson(route('ai.teacher.learning.preview'), [
@@ -773,6 +841,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-preview-bebas',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $response = $this->actingAs($user)->postJson(route('ai.teacher.learning.preview'), [
@@ -790,6 +859,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-history',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $responses = collect([
@@ -860,6 +930,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-preview-xss',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $response = $this->actingAs($user)->postJson(route('ai.teacher.learning.preview'), [
@@ -878,6 +949,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-learning-pdf-tabel',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $response = $this->actingAs($user)->postJson(route('ai.teacher.learning.export-pdf'), [
@@ -897,6 +969,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-quiz-pdf',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $response = $this->actingAs($user)->postJson(route('ai.teacher.quiz.export-pdf'), [
@@ -915,6 +988,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-quiz-pdf-bebas',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $response = $this->actingAs($user)->postJson(route('ai.teacher.quiz.export-pdf'), [
@@ -931,6 +1005,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-hapus-history',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $history = AiTeacherHistory::create([
@@ -957,11 +1032,13 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-pemilik-history',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
         $penyusup = User::create([
             'username' => 'guru-penyusup-history',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $history = AiTeacherHistory::create([
@@ -987,6 +1064,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-quiz-preview',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $response = $this->actingAs($user)->postJson(route('ai.teacher.quiz.preview'), [
@@ -1011,6 +1089,7 @@ class AiTeacherControllerTest extends TestCase
             'username' => 'guru-quiz-preview-bebas',
             'password' => 'password',
             'access' => 'guru',
+            'gemini_account' => 'guru@belajar.id',
         ]);
 
         $response = $this->actingAs($user)->postJson(route('ai.teacher.quiz.preview'), [
@@ -1116,6 +1195,7 @@ class AiTeacherControllerTest extends TestCase
                 'username' => 'ai_ok_'.$access,
                 'password' => 'password',
                 'access' => $access,
+                'gemini_account' => $access.'@belajar.id',
             ]);
 
             $this->actingAs($user)

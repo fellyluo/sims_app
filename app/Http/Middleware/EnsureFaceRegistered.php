@@ -20,6 +20,8 @@ class EnsureFaceRegistered
         'ganti.password', 'ganti.password.post', 'ganti.username', 'ganti.pin', 'ganti.pin.post',
         'profile.style',
         'absen.qr', 'absen.qr.mark',   // absen QR boleh tanpa wajib daftar wajah
+        'notifications.fcmToken.store', 'notifications.fcmToken.destroy',
+        'fcm.token.store', 'fcm.token.destroy',   // alias legacy APK Android
     ];
 
     public function handle(Request $request, Closure $next): Response

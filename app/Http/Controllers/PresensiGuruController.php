@@ -5,8 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\Guru;
 use App\Models\PresensiGuru;
 use App\Models\Setting;
+use App\Models\User;
+use App\Notifications\GuruIzinPulangNotification;
+use App\Notifications\GuruTerlambatNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Notification;
 
 class PresensiGuruController extends Controller
 {
@@ -107,9 +111,24 @@ class PresensiGuruController extends Controller
             ]);
         }
 
-        // Guru wajib melengkapi agenda hari ini sebelum boleh absen pulang.
         if ($mode === 'pulang') {
             $guru = Guru::find($data['id_guru']);
+
+            // Jam pulang wajib per-guru (opsional, diatur admin): guru dengan jadwal
+            // pulang tertentu hanya boleh scan pulang pada jam itu atau setelahnya.
+            // Kosong ("bebas") = tak ada batasan, perilaku lama.
+            if ($guru && $guru->jam_pulang_wajib) {
+                $sekarang = now()->format('H:i:s');
+                if ($sekarang < $guru->jam_pulang_wajib) {
+                    return response()->json([
+                        'success' => false,
+                        'blocked' => true,
+                        'message' => 'Belum waktunya pulang. Jadwal pulang Anda pukul ' . substr($guru->jam_pulang_wajib, 0, 5) . '.',
+                    ]);
+                }
+            }
+
+            // Guru wajib melengkapi agenda hari ini sebelum boleh absen pulang.
             $belum = $guru ? \App\Support\AgendaGuru::belumDiisi($guru, $data['tanggal']) : [];
             if (!empty($belum) && \App\Support\AgendaGuru::wajibSebelumPulang()) {
                 return response()->json([
@@ -151,6 +170,129 @@ class PresensiGuruController extends Controller
             'jam'       => substr($mode === 'pulang' ? $row->jam_pulang : $row->jam_masuk, 0, 5),
             'terlambat' => $mode === 'masuk' && $row->terlambat($batas),
         ]);
+    }
+
+    /** Presensi Saya (guru): riwayat sendiri + akses ke form keterlambatan & izin pulang awal. */
+    public function self(Request $request)
+    {
+        $guru = auth()->user()->guru;
+        abort_unless($guru, 403, 'Halaman ini khusus untuk akun guru.');
+
+        $dari   = $request->dari   ?: now()->startOfMonth()->toDateString();
+        $sampai = $request->sampai ?: now()->toDateString();
+        if ($dari > $sampai) [$dari, $sampai] = [$sampai, $dari];
+
+        $batas = Setting::get('waktu_terlambat_guru', Setting::get('waktu_terlambat', '07:30'));
+
+        $riwayat = PresensiGuru::where('id_guru', $guru->uuid)
+            ->whereDate('tanggal', '>=', $dari)
+            ->whereDate('tanggal', '<=', $sampai)
+            ->orderByDesc('tanggal')
+            ->get();
+
+        $today = PresensiGuru::where('id_guru', $guru->uuid)->whereDate('tanggal', now())->first();
+        $belumAgenda = \App\Support\AgendaGuru::belumDiisi($guru);
+
+        // Izin pulang awal menyesuaikan metode absensi aktif sekolah: QR scan
+        // (dilengkapi lokasi) atau verifikasi kamera wajah — bukan keduanya sekaligus.
+        $bolehQr = \App\Support\AbsensiGuru::bolehQr();
+        $qrLat    = Setting::get('sekolah_lat');
+        $qrLng    = Setting::get('sekolah_lng');
+        $qrRadius = (float) Setting::get('absen_radius', 100);
+
+        return view('presensi_guru.self', compact(
+            'guru', 'riwayat', 'batas', 'dari', 'sampai', 'today', 'belumAgenda',
+            'bolehQr', 'qrLat', 'qrLng', 'qrRadius'
+        ));
+    }
+
+    /** Simpan alasan keterlambatan utk presensi masuk hari ini (hanya milik sendiri). */
+    public function keterlambatanStore(Request $request)
+    {
+        $guru = auth()->user()->guru;
+        abort_unless($guru, 403);
+
+        $data = $request->validate(['keterangan' => 'required|string|max:500']);
+
+        $batas = Setting::get('waktu_terlambat_guru', Setting::get('waktu_terlambat', '07:30'));
+        $row = PresensiGuru::where('id_guru', $guru->uuid)->whereDate('tanggal', now())->first();
+        if (!$row || $row->status !== 'hadir' || !$row->terlambat($batas)) {
+            return back()->with('error', 'Anda tidak tercatat terlambat hari ini.');
+        }
+
+        $row->keterangan = $data['keterangan'];
+        $row->save();
+
+        Notification::send($this->notifRecipients(), new GuruTerlambatNotification($row));
+
+        return back()->with('success', 'Keterangan keterlambatan tersimpan.');
+    }
+
+    /**
+     * Izin pulang awal (self-service): guru sudah diverifikasi wajahnya di sisi klien
+     * (kamera sendiri, bukan kiosk), lalu jam pulang dicatat langsung. Sengaja TIDAK
+     * dicek AgendaGuru::belumDiisi() — izin pulang awal memang berarti sebagian jam
+     * mengajar hari ini belum selesai/terisi; itu wajar & ditandai lewat alasan.
+     */
+    public function izinPulangStore(Request $request)
+    {
+        $guru = auth()->user()->guru;
+        abort_unless($guru, 403);
+
+        $data = $request->validate(['alasan' => 'required|string|max:500']);
+
+        $row = PresensiGuru::where('id_guru', $guru->uuid)->whereDate('tanggal', now())->first();
+        if (!$row || empty($row->jam_masuk)) {
+            return response()->json(['success' => false, 'message' => 'Anda belum tercatat absen masuk hari ini.'], 422);
+        }
+        if (!empty($row->jam_pulang)) {
+            return response()->json(['success' => false, 'message' => 'Anda sudah tercatat pulang hari ini.'], 422);
+        }
+
+        $row->jam_pulang = now()->format('H:i:s');
+        $row->keterangan = trim(($row->keterangan ? $row->keterangan . ' | ' : '') . 'Izin pulang awal: ' . $data['alasan']);
+        $row->save();
+
+        Notification::send($this->notifRecipients(), new GuruIzinPulangNotification($row, $data['alasan']));
+
+        return response()->json(['success' => true, 'jam' => substr($row->jam_pulang, 0, 5)]);
+    }
+
+    /** Kelola jam pulang wajib per guru (admin) — daftar guru + status jadwal pulangnya. */
+    public function jamPulang(Request $request)
+    {
+        $search = trim((string) $request->search);
+        $gurus = Guru::query()
+            ->when($search !== '', fn ($q) => $q->where('nama', 'like', "%{$search}%"))
+            ->orderBy('nama')
+            ->get();
+
+        return view('presensi_guru.jam-pulang', compact('gurus', 'search'));
+    }
+
+    /** Terapkan/hapus jam pulang wajib utk guru terpilih sekaligus. */
+    public function jamPulangUpdate(Request $request)
+    {
+        $data = $request->validate([
+            'guru_ids'         => 'required|array|min:1',
+            'guru_ids.*'       => 'exists:gurus,uuid',
+            'jam_pulang_wajib' => 'nullable|date_format:H:i',
+        ]);
+
+        $jam = $data['jam_pulang_wajib'] ?? null;
+        Guru::whereIn('uuid', $data['guru_ids'])->update(['jam_pulang_wajib' => $jam]);
+
+        $pesan = $jam
+            ? count($data['guru_ids']) . ' guru dijadwalkan pulang pukul ' . $jam . '.'
+            : count($data['guru_ids']) . ' guru dibebaskan dari jadwal pulang (bebas).';
+
+        return back()->with('success', $pesan);
+    }
+
+    /** Kepala Sekolah & Admin — penerima notifikasi keterlambatan/izin pulang guru. */
+    private function notifRecipients()
+    {
+        return User::query()->whereIn('access', ['kepala', 'admin', 'superadmin'])->get();
     }
 
     /** Batalkan absen masuk/pulang dari scan wajah */
