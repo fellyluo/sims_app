@@ -32,28 +32,72 @@
         <div class="nalar-layout">
             <section class="nalar-stage">
                 <section class="module-panel active" id="panel-narrative">
-                    <div class="module-head"><h2 id="narrativeTitle">Memuat…</h2></div>
-                    <div class="story-card" id="narrativeCard"></div>
+                    <div class="module-head"><h2 id="narrativeTitle">Memuat…</h2><div id="narrativeScore" class="font-bold text-primary"></div></div>
+                    <div class="story-card" id="narrativeCard">
+                        <p class="story-tag" id="narrativeTag"></p>
+                        <p id="narrativePrompt" class="font-bold text-slate-800"></p>
+                        <p id="narrativeBody"></p>
+                        <div class="choice-grid" id="narrativeChoices"></div>
+                    </div>
                     <div class="path-row" id="narrativePath"></div>
                 </section>
                 <section class="module-panel" id="panel-decision">
-                    <div class="module-head"><h2>Keputusan Strategis</h2></div>
-                    <div id="decisionBoard"></div>
+                    <div class="module-head"><h2 id="decisionRound">Keputusan Strategis</h2><span id="decisionTag" class="story-tag"></span></div>
+                    <div class="decision-meter">
+                        <div>
+                            <span>Stabilitas</span><strong id="stabilityValue">0</strong>
+                            <div class="meter-bar"><span id="stabilityBar" style="width: 0%"></span></div>
+                        </div>
+                        <div>
+                            <span>Kepercayaan</span><strong id="trustValue">0</strong>
+                            <div class="meter-bar"><span id="trustBar" style="width: 0%"></span></div>
+                        </div>
+                        <div>
+                            <span>Anggaran</span><strong id="budgetValue">0</strong>
+                            <div class="meter-bar budget"><span id="budgetBar" style="width: 0%"></span></div>
+                        </div>
+                    </div>
+                    <div class="story-card decision-card" id="decisionBoard">
+                        <p id="decisionPrompt" class="font-bold text-slate-800"></p>
+                        <p id="decisionBody"></p>
+                        <div class="choice-grid" id="decisionChoices"></div>
+                    </div>
+                    <div class="path-row" id="decisionLog"></div>
                 </section>
                 <section class="module-panel" id="panel-puzzle">
-                    <div class="module-head"><h2>Puzzle Sequencing</h2></div>
-                    <div id="puzzleBoard" class="puzzle-board"></div>
+                    <div class="module-head"><h2>Puzzle Sequencing</h2><span id="puzzleScore" class="font-bold text-primary"></span></div>
+                    <div id="puzzleBoard" class="puzzle-board">
+                        <div class="puzzle-grid">
+                            <div class="sequence-list" id="sequenceList"></div>
+                            <div class="target-list" id="targetList"></div>
+                        </div>
+                        <div class="nalar-actions path-row mt-4 flex justify-end gap-2">
+                            <button type="button" class="path-pill" id="shufflePuzzle">Acak Urutan</button>
+                            <button type="button" class="path-pill !bg-primary !text-white" id="checkPuzzle">Periksa</button>
+                        </div>
+                    </div>
                 </section>
             </section>
             <aside class="nalar-side">
-                <div class="summary-card" id="missionSummary">
-                    <p class="eyebrow">Ringkasan</p>
-                    <h3>Skor sementara</h3>
-                    <p id="summaryScore">0%</p>
+                <div class="summary-card p-4 space-y-3" id="missionSummary">
+                    <p class="eyebrow text-xs font-bold text-slate-400 uppercase">Ringkasan</p>
+                    <p id="activeModuleLabel" class="text-sm font-semibold text-primary"></p>
+                    <div>
+                        <p class="text-sm text-slate-500">Skor sementara</p>
+                        <p id="summaryScore" class="text-2xl font-black text-slate-800"><span id="totalPoints">0</span></p>
+                    </div>
+                    <p id="moduleStatus" class="text-sm font-medium text-amber-600">Belum selesai</p>
+                    <div class="flex flex-col gap-2 mt-4">
+                        <button type="button" id="resetModule" class="path-pill text-center">Reset Modul</button>
+                        <button type="button" id="randomModule" class="path-pill text-center">Modul Acak</button>
+                        <button type="button" id="completeModule" class="path-pill text-center !bg-emerald-100 !text-emerald-700">Selesaikan Modul</button>
+                        <button type="button" id="finishNalar" class="hidden">Finish</button>
+                    </div>
                 </div>
             </aside>
         </div>
     </div>
+    <div id="toast" class="fixed bottom-4 right-4 bg-slate-800 text-white px-4 py-2 rounded-lg shadow-lg opacity-0 transition-opacity duration-300 pointer-events-none z-50"></div>
     <div id="submitResult" class="hidden rounded-xl bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 p-4 text-sm"></div>
 </div>
 @endsection

@@ -23,7 +23,17 @@ class MissionNalarController extends Controller
             ->orderBy('title')
             ->get();
 
-        return view('jagat-misi.index', compact('missions'));
+        // Kuis & Live per kelas (GameQuiz) sekarang dijangkau dari sini juga (bukan
+        // lagi tab di Ruang Kelas) — tampilkan kelas yang boleh dilihat user, sama
+        // persis aturan ClassroomPolicy::view() supaya tak ada yang bocor/hilang.
+        $user = auth()->user();
+        $classrooms = \App\Models\Classroom::with(['rombel', 'pelajaran'])
+            ->orderBy('title')
+            ->get()
+            ->filter(fn ($c) => Gate::forUser($user)->allows('view', $c))
+            ->values();
+
+        return view('jagat-misi.index', compact('missions', 'classrooms'));
     }
 
     public function play(Mission $mission): View

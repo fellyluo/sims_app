@@ -60,7 +60,7 @@ class AbsensiController extends Controller
 
         $batas = Setting::get('waktu_terlambat', '07:30');
 
-        return view('absensi.index', compact('kelasList', 'selectedKelas', 'tanggal', 'siswas', 'existing', 'batas'));
+        return view('absensi.index', compact('kelasList', 'selectedKelas', 'tanggal', 'siswas', 'existing', 'batas', 'walikelasKelas'));
     }
 
     public function store(Request $request)
@@ -184,15 +184,20 @@ class AbsensiController extends Controller
         return $dates;
     }
 
-    /** Halaman registrasi wajah siswa */
+    /** Halaman registrasi wajah siswa — admin (semua kelas) + wali kelas (kelasnya saja) */
     public function wajah(Request $request)
     {
         $kelasList = Kelas::orderBy('tingkat')->orderBy('kelas')->get();
-        $selectedKelas = $request->kelas ?: optional($kelasList->first())->uuid;
+        $walikelasKelas = $this->walikelasKelasId();
+        abort_if(!auth()->user()->canAccess('manage_absensi') && !$walikelasKelas, 403, 'Hanya admin/wali kelas yang dapat mengakses registrasi wajah.');
+        if ($walikelasKelas) {
+            $kelasList = $kelasList->where('uuid', $walikelasKelas)->values();
+        }
+        $selectedKelas = $walikelasKelas ?: ($request->kelas ?: optional($kelasList->first())->uuid);
         $siswas = $selectedKelas
             ? Siswa::where('id_kelas', $selectedKelas)->orderBy('nama')->get()
             : collect();
-        return view('absensi.wajah', compact('kelasList', 'selectedKelas', 'siswas'));
+        return view('absensi.wajah', compact('kelasList', 'selectedKelas', 'siswas', 'walikelasKelas'));
     }
 
     /** Halaman registrasi wajah guru */

@@ -185,9 +185,19 @@ class SiswaController extends Controller
         return redirect()->route('siswa.index')->with('success', 'Siswa dihapus.');
     }
 
+    /** Wali kelas hanya boleh sentuh data wajah siswa di kelasnya sendiri; admin bebas semua kelas. */
+    private function bisaKelolaWajah(?string $idKelasSiswa): bool
+    {
+        return auth()->user()->canAccess('manage_absensi')
+            || auth()->user()->guru?->walikelas?->id_kelas === $idKelasSiswa;
+    }
+
     /** Simpan data wajah (face descriptors) untuk pengenalan absensi */
     public function storeFace(Request $request, string $uuid)
     {
+        $target = Siswa::findOrFail($uuid);
+        abort_unless($this->bisaKelolaWajah($target->id_kelas), 403, 'Anda hanya dapat mendaftarkan wajah siswa kelas Anda sendiri.');
+
         $request->validate([
             'descriptors'   => 'required|array|min:3|max:5',
             'descriptors.*' => 'array|min:64',   // embedding (face-api 128 / Human ~1024)
@@ -206,18 +216,20 @@ class SiswaController extends Controller
             ], 422);
         }
 
-        $siswa = Siswa::findOrFail($uuid);
-        $siswa->update([
+        $target->update([
             'face_descriptor'    => $request->descriptors,
             'face_registered_at' => now(),
-            'face_photo'         => \App\Support\FaceMatch::saveFromDataUrl($request->photo, $siswa->uuid, $siswa->face_photo),
+            'face_photo'         => \App\Support\FaceMatch::saveFromDataUrl($request->photo, $target->uuid, $target->face_photo),
         ]);
-        return response()->json(['success' => true, 'message' => 'Wajah ' . $siswa->nama . ' terdaftar.']);
+        return response()->json(['success' => true, 'message' => 'Wajah ' . $target->nama . ' terdaftar.']);
     }
 
     public function destroyFace(string $uuid)
     {
-        Siswa::findOrFail($uuid)->update(['face_descriptor' => null, 'face_registered_at' => null]);
+        $target = Siswa::findOrFail($uuid);
+        abort_unless($this->bisaKelolaWajah($target->id_kelas), 403, 'Anda hanya dapat menghapus wajah siswa kelas Anda sendiri.');
+
+        $target->update(['face_descriptor' => null, 'face_registered_at' => null]);
         return response()->json(['success' => true, 'message' => 'Data wajah dihapus.']);
     }
 

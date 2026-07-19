@@ -6,8 +6,12 @@ use App\Models\Absensi;
 use App\Models\Guru;
 use App\Models\PresensiGuru;
 use App\Models\Setting;
+use App\Models\User;
+use App\Notifications\GuruIzinPulangNotification;
+use App\Support\AbsensiGuru;
 use App\Support\AttendanceParentNotifier;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -240,5 +244,70 @@ class QrAbsensiController extends Controller
             'jam'     => substr((string) $jamDipakai, 0, 5),
             'jarak'   => round($dist),
         ]);
+    }
+
+    /**
+     * Izin pulang awal via QR — dipakai saat metode absensi aktif sekolah = Barcode/QR
+     * (padanan presensi-guru.izinPulang.store yang berbasis wajah). Sengaja TIDAK
+     * mengecek AgendaGuru::belumDiisi() — izin pulang awal memang berarti sebagian
+     * jam mengajar hari ini belum selesai/terisi; itu wajar & ditandai lewat alasan.
+     */
+    public function izinPulangMark(Request $request)
+    {
+        $guru = auth()->user()->guru;
+        abort_unless($guru, 403);
+
+        $data = $request->validate([
+            'token'  => 'required|string',
+            'lat'    => 'required|numeric',
+            'lng'    => 'required|numeric',
+            'alasan' => 'required|string|max:500',
+        ]);
+
+        if (Setting::get('qr_absensi_aktif', '1') != '1') {
+            return response()->json(['ok' => false, 'message' => 'Absen QR sedang dinonaktifkan admin.'], 422);
+        }
+        if (!AbsensiGuru::bolehQr()) {
+            return response()->json(['ok' => false, 'message' => AbsensiGuru::pesanKunci('QR')], 422);
+        }
+        if (!hash_equals($this->token(), $data['token'])) {
+            $pesan = Setting::get('qr_absensi_mode', 'harian') === 'tetap'
+                ? 'QR tidak valid. QR ini mungkin sudah dibuat ulang oleh admin — pindai QR yang terbaru.'
+                : 'QR tidak valid atau sudah kedaluwarsa. Pindai QR hari ini.';
+            return response()->json(['ok' => false, 'message' => $pesan], 422);
+        }
+
+        $slat = Setting::get('sekolah_lat');
+        $slng = Setting::get('sekolah_lng');
+        if (!$slat || !$slng) {
+            return response()->json(['ok' => false, 'message' => 'Lokasi sekolah belum diatur oleh admin.'], 422);
+        }
+        $radius = (float) Setting::get('absen_radius', 100);
+        $dist = $this->distanceMeters((float) $slat, (float) $slng, (float) $data['lat'], (float) $data['lng']);
+        if ($dist > $radius) {
+            return response()->json([
+                'ok'      => false,
+                'message' => 'Anda berada ' . round($dist) . ' m dari sekolah (maks ' . round($radius) . ' m). Absen hanya bisa di lokasi sekolah.',
+            ], 422);
+        }
+
+        $row = PresensiGuru::where('id_guru', $guru->uuid)->whereDate('tanggal', now())->first();
+        if (!$row || empty($row->jam_masuk)) {
+            return response()->json(['ok' => false, 'message' => 'Anda belum tercatat absen masuk hari ini.'], 422);
+        }
+        if (!empty($row->jam_pulang)) {
+            return response()->json(['ok' => false, 'message' => 'Anda sudah tercatat pulang hari ini.'], 422);
+        }
+
+        $row->jam_pulang = now()->format('H:i:s');
+        $row->keterangan = trim(($row->keterangan ? $row->keterangan . ' | ' : '') . 'Izin pulang awal: ' . $data['alasan']);
+        $row->save();
+
+        Notification::send(
+            User::query()->whereIn('access', ['kepala', 'admin', 'superadmin'])->get(),
+            new GuruIzinPulangNotification($row, $data['alasan'])
+        );
+
+        return response()->json(['ok' => true, 'jam' => substr($row->jam_pulang, 0, 5), 'jarak' => round($dist)]);
     }
 }

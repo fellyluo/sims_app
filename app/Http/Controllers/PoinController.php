@@ -37,7 +37,18 @@ class PoinController extends Controller
     /** Bisa melihat ringkasan/ledger poin: admin/kesiswaan (semua siswa) atau wali kelas (kelasnya saja). */
     private function bisaLihatSiswa(): bool
     {
-        return $this->bisaKelola() || (bool) auth()->user()->guru?->walikelas;
+        return $this->bisaKelola() || $this->isWalikelas();
+    }
+
+    /**
+     * User yang JUGA wali kelas (walau punya izin manage_disiplin lewat peran lain, mis.
+     * kesiswaan) tetap dibatasi ke kelasnya sendiri di sini — supaya "Poin Siswa Kelas" di
+     * menu Wali Kelas selalu tampil sama utk semua wali kelas, tidak berubah jadi lihat
+     * semua siswa hanya karena kebetulan yg login juga kesiswaan.
+     */
+    private function isWalikelas(): bool
+    {
+        return (bool) auth()->user()->guru?->walikelas;
     }
 
     private function guardLihatSiswa(): void
@@ -292,7 +303,7 @@ class PoinController extends Controller
         $this->guardLihatSiswa();
         [$sort, $dir] = \App\Support\TableSort::resolve($request, ['nama', 'nis', 'kelas', 'sisa'], 'nama');
 
-        $siswas = ($this->bisaKelola() ? Siswa::with('kelas') : $this->siswaScope()->with('kelas'))
+        $siswas = ($this->bisaKelola() && !$this->isWalikelas() ? Siswa::with('kelas') : $this->siswaScope()->with('kelas'))
             ->when($request->search, fn ($q) => $q->where(fn ($q2) => $q2
                 ->where('nama', 'like', '%' . $request->search . '%')
                 ->orWhere('nis', 'like', '%' . $request->search . '%')))
@@ -318,7 +329,7 @@ class PoinController extends Controller
     public function poinShow(Request $request, Siswa $siswa)
     {
         $this->guardLihatSiswa();
-        if (!$this->bisaKelola()) {
+        if (!$this->bisaKelola() || $this->isWalikelas()) {
             $u = auth()->user();
             abort_unless($u->guru?->walikelas && $siswa->id_kelas === $u->guru->walikelas->id_kelas, 403, 'Siswa ini bukan siswa kelas Anda.');
         }

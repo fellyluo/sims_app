@@ -492,6 +492,10 @@
                         $akademik[] = ['classroom.index', ['classroom.*'], 'graduation-cap', 'Ruang Kelas'];
                     }
 
+                    if ($modulOn('arena_belajar') && $access !== 'orangtua') {
+                        $akademik[] = ['jagat-misi.index', ['jagat-misi.*'], 'gamepad-2', 'Arena Belajar'];
+                    }
+
                     if ($isAdmin || auth()->user()?->canAccess('manage_jadwal')) {
                         $akademik[] = ['jadwal.index', ['jadwal.*'], 'calendar-clock', 'Jadwal Pelajaran'];
                     } elseif (auth()->user()?->guru) {
@@ -618,8 +622,10 @@
                         ['walikelas.sekretaris.form', ['walikelas.sekretaris.*'], 'user-cog', 'Set Sekretaris'],
                     ];
                     if ($modulOn('absensi')) {
-                        $walikelasItems[] = ['absensi.index', ['absensi.index', 'absensi.store'], 'clipboard-check', 'Absensi Kelas Saya'];
-                        $walikelasItems[] = ['absensi.rekap', ['absensi.rekap'], 'calendar-check-2', 'Rekap Absensi Kelas'];
+                        // Digabung 1 menu (Absensi + Rekap + Daftar Wajah sudah saling ditautkan
+                        // lewat tombol di dalam halaman absensi.index), pola sama dgn menu admin
+                        // "Absensi Siswa" yang juga pakai wildcard absensi.*.
+                        $walikelasItems[] = ['absensi.index', ['absensi.*'], 'clipboard-check', 'Absensi Kelas Saya'];
                         $walikelasItems[] = ['kaih.rekap', ['kaih.rekap', 'kaih.override.*'], 'list-checks', 'Rekap 7 KAIH Kelas'];
                     }
                     if ($modulOn('disiplin')) {
@@ -705,15 +711,21 @@
                 }
                 // (Akun Saya dipindah ke dropdown profil di navbar)
 
-                // Grup yang memuat halaman aktif → dibuka otomatis saat load
-                $activeGroup = '';
+                // Grup yang memuat halaman aktif → dibuka otomatis saat load. Beberapa route
+                // (mis. poin.siswa.index) sengaja dipakai bareng di 2 grup berbeda (Poin & Aturan
+                // milik kesiswaan + Wali Kelas milik walikelas, untuk user yang punya kedua peran) —
+                // jadi di sini kumpulkan SEMUA grup yang cocok, bukan cuma yang pertama ketemu.
+                // Pemilihan mana yang dibuka (kalau localStorage masih ingat grup mana yg sedang
+                // dibuka user) ditentukan di JS (lihat openGroup), supaya klik dari dalam menu
+                // Wali Kelas tidak "meloncat" membuka Poin & Aturan begitu saja.
+                $activeGroups = [];
                 foreach ($groups as $gk => $g) {
                     foreach ($g[2] as $it) {
-                        if (request()->routeIs(...$it[1])) { $activeGroup = $gk; break 2; }
+                        if (request()->routeIs(...$it[1])) { $activeGroups[] = $gk; break; }
                     }
                 }
                 if (request()->routeIs('panduan.*', 'feedback.*')) {
-                    $activeGroup = 'bantuan';
+                    $activeGroups[] = 'bantuan';
                 }
             @endphp
 
@@ -791,7 +803,7 @@
             {{-- Mode lebar: tombol grup + submenu collapsible --}}
             <div x-show="!mini" class="pt-1">
                 <button type="button" @click="toggleGroup('{{ $gk }}')"
-                        class="nav-group w-full flex items-center gap-3 px-3 py-2.5 {{ $activeGroup===$gk ? 'has-active' : '' }}">
+                        class="nav-group w-full flex items-center gap-3 px-3 py-2.5 {{ in_array($gk, $activeGroups, true) ? 'has-active' : '' }}">
                     <i data-lucide="{{ $gicon }}" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
                     <span class="text-sm font-semibold truncate flex-1 text-left">{{ $glabel }}</span>
                     <span class="flex-shrink-0 transition-transform duration-200 inline-block" :class="openGroup==='{{ $gk }}' ? 'rotate-180' : ''">
@@ -821,7 +833,7 @@
             {{-- Bantuan: panduan pemakaian dan kanal feedback pengguna --}}
             <div x-show="!mini" class="mt-2 pt-2 border-t border-black/10 dark:border-white/10">
                 <button type="button" @click="toggleGroup('bantuan')"
-                        class="nav-group w-full flex items-center gap-3 px-3 py-2.5 {{ $activeGroup==='bantuan' ? 'has-active' : '' }}">
+                        class="nav-group w-full flex items-center gap-3 px-3 py-2.5 {{ in_array('bantuan', $activeGroups, true) ? 'has-active' : '' }}">
                     <i data-lucide="life-buoy" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
                     <span class="text-sm font-semibold truncate flex-1 text-left">Bantuan</span>
                     <span class="flex-shrink-0 transition-transform duration-200 inline-block" :class="openGroup==='bantuan' ? 'rotate-180' : ''">
@@ -1347,7 +1359,17 @@
             get mini(){ return this.collapsed && !this.isMobile; },
             get sidebarStyle(){ return (!this.mini && !this.isMobile) ? 'width:' + this.sidebarWidth + 'px' : ''; },
             avatarZoom: false,
-            openGroup: ('{{ $activeGroup ?? '' }}' || localStorage.getItem('sb_group') || ''),
+            // Kalau halaman aktif cocok di >1 grup (mis. poin.siswa.index dipakai bareng oleh
+            // grup "Poin & Aturan" dan "Wali Kelas" utk user yg punya kedua peran), utamakan
+            // grup yang terakhir dibuka manual (localStorage) SELAMA grup itu tetap salah satu
+            // yang valid utk halaman ini — supaya klik link di dalam Wali Kelas tidak "meloncat"
+            // ke Poin & Aturan begitu saja. Kalau tak ada localStorage yg cocok, pakai match pertama.
+            openGroup: (() => {
+                const matches = @json($activeGroups ?? []);
+                const stored = localStorage.getItem('sb_group');
+                if (stored && matches.includes(stored)) return stored;
+                return matches[0] || '';
+            })(),
             toggleGroup(g){ this.openGroup = (this.openGroup === g ? '' : g); localStorage.setItem('sb_group', this.openGroup); this.$nextTick(()=>lucide.createIcons()); },
             darkMode: (localStorage.getItem('theme_mode') ?? '{{ $pref->theme_mode ?? 'light' }}') === 'dark',
             uiStyle: '{{ $pref->ui_style ?? 'soft' }}',

@@ -3,7 +3,8 @@
 
 @section('content')
 @php $hasFace = !empty($guru->face_descriptor); @endphp
-<div class="max-w-4xl mx-auto space-y-5" x-data="izinPulang(@js($hasFace))">
+<div class="max-w-4xl mx-auto space-y-5"
+     x-data="{{ $bolehQr ? 'izinPulangQr(' . json_encode(['lat' => $qrLat, 'lng' => $qrLng, 'radius' => $qrRadius]) . ')' : 'izinPulang(' . json_encode($hasFace) . ')' }}">
     <div>
         <h1 class="page-title">Presensi Saya</h1>
         <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Riwayat jam masuk &amp; pulang, form keterlambatan, dan izin pulang awal.</p>
@@ -68,43 +69,80 @@
             </div>
             @endif
 
-            @if(!$hasFace)
-            <p class="text-sm text-slate-500 dark:text-slate-400">Wajah Anda belum terdaftar, jadi izin pulang lewat kamera belum bisa dipakai. <a href="{{ route('face.self', ['ulang' => 1]) }}" class="text-primary font-semibold hover:underline">Daftarkan wajah</a> dulu.</p>
+            @if($bolehQr)
+                {{-- ===== Jalur QR (metode absensi aktif = Barcode/QR) ===== --}}
+                @if(!$qrLat || !$qrLng)
+                <p class="text-sm text-slate-500 dark:text-slate-400">Lokasi sekolah belum diatur admin, jadi izin pulang via QR belum bisa dipakai. Hubungi admin.</p>
+                @else
+                <template x-if="!scannedToken">
+                    <div class="space-y-3">
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Pastikan Anda berada di area sekolah, lalu pindai QR absensi untuk mencatat jam pulang.</p>
+                        <div class="flex items-center justify-between text-sm px-1">
+                            <span class="text-slate-500 flex items-center gap-1.5"><i data-lucide="map-pin" class="w-4 h-4"></i> <span x-text="status"></span></span>
+                            <button type="button" @click="locate()" class="text-xs text-primary font-semibold flex items-center gap-1"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Perbarui</button>
+                        </div>
+                        <div x-show="scanning" x-cloak class="space-y-2">
+                            <div id="izinReader" class="rounded-2xl overflow-hidden"></div>
+                            <button type="button" @click="stopScan()" class="w-full py-2.5 rounded-xl text-sm font-semibold border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300">Batal Scan</button>
+                        </div>
+                        <button x-show="!scanning" type="button" @click="startScan()" class="btn-primary w-full px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2">
+                            <i data-lucide="qr-code" class="w-4 h-4"></i> Pindai QR — Izin Pulang
+                        </button>
+                        <p class="text-center text-sm" :class="msgErr ? 'text-rose-500' : 'text-slate-500'" x-show="msg" x-text="msg"></p>
+                    </div>
+                </template>
+
+                <template x-if="scannedToken">
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-1.5 text-emerald-600 text-sm font-semibold"><i data-lucide="check-circle-2" class="w-4 h-4"></i> QR terverifikasi</div>
+                        <form @submit.prevent="submitIzin()" class="space-y-2">
+                            <textarea x-model="alasan" rows="3" class="form-input" placeholder="Alasan izin pulang awal (wajib diisi)" required></textarea>
+                            <button type="submit" :disabled="sending || !alasan.trim()" class="btn-primary w-full px-4 py-2.5 rounded-xl text-sm font-bold disabled:opacity-50" x-text="sending ? 'Menyimpan...' : 'Catat Pulang Sekarang'"></button>
+                        </form>
+                        <p class="text-center text-sm text-rose-500" x-show="msg" x-text="msg"></p>
+                    </div>
+                </template>
+                @endif
             @else
-            <template x-if="!verified">
-                <div class="space-y-3">
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Nyalakan kamera untuk memverifikasi wajah Anda sebelum mencatat jam pulang.</p>
-                    <div class="relative rounded-2xl overflow-hidden bg-slate-900 aspect-video">
-                        <video x-ref="video" autoplay muted playsinline class="w-full h-full object-cover" :class="streaming ? '' : 'opacity-0'"></video>
-                        <div x-show="!streaming" class="absolute inset-0 grid place-items-center text-slate-300 text-sm px-4 text-center">
-                            <div>
-                                <i data-lucide="loader-2" class="w-7 h-7 mx-auto animate-spin mb-2" x-show="loading"></i>
-                                <i data-lucide="camera" class="w-7 h-7 mx-auto mb-2 opacity-50" x-show="!loading"></i>
-                                <p x-text="status"></p>
+                {{-- ===== Jalur Wajah (metode absensi aktif = Scan Wajah) ===== --}}
+                @if(!$hasFace)
+                <p class="text-sm text-slate-500 dark:text-slate-400">Wajah Anda belum terdaftar, jadi izin pulang lewat kamera belum bisa dipakai. <a href="{{ route('face.self', ['ulang' => 1]) }}" class="text-primary font-semibold hover:underline">Daftarkan wajah</a> dulu.</p>
+                @else
+                <template x-if="!verified">
+                    <div class="space-y-3">
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Nyalakan kamera untuk memverifikasi wajah Anda sebelum mencatat jam pulang.</p>
+                        <div class="relative rounded-2xl overflow-hidden bg-slate-900 aspect-video">
+                            <video x-ref="video" autoplay muted playsinline class="w-full h-full object-cover" :class="streaming ? '' : 'opacity-0'"></video>
+                            <div x-show="!streaming" class="absolute inset-0 grid place-items-center text-slate-300 text-sm px-4 text-center">
+                                <div>
+                                    <i data-lucide="loader-2" class="w-7 h-7 mx-auto animate-spin mb-2" x-show="loading"></i>
+                                    <i data-lucide="camera" class="w-7 h-7 mx-auto mb-2 opacity-50" x-show="!loading"></i>
+                                    <p x-text="status"></p>
+                                </div>
                             </div>
                         </div>
+                        <p class="text-center text-sm" :class="msgErr ? 'text-rose-500' : 'text-slate-500'" x-text="msg"></p>
+                        <button x-show="!streaming" @click="openCam()" :disabled="loading" type="button" class="btn-primary w-full px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50">
+                            <i data-lucide="video" class="w-4 h-4"></i> Nyalakan Kamera
+                        </button>
+                        <button x-show="streaming" @click="verify()" :disabled="verifying" type="button" class="btn-primary w-full px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50">
+                            <i data-lucide="loader-2" class="w-4 h-4 animate-spin" x-show="verifying"></i>
+                            <i data-lucide="scan-face" class="w-4 h-4" x-show="!verifying"></i>
+                            <span x-text="verifying ? 'Memverifikasi...' : 'Verifikasi Wajah'"></span>
+                        </button>
                     </div>
-                    <p class="text-center text-sm" :class="msgErr ? 'text-rose-500' : 'text-slate-500'" x-text="msg"></p>
-                    <button x-show="!streaming" @click="openCam()" :disabled="loading" type="button" class="btn-primary w-full px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50">
-                        <i data-lucide="video" class="w-4 h-4"></i> Nyalakan Kamera
-                    </button>
-                    <button x-show="streaming" @click="verify()" :disabled="verifying" type="button" class="btn-primary w-full px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50">
-                        <i data-lucide="loader-2" class="w-4 h-4 animate-spin" x-show="verifying"></i>
-                        <i data-lucide="scan-face" class="w-4 h-4" x-show="!verifying"></i>
-                        <span x-text="verifying ? 'Memverifikasi...' : 'Verifikasi Wajah'"></span>
-                    </button>
-                </div>
-            </template>
+                </template>
 
-            <template x-if="verified">
-                <div class="space-y-2">
-                    <div class="flex items-center gap-1.5 text-emerald-600 text-sm font-semibold"><i data-lucide="check-circle-2" class="w-4 h-4"></i> Wajah terverifikasi</div>
-                    <form @submit.prevent="submitIzin()" class="space-y-2">
-                        <textarea x-model="alasan" rows="3" class="form-input" placeholder="Alasan izin pulang awal (wajib diisi)" required></textarea>
-                        <button type="submit" :disabled="sending || !alasan.trim()" class="btn-primary w-full px-4 py-2.5 rounded-xl text-sm font-bold disabled:opacity-50" x-text="sending ? 'Menyimpan...' : 'Catat Pulang Sekarang'"></button>
-                    </form>
-                </div>
-            </template>
+                <template x-if="verified">
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-1.5 text-emerald-600 text-sm font-semibold"><i data-lucide="check-circle-2" class="w-4 h-4"></i> Wajah terverifikasi</div>
+                        <form @submit.prevent="submitIzin()" class="space-y-2">
+                            <textarea x-model="alasan" rows="3" class="form-input" placeholder="Alasan izin pulang awal (wajib diisi)" required></textarea>
+                            <button type="submit" :disabled="sending || !alasan.trim()" class="btn-primary w-full px-4 py-2.5 rounded-xl text-sm font-bold disabled:opacity-50" x-text="sending ? 'Menyimpan...' : 'Catat Pulang Sekarang'"></button>
+                        </form>
+                    </div>
+                </template>
+                @endif
             @endif
         </div>
         @endif
@@ -166,6 +204,80 @@
 </div>
 
 @push('scripts')
+@if($bolehQr)
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+function izinPulangQr(cfg){
+    return {
+        schoolLat: cfg.lat ? parseFloat(cfg.lat) : null,
+        schoolLng: cfg.lng ? parseFloat(cfg.lng) : null,
+        radius: cfg.radius,
+        lat:null, lng:null, dist:null, status:'', scanning:false,
+        scannedToken:null, alasan:'', sending:false, msg:'', msgErr:false,
+        scanner:null,
+
+        init(){
+            this.status = this.schoolLat ? 'Tekan "Perbarui" untuk membaca lokasi Anda.' : 'Lokasi sekolah belum diatur admin.';
+        },
+        haversine(la1,ln1,la2,ln2){
+            const R=6371000, dLa=(la2-la1)*Math.PI/180, dLn=(ln2-ln1)*Math.PI/180;
+            const a=Math.sin(dLa/2)**2 + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLn/2)**2;
+            return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+        },
+        locate(){
+            if(!this.schoolLat) return;
+            this.status='Sedang membaca lokasi Anda...';
+            if(!navigator.geolocation){ this.status='Perangkat ini tidak mendukung deteksi lokasi.'; return; }
+            navigator.geolocation.getCurrentPosition(p=>{
+                this.lat=p.coords.latitude; this.lng=p.coords.longitude;
+                this.dist=Math.round(this.haversine(this.schoolLat,this.schoolLng,this.lat,this.lng));
+                this.status = this.dist<=this.radius ? 'Anda berada di area sekolah — siap pindai QR.' : ('Anda berada '+this.dist+' m dari sekolah (di luar area).');
+            }, err=>{
+                this.status = (err && err.code===1) ? 'Izin lokasi ditolak. Aktifkan izin Lokasi lalu tekan Perbarui.' : 'Lokasi gagal dibaca. Tekan Perbarui untuk mencoba lagi.';
+            }, { enableHighAccuracy:true, timeout:12000 });
+        },
+        startScan(){
+            if(!this.lat){ this.locate(); showToast('Mengambil lokasi dulu, coba lagi sebentar','info'); return; }
+            this.msg=''; this.msgErr=false; this.scanning=true;
+            this.$nextTick(()=>{
+                this.scanner = new Html5Qrcode('izinReader');
+                this.scanner.start({ facingMode:'environment' }, { fps:10, qrbox:220 },
+                    (text)=> this.onScan(text), ()=>{}).catch(e=>{ this.scanning=false; showToast('Tak bisa buka kamera: '+e,'error'); });
+            });
+        },
+        stopScan(){
+            if(this.scanner){ this.scanner.stop().then(()=>{ try{this.scanner.clear();}catch(e){} }).catch(()=>{}); this.scanner=null; }
+            this.scanning=false;
+        },
+        onScan(token){
+            this.stopScan();
+            this.scannedToken = token;
+        },
+        async submitIzin(){
+            if(!this.alasan.trim() || !this.scannedToken) return;
+            this.sending=true; this.msgErr=false;
+            try {
+                const res = await fetch('{{ route('presensi-guru.izinPulang.qrStore') }}', {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json','X-CSRF-TOKEN':$('meta[name=csrf-token]').attr('content'),Accept:'application/json'},
+                    body: JSON.stringify({ token: this.scannedToken, lat: this.lat, lng: this.lng, alasan: this.alasan })
+                });
+                const d = await res.json();
+                if(res.ok && d.ok){
+                    showToast('Absen pulang tercatat pukul ' + d.jam + '.');
+                    setTimeout(()=> window.location.reload(), 800);
+                    return;
+                }
+                this.msg = d.message || 'Gagal mencatat izin pulang.'; this.msgErr = true;
+                this.scannedToken = null;
+                showToast(this.msg, 'error');
+            } catch(e){ showToast('Gagal menghubungi server', 'error'); }
+            this.sending=false;
+        }
+    }
+}
+</script>
+@else
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/human/dist/human.js"></script>
 <script>
 let humanIzin=null, humanIzinReady=false;
@@ -262,5 +374,6 @@ function izinPulang(hasFace){
     }
 }
 </script>
+@endif
 @endpush
 @endsection

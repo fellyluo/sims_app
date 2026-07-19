@@ -55,9 +55,9 @@
 
     {{-- Top HUD --}}
     <header class="arena-lobby-hud arena-anim-in">
-        <a href="{{ route('classroom.show', $classroom) }}" class="arena-hud-back">
+        <a href="{{ route('jagat-misi.index') }}" class="arena-hud-back">
             <i data-lucide="chevron-left" class="w-4 h-4"></i>
-            <span class="truncate">{{ $classroom->title }}</span>
+            <span class="truncate">Kembali</span>
         </a>
         <div class="arena-hud-player">
             <span class="arena-hud-avatar" aria-hidden="true">{{ $playerInitial }}</span>

@@ -33,6 +33,9 @@
             <a href="{{ route('presensi-guru.rekap') }}" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition">
                 <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Rekap
             </a>
+            <a href="{{ route('presensi-guru.jamPulang.index') }}" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+                <i data-lucide="clock-4" class="w-4 h-4"></i> Jadwal Pulang
+            </a>
         </div>
     </div>
 
