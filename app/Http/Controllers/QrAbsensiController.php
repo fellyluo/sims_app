@@ -195,6 +195,7 @@ class QrAbsensiController extends Controller
             if (!empty($row->jam_masuk)) {
                 return response()->json(['ok' => false, 'message' => 'Anda sudah absen hari ini pukul ' . substr($row->jam_masuk, 0, 5) . '.'], 422);
             }
+            $previousStatus = $row->exists ? $row->status : null;
             $row->id_kelas = $user->siswa->id_kelas;
             $row->status = 'hadir';
             $row->keterangan = 'Absen QR';
@@ -202,7 +203,7 @@ class QrAbsensiController extends Controller
             $row->jam_masuk = $jam;
             $row->fill($geoAudit);
             $row->save();
-            AttendanceParentNotifier::notify($row);
+            AttendanceParentNotifier::notifyIfStatusChanged($previousStatus, $row);
             $jamDipakai = $row->jam_masuk;
 
             // Auto-deduksi poin bila terlambat (khusus sistem Poin/Aturan lama).

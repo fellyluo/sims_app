@@ -90,11 +90,12 @@ class AbsensiController extends Controller
             if ($ket !== null && $ket !== '') {
                 $row->keterangan = $ket;
             }
-            // jam_masuk SENGAJA tidak disentuh → waktu absen hasil scan tetap tersimpan
-            $row->save();
-            if ($status === 'hadir' && $previousStatus !== 'hadir') {
-                AttendanceParentNotifier::notify($row);
+            // Isi jam_masuk hanya saat pertama kali ditandai hadir (jangan timpa hasil scan).
+            if ($status === 'hadir' && empty($row->jam_masuk)) {
+                $row->jam_masuk = now()->format('H:i:s');
             }
+            $row->save();
+            AttendanceParentNotifier::notifyIfStatusChanged($previousStatus, $row);
             $count++;
         }
 
@@ -325,9 +326,7 @@ class AbsensiController extends Controller
         if ($scanPertama && $terlambat) {
             \App\Http\Controllers\PoinController::autoTerlambat($data['id_siswa'], $data['tanggal']);
         }
-        if ($row->status === 'hadir' && $previousStatus !== 'hadir') {
-            AttendanceParentNotifier::notify($row);
-        }
+        AttendanceParentNotifier::notifyIfStatusChanged($previousStatus, $row);
 
         return response()->json([
             'success'   => true,
