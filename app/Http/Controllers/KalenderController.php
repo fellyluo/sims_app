@@ -23,7 +23,7 @@ class KalenderController extends Controller
         $bulan = $request->bulan && preg_match('/^\d{4}-\d{2}$/', $request->bulan)
             ? $request->bulan : now()->format('Y-m');
 
-        $awal = Carbon::parse($bulan . '-01')->startOfMonth();
+        $awal = Carbon::parse($bulan.'-01')->startOfMonth();
         $gridAwal = $awal->copy()->startOfWeek(Carbon::MONDAY);
         $akhir = $awal->copy()->endOfMonth();
         $gridAkhir = $akhir->copy()->endOfWeek(Carbon::SUNDAY);
@@ -33,51 +33,53 @@ class KalenderController extends Controller
             ->get()->keyBy(fn ($r) => $r->tanggal->toDateString());
 
         $hari = [];
-        $state = [];   // ymd => [absen_siswa, agenda_guru]  (untuk Alpine)
+        $state = [];   // ymd => [absen_siswa, agenda_guru, kaih_wajib]
         for ($d = $gridAwal->copy(); $d <= $gridAkhir; $d->addDay()) {
             $ymd = $d->toDateString();
             $row = $rows->get($ymd);
             $hari[] = [
-                'ymd'      => $ymd,
-                'day'      => $d->day,
-                'inMonth'  => $d->month === $awal->month,
-                'weekend'  => $d->dayOfWeekIso >= 6,
+                'ymd' => $ymd,
+                'day' => $d->day,
+                'inMonth' => $d->month === $awal->month,
+                'weekend' => $d->dayOfWeekIso >= 6,
                 'hari_ini' => $ymd === now()->toDateString(),
             ];
             if ($d->month === $awal->month) {
                 $state[$ymd] = [
                     'absen_siswa' => (bool) ($row?->absen_siswa),
                     'agenda_guru' => (bool) ($row?->agenda_guru),
+                    'kaih_wajib' => (bool) ($row?->kaih_wajib),
                 ];
             }
         }
 
         $minggu = array_chunk($hari, 7);
 
-        $absenAktif  = Setting::get('kalender_absen_aktif', '0') === '1';
+        $absenAktif = Setting::get('kalender_absen_aktif', '0') === '1';
         $agendaAktif = Setting::get('kalender_agenda_aktif', '0') === '1';
+        $kaihAktif = Setting::get('kalender_kaih_aktif', '0') === '1';
         $label = $awal->locale('id')->isoFormat('MMMM Y');
         $prev = $awal->copy()->subMonth()->format('Y-m');
         $next = $awal->copy()->addMonth()->format('Y-m');
 
         return view('kalender.index', compact(
-            'bulan', 'label', 'prev', 'next', 'minggu', 'state', 'absenAktif', 'agendaAktif'
+            'bulan', 'label', 'prev', 'next', 'minggu', 'state', 'absenAktif', 'agendaAktif', 'kaihAktif'
         ));
     }
 
-    /** AJAX: set satu field (absen_siswa | agenda_guru) untuk satu tanggal. */
+    /** AJAX: set satu field untuk satu tanggal. */
     public function toggle(Request $request)
     {
         $this->guard();
         $data = $request->validate([
             'tanggal' => 'required|date',
-            'field'   => 'required|in:absen_siswa,agenda_guru',
-            'value'   => 'required|boolean',
+            'field' => 'required|in:absen_siswa,agenda_guru,kaih_wajib',
+            'value' => 'required|boolean',
         ]);
 
         $row = HariEfektif::firstOrNew(['tanggal' => $data['tanggal']]);
         $row->{$data['field']} = $data['value'];
-        if (!$row->semester) {
+        if (! $row->semester) {
             $row->semester = (int) (\App\Models\Semester::aktif()?->semester ?? 1);
         }
         $row->save();
@@ -90,13 +92,13 @@ class KalenderController extends Controller
     {
         $this->guard();
         $data = $request->validate([
-            'bulan'       => 'required|date_format:Y-m',
-            'field'       => 'required|in:absen_siswa,agenda_guru',
-            'value'       => 'required|boolean',
+            'bulan' => 'required|date_format:Y-m',
+            'field' => 'required|in:absen_siswa,agenda_guru,kaih_wajib',
+            'value' => 'required|boolean',
             'akhir_pekan' => 'nullable|boolean',
         ]);
 
-        $awal = Carbon::parse($data['bulan'] . '-01')->startOfMonth();
+        $awal = Carbon::parse($data['bulan'].'-01')->startOfMonth();
         $akhir = $awal->copy()->endOfMonth();
         $sem = (int) (\App\Models\Semester::aktif()?->semester ?? 1);
         $n = 0;
@@ -107,14 +109,22 @@ class KalenderController extends Controller
             }
             $row = HariEfektif::firstOrNew(['tanggal' => $d->toDateString()]);
             $row->{$data['field']} = $data['value'];
-            if (!$row->semester) $row->semester = $sem;
+            if (! $row->semester) {
+                $row->semester = $sem;
+            }
             $row->save();
             $n++;
         }
 
-        $f = $data['field'] === 'absen_siswa' ? 'Absen siswa' : 'Agenda guru';
+        $f = match ($data['field']) {
+            'absen_siswa' => 'Absen siswa',
+            'agenda_guru' => 'Agenda guru',
+            'kaih_wajib' => 'Wajib 7 KAIH',
+            default => $data['field'],
+        };
         $st = $data['value'] ? 'diaktifkan' : 'dinonaktifkan';
-        return back()->with('success', "{$f} {$st} untuk {$n} hari pada " . $awal->locale('id')->isoFormat('MMMM Y') . '.');
+
+        return back()->with('success', "{$f} {$st} untuk {$n} hari pada ".$awal->locale('id')->isoFormat('MMMM Y').'.');
     }
 
     /** Aktif/nonaktifkan penegakan kalender (master toggle). */
@@ -123,6 +133,7 @@ class KalenderController extends Controller
         $this->guard();
         Setting::set('kalender_absen_aktif', $request->boolean('kalender_absen_aktif') ? '1' : '0');
         Setting::set('kalender_agenda_aktif', $request->boolean('kalender_agenda_aktif') ? '1' : '0');
+        Setting::set('kalender_kaih_aktif', $request->boolean('kalender_kaih_aktif') ? '1' : '0');
 
         return back()->with('success', 'Pengaturan penegakan kalender disimpan.');
     }

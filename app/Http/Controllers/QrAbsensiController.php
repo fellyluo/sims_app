@@ -110,7 +110,7 @@ class QrAbsensiController extends Controller
         $siswa = auth()->user()->siswa;
         $kaihBelum = false;
         $kaihPertanyaans = collect();
-        if ($siswa && \App\Support\KaihSiswa::wajibSebelumAbsen() && !\App\Support\KaihSiswa::sudahDiisi($siswa->uuid)) {
+        if ($siswa && ! \App\Support\KaihSiswa::bolehAbsen($siswa->uuid)) {
             $kaihBelum = true;
             $kaihPertanyaans = \App\Models\KaihPertanyaan::with('opsi')->where('aktif', true)->orderBy('urutan')->get();
         }
