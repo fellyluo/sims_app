@@ -48,6 +48,14 @@
         @foreach($tabs as $k=>$label)
         <button @click="tab='{{ $k }}'" :class="tab==='{{ $k }}' ? 'border-primary text-primary' : 'border-transparent text-slate-500'" class="px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition whitespace-nowrap" style="--tw-text-opacity:1" :style="tab==='{{ $k }}' ? 'color:var(--cp);border-color:var(--cp)' : ''">{{ $label }}</button>
         @endforeach
+        {{-- Arena Belajar bukan tab in-page: halaman tersendiri (hub kuis + misi),
+             jadi dirender sebagai tautan. Digate ModulAktif agar selaras dengan
+             middleware 'modul:arena_belajar' pada route-nya. --}}
+        @if(\App\Support\ModulAktif::aktif('arena_belajar'))
+        <a href="{{ route('classroom.arena.index', $classroom) }}" class="px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 -mb-px transition whitespace-nowrap inline-flex items-center gap-1.5">
+            <i data-lucide="gamepad-2" class="w-4 h-4"></i> Arena Belajar
+        </a>
+        @endif
     </div>
 
     {{-- ===== TAB MATERI ===== --}}
