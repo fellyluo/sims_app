@@ -89,21 +89,41 @@ class QrAbsensiController extends Controller
         return null;
     }
 
+    /** Snapshot geofence live (points + bonus jam sibuk) — dipoll klien agar tidak stale. */
+    public function geoConfig()
+    {
+        return response()->json([
+            'ok' => true,
+            'points' => Geofence::schoolPoints(),
+            'rush_bonus' => Geofence::rushBonusMeters(),
+            'radius' => (float) Setting::get('absen_radius', 200),
+            'lat' => Setting::get('sekolah_lat'),
+            'lng' => Setting::get('sekolah_lng'),
+            'soft_tolerance' => Geofence::SOFT_TOLERANCE_M,
+            'server_time' => now()->format('H:i'),
+        ]);
+    }
+
     /** Halaman USER: scan QR + baca lokasi untuk absen. */
     public function absen()
     {
         $siswa = auth()->user()->siswa;
         $kaihBelum = false;
         $kaihPertanyaans = collect();
-        if ($siswa && \App\Support\KaihSiswa::wajibSebelumAbsen() && !\App\Support\KaihSiswa::sudahDiisi($siswa->uuid)) {
+        if ($siswa && ! \App\Support\KaihSiswa::bolehAbsen($siswa->uuid)) {
             $kaihBelum = true;
             $kaihPertanyaans = \App\Models\KaihPertanyaan::with('opsi')->where('aktif', true)->orderBy('urutan')->get();
         }
+
+        $points = Geofence::schoolPoints();
+        $rushBonus = Geofence::rushBonusMeters();
 
         return view('qr.absen', [
             'lat'    => Setting::get('sekolah_lat'),
             'lng'    => Setting::get('sekolah_lng'),
             'radius' => (float) Setting::get('absen_radius', 200),
+            'points' => $points,
+            'rushBonus' => $rushBonus,
             'aktif'  => Setting::get('qr_absensi_aktif', '1') == '1',
             'isGuru' => (bool) auth()->user()->guru,   // guru bisa absen masuk & pulang
             'kaihBelum'       => $kaihBelum,
@@ -141,7 +161,9 @@ class QrAbsensiController extends Controller
         if ($gate !== true) {
             return $gate;
         }
-        [$dist, $radius] = $this->schoolDistance((float) $data['lat'], (float) $data['lng']);
+        $eval = Geofence::evaluate((float) $data['lat'], (float) $data['lng']);
+        $dist = $eval['dist'];
+        $radius = $eval['radius'];
 
         $user = auth()->user();
         $today = now()->toDateString();
@@ -173,6 +195,7 @@ class QrAbsensiController extends Controller
             if (!empty($row->jam_masuk)) {
                 return response()->json(['ok' => false, 'message' => 'Anda sudah absen hari ini pukul ' . substr($row->jam_masuk, 0, 5) . '.'], 422);
             }
+            $previousStatus = $row->exists ? $row->status : null;
             $row->id_kelas = $user->siswa->id_kelas;
             $row->status = 'hadir';
             $row->keterangan = 'Absen QR';
@@ -180,7 +203,7 @@ class QrAbsensiController extends Controller
             $row->jam_masuk = $jam;
             $row->fill($geoAudit);
             $row->save();
-            AttendanceParentNotifier::notify($row);
+            AttendanceParentNotifier::notifyIfStatusChanged($previousStatus, $row);
             $jamDipakai = $row->jam_masuk;
 
             // Auto-deduksi poin bila terlambat (khusus sistem Poin/Aturan lama).
@@ -239,6 +262,8 @@ class QrAbsensiController extends Controller
             'jarak'    => round($dist),
             'accuracy' => (int) round($accuracy),
             'radius'   => (int) round($radius),
+            'bonus'    => (int) round($eval['bonus']),
+            'titik'    => $eval['label'],
         ]);
     }
 
@@ -312,23 +337,25 @@ class QrAbsensiController extends Controller
     }
 
     /**
-     * @return array{0: float, 1: float}  [jarak, radius]
+     * @return array{0: float, 1: float}  [jarak ke titik terbaik, radius titik itu]
      */
     private function schoolDistance(float $lat, float $lng): array
     {
-        $slat = (float) Setting::get('sekolah_lat');
-        $slng = (float) Setting::get('sekolah_lng');
-        $radius = (float) Setting::get('absen_radius', 200);
+        $eval = Geofence::evaluate($lat, $lng);
+        if ($eval === null) {
+            $radius = (float) Setting::get('absen_radius', 200);
 
-        return [Geofence::distanceMeters($slat, $slng, $lat, $lng), $radius];
+            return [PHP_FLOAT_MAX, $radius];
+        }
+
+        return [$eval['dist'], $eval['radius']];
     }
 
     /** true bila OK; JsonResponse 422 bila gagal. */
     private function assertWithinSchool(float $lat, float $lng, float $accuracy)
     {
-        $slat = Setting::get('sekolah_lat');
-        $slng = Setting::get('sekolah_lng');
-        if (!$slat || !$slng) {
+        $eval = Geofence::evaluate($lat, $lng);
+        if ($eval === null) {
             return response()->json(['ok' => false, 'message' => 'Lokasi sekolah belum diatur oleh admin.'], 422);
         }
 
@@ -339,16 +366,21 @@ class QrAbsensiController extends Controller
             ], 422);
         }
 
-        [$dist, $radius] = $this->schoolDistance($lat, $lng);
-        if (!Geofence::withinRadius($dist, $radius)) {
-            $maks = Geofence::effectiveRadius($radius);
+        if (!$eval['ok']) {
+            $bonusTxt = $eval['bonus'] > 0
+                ? ' (termasuk +' . (int) round($eval['bonus']) . ' m zona jam sibuk)'
+                : '';
+
+            $safeLabel = Geofence::sanitizePointLabel($eval['label']);
 
             return response()->json([
                 'ok'       => false,
-                'message'  => 'Anda berada ' . round($dist) . ' m dari sekolah (maks ' . round($maks) . ' m, termasuk toleransi GPS). Absen hanya bisa di lokasi sekolah.',
-                'jarak'    => round($dist),
-                'radius'   => (int) round($radius),
+                'message'  => 'Anda berada ' . round($eval['dist']) . ' m dari titik «' . e($safeLabel) . '» (maks ' . round($eval['effective']) . ' m, termasuk toleransi GPS' . $bonusTxt . '). Absen hanya bisa di area sekolah.',
+                'jarak'    => round($eval['dist']),
+                'radius'   => (int) round($eval['radius']),
                 'accuracy' => (int) round($accuracy),
+                'titik'    => $safeLabel,
+                'bonus'    => (int) round($eval['bonus']),
             ], 422);
         }
 

@@ -84,6 +84,8 @@ class AbsensiParentNotificationTest extends TestCase
         Setting::set('sekolah_lat', '-6.200000');
         Setting::set('sekolah_lng', '106.816666');
         Setting::set('absen_radius', '100');
+        Setting::set('sekolah_geo_points', '[]');
+        Setting::set('absen_rush_bonus', '0'); // isolasi tes radius dasar dari zona jam sibuk
 
         return substr(hash_hmac('sha256', 'qrabsen|'.now()->toDateString(), (string) config('app.key')), 0, 12);
     }
@@ -298,6 +300,46 @@ class AbsensiParentNotificationTest extends TestCase
         ])->assertStatus(422);
     }
 
+    public function test_qr_geolocation_menerima_titik_tambahan(): void
+    {
+        Queue::fake();
+        Carbon::setTestNow(Carbon::parse('2026-07-13 10:00:00')); // di luar jam sibuk
+        [, , , $siswaUser] = $this->siswaDenganOrangtua();
+        $token = $this->aktifkanQrGeolocation();
+
+        // Titik tambahan ~222 m ke utara dari pin utama; radius titik 120 + soft 50 = 170 → masih jauh dari utama tapi dekat titik tambahan
+        Setting::set('sekolah_geo_points', json_encode([
+            ['label' => 'Lapangan', 'lat' => -6.198000, 'lng' => 106.816666, 'radius' => 120],
+        ]));
+
+        $this->actingAs($siswaUser)->postJson('/absen-qr', [
+            'token' => $token,
+            'lat' => '-6.198000',
+            'lng' => '106.816666',
+            'accuracy' => 30,
+        ])->assertOk()->assertJsonPath('ok', true);
+    }
+
+    public function test_qr_geolocation_bonus_jam_sibuk_melebarkan_radius(): void
+    {
+        Queue::fake();
+        Carbon::setTestNow(Carbon::parse('2026-07-13 07:20:00'));
+        [, , , $siswaUser] = $this->siswaDenganOrangtua();
+        $token = $this->aktifkanQrGeolocation();
+
+        Setting::set('absen_rush_bonus', '100');
+        Setting::set('absen_rush_start', '06:30');
+        Setting::set('absen_rush_end', '07:45');
+
+        // ~167 m: tanpa bonus ditolak (100+50=150); dengan bonus 100 → efektif 250 → lolos
+        $this->actingAs($siswaUser)->postJson('/absen-qr', [
+            'token' => $token,
+            'lat' => '-6.198500',
+            'lng' => '106.816666',
+            'accuracy' => 40,
+        ])->assertOk()->assertJsonPath('ok', true);
+    }
+
     public function test_orangtua_melihat_notifikasi_kehadiran_di_api_bell(): void
     {
         Queue::fake();
@@ -345,6 +387,144 @@ class AbsensiParentNotificationTest extends TestCase
 
         $this->assertSame(0, $otherParent->notifications()->count());
         $this->assertSame(0, $parentUser->notifications()->count()); // belum lewat notifier resmi
+        Queue::assertNothingPushed();
+    }
+
+    public function test_form_manual_hadir_mengirim_notifikasi_dan_mengisi_jam_masuk(): void
+    {
+        Queue::fake();
+        Carbon::setTestNow(Carbon::parse('2026-07-13 07:30:00'));
+        [$siswa, $kelas, $parentUser] = $this->siswaDenganOrangtua();
+
+        $this->actingAs($this->admin())->post('/absensi', [
+            'id_kelas' => $kelas->uuid,
+            'tanggal' => '2026-07-13',
+            'status' => [$siswa->uuid => 'hadir'],
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('absensis', [
+            'id_siswa' => $siswa->uuid,
+            'tanggal' => '2026-07-13',
+            'status' => 'hadir',
+            'jam_masuk' => '07:30:00',
+        ]);
+
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_type' => User::class,
+            'notifiable_id' => $parentUser->uuid,
+            'type' => 'App\\Notifications\\StudentAttendanceRecorded',
+        ]);
+
+        Queue::assertPushed(SendFcmNotificationJob::class, function (SendFcmNotificationJob $job) use ($parentUser) {
+            return $job->userUuid === $parentUser->uuid
+                && $job->payload['title'] === 'Anak sudah masuk sekolah'
+                && str_contains($job->payload['message'], '07:30');
+        });
+    }
+
+    public function test_form_manual_izin_mengirim_notifikasi_ke_orang_tua(): void
+    {
+        Queue::fake();
+        Carbon::setTestNow(Carbon::parse('2026-07-13 08:00:00'));
+        [$siswa, $kelas, $parentUser] = $this->siswaDenganOrangtua();
+
+        $this->actingAs($this->admin())->post('/absensi', [
+            'id_kelas' => $kelas->uuid,
+            'tanggal' => '2026-07-13',
+            'status' => [$siswa->uuid => 'izin'],
+            'keterangan' => [$siswa->uuid => 'Urusan keluarga'],
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('absensis', [
+            'id_siswa' => $siswa->uuid,
+            'status' => 'izin',
+        ]);
+
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_id' => $parentUser->uuid,
+            'type' => 'App\\Notifications\\StudentAttendanceRecorded',
+        ]);
+
+        Queue::assertPushed(SendFcmNotificationJob::class, function (SendFcmNotificationJob $job) use ($parentUser) {
+            return $job->userUuid === $parentUser->uuid
+                && $job->payload['title'] === 'Anak tercatat izin'
+                && str_contains($job->payload['message'], 'izin')
+                && str_contains($job->payload['message'], 'Budi Santoso');
+        });
+    }
+
+    public function test_ubah_status_mengirim_notifikasi_baru_status_sama_tidak_spam(): void
+    {
+        Queue::fake();
+        Carbon::setTestNow(Carbon::parse('2026-07-13 08:00:00'));
+        [$siswa, $kelas, $parentUser] = $this->siswaDenganOrangtua();
+
+        $this->actingAs($this->admin())->post('/absensi', [
+            'id_kelas' => $kelas->uuid,
+            'tanggal' => '2026-07-13',
+            'status' => [$siswa->uuid => 'sakit'],
+        ])->assertRedirect();
+
+        $this->actingAs($this->admin())->post('/absensi', [
+            'id_kelas' => $kelas->uuid,
+            'tanggal' => '2026-07-13',
+            'status' => [$siswa->uuid => 'sakit'],
+        ])->assertRedirect();
+
+        $this->assertDatabaseCount('notifications', 1);
+
+        $this->actingAs($this->admin())->post('/absensi', [
+            'id_kelas' => $kelas->uuid,
+            'tanggal' => '2026-07-13',
+            'status' => [$siswa->uuid => 'alpa'],
+        ])->assertRedirect();
+
+        $this->assertDatabaseCount('notifications', 2);
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_id' => $parentUser->uuid,
+        ]);
+
+        Queue::assertPushed(SendFcmNotificationJob::class, 2);
+        Queue::assertPushed(SendFcmNotificationJob::class, function (SendFcmNotificationJob $job) {
+            return $job->payload['title'] === 'Anak tercatat alpa';
+        });
+    }
+
+    public function test_tanpa_orang_tua_terhubung_mencatat_peringatan_log(): void
+    {
+        Queue::fake();
+        Carbon::setTestNow(Carbon::parse('2026-07-13 07:12:00'));
+
+        $kelas = Kelas::create(['tingkat' => 7, 'kelas' => 'B']);
+        $siswaUser = User::create([
+            'username' => 'siswa_tanpa_ortu',
+            'password' => Hash::make('password'),
+            'access' => 'siswa',
+        ]);
+        $siswa = Siswa::create([
+            'id_login' => $siswaUser->uuid,
+            'nama' => 'Ani Tanpa Ortu',
+            'nis' => 'ABS-NO-PARENT',
+            'id_kelas' => $kelas->uuid,
+            'jk' => 'P',
+        ]);
+
+        \Illuminate\Support\Facades\Log::shouldReceive('warning')
+            ->once()
+            ->withArgs(function (string $message, array $context) use ($siswa) {
+                return str_contains($message, 'orang tua')
+                    && ($context['siswa_id'] ?? null) === $siswa->uuid
+                    && ($context['status'] ?? null) === 'hadir';
+            });
+
+        $this->actingAs($this->admin())->postJson('/absensi/mark', [
+            'id_siswa' => $siswa->uuid,
+            'id_kelas' => $kelas->uuid,
+            'tanggal' => '2026-07-13',
+            'status' => 'hadir',
+        ])->assertOk();
+
+        $this->assertDatabaseCount('notifications', 0);
         Queue::assertNothingPushed();
     }
 }

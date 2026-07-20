@@ -43,5 +43,32 @@ class GeofenceTest extends TestCase
             200.0 + Geofence::SOFT_TOLERANCE_M,
             Geofence::effectiveRadius(200)
         );
+        $this->assertSame(
+            100.0 + Geofence::SOFT_TOLERANCE_M + 100.0,
+            Geofence::effectiveRadius(100, 100)
+        );
+    }
+
+    public function test_within_radius_honors_rush_bonus(): void
+    {
+        // 200 m jarak, radius 100 → soft 50 = 150 (tolak); +bonus 100 = 250 (terima)
+        $this->assertFalse(Geofence::withinRadius(200, 100));
+        $this->assertTrue(Geofence::withinRadius(200, 100, 100));
+    }
+
+    public function test_sanitize_point_label_strips_html(): void
+    {
+        $this->assertSame('Titik', Geofence::sanitizePointLabel('<img src=x onerror=alert(1)>'));
+        $this->assertSame('Gerbang', Geofence::sanitizePointLabel('<script>x</script>Gerbang'));
+        $this->assertSame('Gerbang Utama', Geofence::sanitizePointLabel('  Gerbang   Utama  '));
+        $this->assertSame('Titik', Geofence::sanitizePointLabel(''));
+    }
+
+    public function test_normalize_rush_hm_rejects_invalid(): void
+    {
+        $this->assertSame('06:30', Geofence::normalizeRushHm('06:30'));
+        $this->assertNull(Geofence::normalizeRushHm('99:99'));
+        $this->assertNull(Geofence::normalizeRushHm('25:00'));
+        $this->assertNull(Geofence::normalizeRushHm('06:30:00')); // sudah harus dinormalisasi di controller
     }
 }
