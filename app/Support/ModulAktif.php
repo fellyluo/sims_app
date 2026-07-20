@@ -108,17 +108,19 @@ class ModulAktif
 
         // Transisi merge: jagat_misi digabung ke arena_belajar.
         // Aktif jika arena ON, atau (belum ada row arena) dan legacy jagat ON.
+        // Lewat Setting::get (bukan query langsung) agar ikut memo per-request;
+        // sentinel dipakai untuk membedakan "baris tidak ada" dari nilai kosong.
         if ($kode === 'arena_belajar') {
-            $arenaKey = self::settingKey('arena_belajar');
-            $legacyKey = 'fitur_jagat_misi_aktif';
-            $arenaRow = Setting::where('key', $arenaKey)->first();
-            $legacyRow = Setting::where('key', $legacyKey)->first();
+            $absent = "\0absent";
 
-            if ($arenaRow !== null) {
-                return $arenaRow->value === '1';
+            $arena = Setting::get(self::settingKey('arena_belajar'), $absent);
+            if ($arena !== $absent) {
+                return $arena === '1';
             }
-            if ($legacyRow !== null) {
-                return $legacyRow->value === '1';
+
+            $legacy = Setting::get('fitur_jagat_misi_aktif', $absent);
+            if ($legacy !== $absent) {
+                return $legacy === '1';
             }
 
             return true;
