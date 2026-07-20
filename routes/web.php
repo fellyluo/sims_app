@@ -17,6 +17,7 @@ use App\Http\Controllers\KartuPelajarController;
 use App\Http\Controllers\KalenderController;
 use App\Http\Controllers\PoinController;
 use App\Http\Controllers\P3Controller;
+use App\Http\Controllers\PantauLokasiController;
 use App\Http\Controllers\PemanggilanController;
 use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\DashboardController;
@@ -238,6 +239,11 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
     // Absen QR mandiri (siswa/guru) — scan QR harian + cek lokasi
     Route::middleware('modul:absensi')->get('/absen-qr', [QrAbsensiController::class, 'absen'])->name('absen.qr');
     Route::middleware('modul:absensi')->post('/absen-qr', [QrAbsensiController::class, 'mark'])->name('absen.qr.mark');
+
+    // Pantau Lokasi — titik absen QR di dalam area sekolah. Tanpa middleware peran:
+    // orang tua juga berhak (lihat anaknya), dan cakupan per-peran (sekolah/kelas/anak)
+    // beserta on-off fitur ditegakkan di PantauLokasi::canAccess() dalam controller.
+    Route::middleware('modul:absensi')->get('/pantau-lokasi', [PantauLokasiController::class, 'index'])->name('pantau-lokasi.index');
 
     // Ganti password & PIN
     Route::get('/ganti-password', [LoginController::class, 'changePasswordPage'])->name('ganti.password');
