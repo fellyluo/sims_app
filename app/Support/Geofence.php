@@ -93,16 +93,31 @@ class Geofence
             if (isset($p['radius']) && $p['radius'] !== '' && $p['radius'] !== null && is_numeric($p['radius'])) {
                 $r = (float) $p['radius'];
             }
-            $label = trim((string) ($p['label'] ?? 'Titik'));
+            $label = self::sanitizePointLabel((string) ($p['label'] ?? 'Titik'));
             $points[] = [
-                'label' => $label !== '' ? $label : 'Titik',
+                'label' => $label,
                 'lat' => (float) $p['lat'],
                 'lng' => (float) $p['lng'],
-                'radius' => max(10.0, min(5000.0, $r)),
+                'radius' => max(10.0, min(1000.0, $r)),
             ];
+            if (count($points) >= 9) { // utama + 8 ekstra
+                break;
+            }
         }
 
         return $points;
+    }
+
+    /** Label aman untuk toast/popup (cegah XSS lewat innerHTML / Leaflet). */
+    public static function sanitizePointLabel(string $label): string
+    {
+        $label = html_entity_decode($label, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $label = strip_tags($label);
+        $label = preg_replace('/[\x00-\x1F\x7F]/u', '', $label) ?? '';
+        $label = trim(preg_replace('/\s+/u', ' ', $label) ?? '');
+        $label = mb_substr($label, 0, 40);
+
+        return $label !== '' ? $label : 'Titik';
     }
 
     /**
@@ -117,9 +132,9 @@ class Geofence
         }
 
         $carbon = $now ? Carbon::parse($now)->timezone(config('app.timezone')) : now();
-        $start = (string) Setting::get('absen_rush_start', '06:30');
-        $end = (string) Setting::get('absen_rush_end', '07:45');
-        if (!preg_match('/^\d{2}:\d{2}$/', $start) || !preg_match('/^\d{2}:\d{2}$/', $end)) {
+        $start = self::normalizeRushHm((string) Setting::get('absen_rush_start', '06:30'));
+        $end = self::normalizeRushHm((string) Setting::get('absen_rush_end', '07:45'));
+        if ($start === null || $end === null) {
             return 0.0;
         }
 
@@ -130,6 +145,22 @@ class Geofence
 
         // Rentang melewati tengah malam (jarang, tapi aman).
         return ($t >= $start || $t <= $end) ? $bonus : 0.0;
+    }
+
+    /** Terima hanya HH:MM valid 00:00–23:59 (tolak 99:99 dll). */
+    public static function normalizeRushHm(string $value): ?string
+    {
+        $value = trim($value);
+        if (!preg_match('/^(\d{2}):(\d{2})$/', $value, $m)) {
+            return null;
+        }
+        $h = (int) $m[1];
+        $i = (int) $m[2];
+        if ($h > 23 || $i > 59) {
+            return null;
+        }
+
+        return sprintf('%02d:%02d', $h, $i);
     }
 
     /**

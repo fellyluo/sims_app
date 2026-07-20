@@ -199,6 +199,15 @@
         return best;
     }
 
+    function escapeHtml(str) {
+        return String(str == null ? '' : str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     global.SimsGeo = {
         defaults: DEFAULTS,
         pesanGagal: pesanGagal,
@@ -207,5 +216,6 @@
         withinRadius: withinRadius,
         effectiveRadius: effectiveRadius,
         nearestMatch: nearestMatch,
+        escapeHtml: escapeHtml,
     };
 })(typeof window !== 'undefined' ? window : this);

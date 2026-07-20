@@ -351,13 +351,15 @@ class QrAbsensiController extends Controller
                 ? ' (termasuk +' . (int) round($eval['bonus']) . ' m zona jam sibuk)'
                 : '';
 
+            $safeLabel = Geofence::sanitizePointLabel($eval['label']);
+
             return response()->json([
                 'ok'       => false,
-                'message'  => 'Anda berada ' . round($eval['dist']) . ' m dari titik «' . $eval['label'] . '» (maks ' . round($eval['effective']) . ' m, termasuk toleransi GPS' . $bonusTxt . '). Absen hanya bisa di area sekolah.',
+                'message'  => 'Anda berada ' . round($eval['dist']) . ' m dari titik «' . e($safeLabel) . '» (maks ' . round($eval['effective']) . ' m, termasuk toleransi GPS' . $bonusTxt . '). Absen hanya bisa di area sekolah.',
                 'jarak'    => round($eval['dist']),
                 'radius'   => (int) round($eval['radius']),
                 'accuracy' => (int) round($accuracy),
-                'titik'    => $eval['label'],
+                'titik'    => $safeLabel,
                 'bonus'    => (int) round($eval['bonus']),
             ], 422);
         }

@@ -590,7 +590,8 @@
                             </div>
                             <div class="sm:col-span-3">
                                 <label class="form-label">Radius (opsional)</label>
-                                <input type="number" x-model="p.radius" min="10" max="5000" class="form-input text-sm" placeholder="ikuti utama" @change="redrawExtra()">
+                                <input type="number" x-model="p.radius" min="10" max="1000" class="form-input text-sm" placeholder="ikuti utama" @change="redrawExtra()">
+                                <p class="text-[11px] text-slate-400 mt-1">Kosong = ikut radius utama. Maks 1000 m.</p>
                             </div>
                             <div class="sm:col-span-2">
                                 <button type="button" @click="removePoint(idx)" class="w-full py-2.5 rounded-lg text-xs font-bold text-rose-600 border border-rose-200 hover:bg-rose-50">Hapus</button>
@@ -803,7 +804,7 @@ function qrLokasi(cfg){
                 if(!isFinite(la) || !isFinite(ln)) return;
                 const r = (p.radius !== '' && p.radius != null && isFinite(parseFloat(p.radius))) ? parseFloat(p.radius) : defaultR;
                 const m = L.circleMarker([la, ln], { radius: 7, color:'#fff', weight:2, fillColor:'#f59e0b', fillOpacity:1 })
-                    .addTo(this.map).bindPopup(p.label || 'Titik');
+                    .addTo(this.map).bindPopup(SimsGeo.escapeHtml(p.label || 'Titik'));
                 const c = L.circle([la, ln], { radius: r, color:'#f59e0b', weight:1.5, fillColor:'#f59e0b', fillOpacity:0.08 })
                     .addTo(this.map);
                 this.extraLayers.push(m, c);

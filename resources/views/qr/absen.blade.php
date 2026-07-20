@@ -65,7 +65,7 @@
             </div>
             <div class="flex items-center justify-between text-sm px-1">
                 <span class="text-slate-500 flex items-center gap-1.5"><i data-lucide="map-pin" class="w-4 h-4"></i> <span x-text="status || 'Menunggu lokasi...'"></span></span>
-                <button @click="locate()" :disabled="locating || loading" class="text-xs text-primary font-semibold flex items-center gap-1 disabled:opacity-50"><i data-lucide="refresh-cw" class="w-3.5 h-3.5" :class="locating && 'animate-spin'"></i> Perbarui</button>
+                <button @click="locate()" :disabled="locating || loading || scanning" class="text-xs text-primary font-semibold flex items-center gap-1 disabled:opacity-50"><i data-lucide="refresh-cw" class="w-3.5 h-3.5" :class="locating && 'animate-spin'"></i> Perbarui</button>
             </div>
             <template x-if="dist!==null">
                 <div class="flex flex-wrap items-center gap-2 px-1">
@@ -185,7 +185,7 @@ function qrAbsen(cfg){
             this.$nextTick(()=> this.renderMap());
         },
         async locate(){
-            if(this.locating || this.loading) return;
+            if(this.locating || this.loading || this.scanning) return;
             this.locating = true;
             this.status = 'Sedang membaca lokasi (GPS sedang dipanaskan)…';
             try {
@@ -196,6 +196,10 @@ function qrAbsen(cfg){
                 });
                 this.applyFix(fix);
             } catch(err){
+                // Invalidate stale fix so badge tidak tetap "siap absen" setelah gagal.
+                this.lat = null; this.lng = null; this.accuracy = null;
+                this.dist = null; this.distMeters = null;
+                this.nearestLabel = null; this.nearestRadius = null;
                 this.status = (err && err.message) || SimsGeo.pesanGagal(err);
             }
             this.locating = false;
@@ -218,7 +222,7 @@ function qrAbsen(cfg){
             this.baseMode = this.baseCtrl.mode;
             zones.forEach((z, i)=>{
                 const color = i === 0 ? '#10b981' : '#f59e0b';
-                L.marker([z.lat, z.lng]).addTo(this.map).bindPopup(z.label || ('Titik '+(i+1)));
+            L.marker([z.lat, z.lng]).addTo(this.map).bindPopup(SimsGeo.escapeHtml(z.label || ('Titik '+(i+1))));
                 L.circle([z.lat, z.lng],{ radius:z.radius, color, weight:2, fillColor:color, fillOpacity:0.10 }).addTo(this.map);
                 L.circle([z.lat, z.lng],{ radius:SimsGeo.effectiveRadius(z.radius, this.softTolerance, this.rushBonus), color, weight:1, fillOpacity:0, dashArray:'6 4' }).addTo(this.map);
             });
@@ -263,7 +267,7 @@ function qrAbsen(cfg){
             this.scanning=false;
         },
         async onScan(token){
-            if(this.loading) return;
+            if(this.loading || this.locating) return;
             this.loading=true;
             this.stopScan();
             this.status='Menyempurnakan GPS & memverifikasi QR…';
@@ -293,6 +297,8 @@ function qrAbsen(cfg){
                 if(d.jarak!=null){ this.distMeters = d.jarak; this.dist = Math.round(d.jarak); }
                 if(d.accuracy!=null) this.accuracy = d.accuracy;
                 if(d.titik) this.nearestLabel = d.titik;
+                if(d.radius!=null) this.nearestRadius = d.radius;
+                if(d.bonus!=null) this.rushBonus = d.bonus;
                 this.renderMap();
                 if(d.ok){ showToast(d.message); this.speak(d.label, d.nama); } else showToast(d.message,'error');
             } catch(err){
