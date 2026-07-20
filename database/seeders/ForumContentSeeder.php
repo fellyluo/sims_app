@@ -26,7 +26,7 @@ class ForumContentSeeder extends Seeder
         $adminU   = User::whereIn('access', ['admin', 'superadmin'])->first();
         $kepalaU  = User::where('access', 'kepala')->first();
         $kesisU   = User::where('access', 'kesiswaan')->first();
-        $saprasU  = User::where('access', 'sapras')->first();
+        $saprasU  = User::whereIn('access', ['sarpras', 'sapras'])->first();
 
         if (!$guruUser && !$adminU) {
             $this->command?->warn('ForumContentSeeder: tidak ada user guru/admin, dilewati.');

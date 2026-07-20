@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\UserRole;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
@@ -25,12 +26,26 @@ class ForumRolePermission extends Model
     /** Cache per-request: [access][permission] => bool. */
     protected static ?array $cache = null;
 
+    /**
+     * Kunci matriks dikanonikalisasi: baris lama bisa tersimpan dengan alias
+     * 'sapras' sementara users.access kini selalu 'sarpras' — tanpa ini, izin
+     * yang sudah diatur admin tidak pernah cocok dan staf sarpras kehilangan
+     * seluruh akses forum.
+     */
     public static function matrix(): array
     {
         if (static::$cache === null) {
             static::$cache = [];
-            foreach (static::all() as $row) {
-                static::$cache[$row->access][$row->permission] = (bool) $row->allowed;
+
+            // Baris beralias lama diterapkan lebih dulu agar, bila keduanya ada,
+            // konfigurasi dengan ejaan kanonik yang menang (bukan urutan acak DB).
+            $rows = static::all()->sortBy(
+                fn ($row) => UserRole::canonicalize((string) $row->access) === $row->access ? 1 : 0
+            );
+
+            foreach ($rows as $row) {
+                $access = UserRole::canonicalize((string) $row->access);
+                static::$cache[$access][$row->permission] = (bool) $row->allowed;
             }
         }
         return static::$cache;
@@ -38,7 +53,7 @@ class ForumRolePermission extends Model
 
     public static function granted(string $access, string $permission): bool
     {
-        return static::matrix()[$access][$permission] ?? false;
+        return static::matrix()[UserRole::canonicalize($access)][$permission] ?? false;
     }
 
     public static function clearCache(): void

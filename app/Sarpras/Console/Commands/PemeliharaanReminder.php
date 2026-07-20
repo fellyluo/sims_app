@@ -39,7 +39,7 @@ class PemeliharaanReminder extends Command
 
         foreach ($jatuhTempo as $jadwal) {
             // Notifikasi ke pengelola Sarpras (SIMS: berbasis kolom access).
-            $wakas = User::whereIn('access', ['superadmin', 'admin', 'sapras'])->get();
+            $wakas = User::whereIn('access', ['superadmin', 'admin', 'sarpras', 'sapras'])->get();
 
             foreach ($wakas as $waka) {
                 $waka->notify(new PemeliharaanJatuhTempo($jadwal));

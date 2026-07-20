@@ -17,6 +17,7 @@ use App\Sarpras\Models\LaporanKerusakan;
 use App\Sarpras\Models\Peminjaman;
 use App\Sarpras\Models\Pengadaan;
 use App\Sarpras\Support\Rupiah;
+use App\Support\UserRole;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
@@ -45,8 +46,8 @@ class DashboardController extends Controller
 
         // ── Data ringkas Sarpras (admin/kepala/sapras saja, 4 query → 1 blok data) ──
         $sarpras = null;
-        $sarprasRoles = ['superadmin', 'admin', 'kepala', 'sapras'];
-        if (in_array($user->access, $sarprasRoles) && $user->can('sarpras.dashboard.lihat')) {
+        $sarprasRoles = ['superadmin', 'admin', 'kepala', 'sarpras'];
+        if (UserRole::matches((string) $user->access, ...$sarprasRoles) && $user->can('sarpras.dashboard.lihat')) {
             $sarpras = [
                 'totalAset'        => Aset::count(),
                 'nilaiTotalRp'     => Rupiah::format(Aset::sum('nilai_perolehan')),

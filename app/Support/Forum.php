@@ -45,7 +45,7 @@ class Forum
         'kepala'     => 'Kepala Sekolah',
         'kurikulum'  => 'Waka Kurikulum',
         'kesiswaan'  => 'Waka Kesiswaan',
-        'sapras'     => 'Waka Sarpras',
+        'sarpras'    => 'Waka Sarpras',
         'bendahara'  => 'Bendahara',
         'guru'       => 'Guru',
         'siswa'      => 'Siswa',
@@ -63,7 +63,7 @@ class Forum
         'kepala'     => ['forum.view.all', 'forum.moderate', 'forum.announce'],
         'kurikulum'  => ['forum.view.all', 'forum.topic.create', 'forum.comment.create', 'forum.moderate', 'forum.announce'],
         'kesiswaan'  => ['forum.view.all', 'forum.topic.create', 'forum.comment.create', 'forum.moderate', 'forum.announce'],
-        'sapras'     => ['forum.view.scope', 'forum.topic.create', 'forum.comment.create', 'forum.moderate'],
+        'sarpras'    => ['forum.view.scope', 'forum.topic.create', 'forum.comment.create', 'forum.moderate'],
         'bendahara'  => ['forum.view.scope', 'forum.topic.create', 'forum.comment.create'],
         'guru'       => ['forum.view.scope', 'forum.topic.create', 'forum.comment.create', 'forum.moderate'],
         'siswa'      => ['forum.view.scope', 'forum.comment.create'],
@@ -81,8 +81,10 @@ class Forum
      */
     public static function categoryScope(string $access): ?array
     {
-        return match ($access) {
-            'sapras'    => ['sarpras', 'umum', 'pengumuman'],
+        // Kanonikalisasi dulu: users.access disimpan 'sarpras', sedangkan alias
+        // lama 'sapras' masih dipakai di beberapa pemanggil/route.
+        return match (UserRole::canonicalize($access)) {
+            'sarpras'   => ['sarpras', 'umum', 'pengumuman'],
             'kesiswaan' => ['kesiswaan', 'umum', 'pengumuman'],
             'kurikulum' => ['akademik', 'umum', 'pengumuman'],
             default     => null,
