@@ -52,7 +52,7 @@ class TickerStats
                 'peminjaman'     => $peminjaman,
                 'semesterLabel'  => $semester ? 'SEMESTER ' . $semester->semester . ' (' . $semester->tahun . ')' : 'TIDAK AKTIF',
                 'onlineSiswa'    => User::where('access', 'siswa')->where('last_seen_at', '>=', $nowSub3)->count(),
-                'onlineGuru'     => User::whereIn('access', ['guru', 'walikelas', 'kurikulum', 'kesiswaan', 'sekretaris', 'kepala', 'sapras', 'bendahara'])->where('last_seen_at', '>=', $nowSub3)->count(),
+                'onlineGuru'     => User::whereIn('access', ['guru', 'walikelas', 'kurikulum', 'kesiswaan', 'sekretaris', 'kepala', 'sarpras', 'sapras', 'bendahara'])->where('last_seen_at', '>=', $nowSub3)->count(),
                 'onlineOrangTua' => User::where('access', 'orangtua')->where('last_seen_at', '>=', $nowSub3)->count(),
                 'onlineAdmin'    => User::whereIn('access', ['superadmin', 'admin'])->where('last_seen_at', '>=', $nowSub3)->count(),
             ];
@@ -62,8 +62,8 @@ class TickerStats
     /** Flag bagian mana yang tampil untuk sebuah role. */
     public static function flags(?string $role): array
     {
-        $management = in_array($role, ['superadmin', 'admin', 'kepala', 'kurikulum', 'kesiswaan', 'sapras', 'sekretaris'], true);
-        $teacher    = in_array($role, ['superadmin', 'admin', 'kepala', 'kurikulum', 'kesiswaan', 'sapras', 'sekretaris', 'walikelas', 'guru'], true);
+        $management = UserRole::matches((string) $role, 'superadmin', 'admin', 'kepala', 'kurikulum', 'kesiswaan', 'sarpras', 'sekretaris');
+        $teacher    = UserRole::matches((string) $role, 'superadmin', 'admin', 'kepala', 'kurikulum', 'kesiswaan', 'sarpras', 'sekretaris', 'walikelas', 'guru');
 
         return [
             'management' => $management,

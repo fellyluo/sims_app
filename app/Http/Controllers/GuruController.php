@@ -103,7 +103,9 @@ class GuruController extends Controller
             'tmt_ngajar'    => 'nullable|date',
             'tmt_smp'       => 'nullable|date',
             'no_telp'       => 'nullable|string|max:20',
-            'access'        => 'nullable|in:' . implode(',', array_keys(self::ROLES)),
+            // 'sapras' tetap diterima: form lama yang masih terbuka bisa mengirim alias
+            // itu; User model mengkanonikalisasinya jadi 'sarpras' saat disimpan.
+            'access'        => 'nullable|in:' . implode(',', array_keys(self::ROLES)) . ',sapras',
         ]);
 
         $access = $data['access'] ?? null;
@@ -158,7 +160,7 @@ class GuruController extends Controller
         'walikelas' => 'Wali Kelas',
         'kurikulum' => 'Kurikulum',
         'kesiswaan' => 'Kesiswaan',
-        'sapras'    => 'Sarana & Prasarana',
+        'sarpras'   => 'Sarana & Prasarana',
         'bendahara' => 'Bendahara',
         'kepala'    => 'Kepala Sekolah',
         'admin'     => 'Admin',

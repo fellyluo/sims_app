@@ -715,14 +715,14 @@
 
 @include('partials.sosmed-bar')
 
-@elseif(in_array($access, ['guru', 'walikelas', 'kurikulum', 'kesiswaan', 'sapras']))
+@elseif(in_array($access, ['guru', 'walikelas', 'kurikulum', 'kesiswaan', 'sarpras']))
 {{-- ===== Guru/Walikelas/Kurikulum/Kesiswaan/Sapras: kartu batik + blok sesuai kebutuhan peran, sama seperti admin ===== --}}
 @php
     $allBlocks = match ($access) {
         'guru', 'walikelas' => auth()->user()->guru ? ['guru_jadwal', 'guru_presensi', 'guru_agenda'] : [],
         'kurikulum' => array_merge(auth()->user()->guru ? ['guru_jadwal', 'guru_presensi', 'guru_agenda'] : [], ['ringkasan_siswa', 'ringkasan_guru', 'ringkasan_kelas', 'ringkasan_tahun', 'kurikulum_agenda']),
         'kesiswaan' => array_merge(auth()->user()->guru ? ['guru_jadwal', 'guru_presensi', 'guru_agenda'] : [], ['ringkasan_siswa', 'kesiswaan_pending', 'kesiswaan_absensi']),
-        'sapras' => array_merge(auth()->user()->guru ? ['guru_jadwal', 'guru_presensi', 'guru_agenda'] : [], auth()->user()->can('sarpras.dashboard.lihat') ? ['sarpras_aset', 'sarpras_kerusakan', 'sarpras_peminjaman', 'sarpras_pengadaan'] : []),
+        'sarpras' => array_merge(auth()->user()->guru ? ['guru_jadwal', 'guru_presensi', 'guru_agenda'] : [], auth()->user()->can('sarpras.dashboard.lihat') ? ['sarpras_aset', 'sarpras_kerusakan', 'sarpras_peminjaman', 'sarpras_pengadaan'] : []),
         default => [],
     };
     $savedLayout = is_array($pref->dashboard_layout) ? $pref->dashboard_layout : [];
@@ -918,7 +918,7 @@
 </script>
 @endpush
 
-@if(in_array($access, ['superadmin','admin','kepala']) || (in_array($access, ['siswa', 'orangtua']) && $siswaWidget) || in_array($access, ['guru', 'walikelas', 'kurikulum', 'kesiswaan', 'sapras']))
+@if(in_array($access, ['superadmin','admin','kepala']) || (in_array($access, ['siswa', 'orangtua']) && $siswaWidget) || in_array($access, ['guru', 'walikelas', 'kurikulum', 'kesiswaan', 'sarpras']))
 @push('scripts')
 <script>
 function dashLayout() {

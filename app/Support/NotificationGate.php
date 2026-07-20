@@ -235,7 +235,7 @@ class NotificationGate
     private static function canViewSarpras(User $user): bool
     {
         return $user->isAdmin()
-            || $user->access === 'sapras'
+            || UserRole::matches((string) $user->access, 'sarpras')
             || $user->canAccess('manage_sarpras');
     }
 

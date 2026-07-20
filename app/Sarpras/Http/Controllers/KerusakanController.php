@@ -81,7 +81,7 @@ class KerusakanController extends Controller
         }
 
         // Notifikasi in-app (database) ke pengelola Sarpras (SIMS: kolom access).
-        $wakas = User::whereIn('access', ['superadmin', 'admin', 'sapras'])->get();
+        $wakas = User::whereIn('access', ['superadmin', 'admin', 'sarpras', 'sapras'])->get();
         Notification::send($wakas, new KerusakanDilaporkan($laporan));
 
         return redirect()->route('sarpras.kerusakan.show', $laporan)
