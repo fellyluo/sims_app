@@ -8,6 +8,7 @@ use App\Models\Mission;
 use App\Models\Ngajar;
 use App\Models\User;
 use App\Models\Walikelas;
+use App\Support\UserRole;
 
 class MissionPolicy
 {
@@ -50,7 +51,7 @@ class MissionPolicy
 
     public function manage(User $user, Mission $mission): bool
     {
-        if (in_array($user->access, ['admin', 'superadmin'], true)) {
+        if (UserRole::matches($user->access, 'admin', 'superadmin')) {
             return true;
         }
 
@@ -128,10 +129,11 @@ class MissionPolicy
 
     public function viewAnalytics(User $user): bool
     {
-        if (in_array($user->access, [
+        if (UserRole::matches(
+            $user->access,
             'guru', 'admin', 'superadmin', 'walikelas',
             'kepala', 'kurikulum', 'kesiswaan', 'sapras',
-        ], true)) {
+        )) {
             return true;
         }
 
@@ -149,7 +151,7 @@ class MissionPolicy
             return false;
         }
 
-        if (in_array($user->access, ['admin', 'superadmin', 'kepala', 'kurikulum', 'kesiswaan'], true)) {
+        if (UserRole::matches($user->access, 'admin', 'superadmin', 'kepala', 'kurikulum', 'kesiswaan')) {
             return true;
         }
 
@@ -168,7 +170,10 @@ class MissionPolicy
 
     private function canPlay(User $user): bool
     {
-        if (in_array($user->access, self::PLAY_ROLES, true)) {
+        // UserRole::matches, bukan in_array: users.access disimpan kanonik ('sarpras')
+        // sedangkan daftar di atas memakai alias lama ('sapras') — perbandingan mentah
+        // membuat staf sarpras tertolak.
+        if (UserRole::matches($user->access, ...self::PLAY_ROLES)) {
             return true;
         }
 
@@ -178,7 +183,7 @@ class MissionPolicy
 
     private function canBuild(User $user): bool
     {
-        if (in_array($user->access, self::BUILDER_ROLES, true)) {
+        if (UserRole::matches($user->access, ...self::BUILDER_ROLES)) {
             return true;
         }
 

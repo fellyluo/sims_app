@@ -16,10 +16,11 @@ use Illuminate\Support\Str;
  */
 class JagatMisiDemoSeeder extends Seeder
 {
+    use \Database\Seeders\Concerns\ResolvesDemoClassroom;
+
     public function run(): void
     {
-        $classroom = Classroom::where('class_code', '2N3-ICS0')->first()
-            ?? Classroom::where('status', 'published')->first();
+        $classroom = $this->resolveDemoClassroom();
         if (! $classroom) {
             $this->command?->warn('Tidak ada classroom published — skip JagatMisiDemoSeeder.');
 
