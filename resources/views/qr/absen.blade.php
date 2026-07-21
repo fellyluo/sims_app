@@ -203,9 +203,7 @@ function qrAbsen(cfg){
                 this.distMeters = null; this.dist = null; this.nearestLabel = null; this.nearestRadius = null;
             }
             const accTxt = this.accuracy!==null ? (' (±'+Math.round(this.accuracy)+' m)') : '';
-            if(!SimsGeo.accuracyAcceptable(this.accuracy)){
-                this.status = 'Akurasi GPS masih rendah'+accTxt+'. Pindah ke tempat terbuka, lalu Perbarui lagi.';
-            } else if(this.dalamArea){
+            if(this.dalamArea){
                 this.status = 'Anda berada di area «'+(this.nearestLabel||'sekolah')+'» — siap absen.'+accTxt;
             } else {
                 this.status = 'Anda berada di luar area sekolah.'+accTxt;
@@ -215,14 +213,10 @@ function qrAbsen(cfg){
         async locate(){
             if(this.locating || this.loading || this.scanning) return;
             this.locating = true;
-            this.status = 'Sedang membaca lokasi (GPS sedang dipanaskan)…';
+            this.status = 'Sedang membaca lokasi Anda…';
             try {
                 await this.refreshGeoConfig(true);
-                const fix = await SimsGeo.getBestLocation({
-                    watchMs: 16000,
-                    targetAccuracy: 75,
-                    onProgress: (msg)=> { this.status = msg; },
-                });
+                const fix = await SimsGeo.getLocationOnce({ timeout: 12000 });
                 this.applyFix(fix);
             } catch(err){
                 // Invalidate stale fix so badge tidak tetap "siap absen" setelah gagal.
@@ -278,9 +272,6 @@ function qrAbsen(cfg){
             this.primeSpeech();
             if(this.loading || this.locating) return;
             if(!this.lat){ this.locate(); showToast('Mengambil lokasi dulu, coba lagi sebentar','info'); return; }
-            if(!SimsGeo.accuracyAcceptable(this.accuracy)){
-                showToast('Akurasi GPS masih rendah. Perbarui lokasi di tempat lebih terbuka dulu.','error'); return;
-            }
             if(!this.dalamArea){
                 showToast('Anda di luar area sekolah. Mendekat ke lokasi sekolah dulu.','error'); return;
             }
@@ -299,20 +290,11 @@ function qrAbsen(cfg){
             if(this.loading || this.locating) return;
             this.loading=true;
             this.stopScan();
-            this.status='Menyempurnakan GPS & memverifikasi QR…';
+            this.status='Membaca lokasi & memverifikasi QR…';
             try {
                 await this.refreshGeoConfig(true);
-                const fix = await SimsGeo.getBestLocation({
-                    watchMs: 12000,
-                    targetAccuracy: 75,
-                    onProgress: (msg)=> { this.status = msg; },
-                });
+                const fix = await SimsGeo.getLocationOnce({ timeout: 12000 });
                 this.applyFix(fix);
-                if(!SimsGeo.accuracyAcceptable(this.accuracy)){
-                    showToast('Akurasi GPS terlalu rendah (±'+Math.round(this.accuracy)+' m). Coba di tempat lebih terbuka.','error');
-                    this.loading=false;
-                    return;
-                }
                 if(!this.dalamArea){
                     showToast('Anda di luar area sekolah (batas '+Math.round(this.effectiveBound)+' m).','error');
                     this.loading=false;

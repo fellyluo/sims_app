@@ -155,6 +155,46 @@
         return accuracy <= maxM;
     }
 
+    /**
+     * Baca posisi SEKALI saja (bukan menunggu akurasi membaik) — cukup titik lokasi,
+     * pengecekan radius yang menentukan boleh/tidaknya absen (lihat withinRadius/nearestMatch).
+     * @param {object} [opts]
+     * @param {number} [opts.timeout]
+     * @returns {Promise<{lat:number,lng:number,accuracy:number|null}>}
+     */
+    function getLocationOnce(opts) {
+        opts = opts || {};
+        var timeout = opts.timeout != null ? opts.timeout : 12000;
+
+        return new Promise(function (resolve, reject) {
+            if (!navigator.geolocation) {
+                reject({ code: 0, message: 'Perangkat ini tidak mendukung deteksi lokasi. Coba buka lewat HP atau browser lain.' });
+                return;
+            }
+            if (typeof window.isSecureContext !== 'undefined' && !window.isSecureContext) {
+                reject({ code: 1, message: pesanGagal(null) });
+                return;
+            }
+
+            var onOk = function (p) {
+                var acc = (typeof p.coords.accuracy === 'number' && isFinite(p.coords.accuracy)) ? p.coords.accuracy : null;
+                resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: acc });
+            };
+
+            navigator.geolocation.getCurrentPosition(onOk, function (err) {
+                // Timeout akurasi tinggi (butuh sinyal GPS kuat) → coba sekali lagi dengan akurasi
+                // biasa, lebih cepat & sering berhasil di dalam ruangan / pakai WiFi.
+                if (err && err.code === 3) {
+                    navigator.geolocation.getCurrentPosition(onOk, function (err2) {
+                        reject({ code: err2 && err2.code, message: pesanGagal(err2) });
+                    }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 });
+                    return;
+                }
+                reject({ code: err && err.code, message: pesanGagal(err) });
+            }, { enableHighAccuracy: true, timeout: timeout, maximumAge: 0 });
+        });
+    }
+
     /** Soft geofence: jarak ≤ radius + toleransi server (+ bonus jam sibuk opsional). */
     function withinRadius(dist, radius, softTolerance, bonus) {
         softTolerance = softTolerance != null ? softTolerance : DEFAULTS.softToleranceM;
@@ -212,6 +252,7 @@
         defaults: DEFAULTS,
         pesanGagal: pesanGagal,
         getBestLocation: getBestLocation,
+        getLocationOnce: getLocationOnce,
         accuracyAcceptable: accuracyAcceptable,
         withinRadius: withinRadius,
         effectiveRadius: effectiveRadius,
