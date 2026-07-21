@@ -9,6 +9,12 @@
         -webkit-overflow-scrolling: touch;
         min-height: 0;
     }
+    /* Nalar Guru — teks polos berstruktur, nyaman dibaca & disalin */
+    .nalar-answer {
+        line-height: 1.7;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
     @media (orientation: landscape) and (max-height: 560px) and (max-width: 900px) {
         .ai-teacher-hasil {
             max-height: min(72vh, 640px);
@@ -22,6 +28,17 @@
     }
 </style>
 <div class="space-y-5 relative min-w-0 max-w-full" x-data="teacherAi()">
+
+    @if(session('error'))
+    <div class="rounded-xl border border-rose-200 bg-rose-50 dark:bg-rose-900/30 dark:border-rose-800 px-4 py-3 text-sm font-semibold text-rose-800 dark:text-rose-200">
+        {{ session('error') }}
+    </div>
+    @endif
+    @if(session('success'))
+    <div class="rounded-xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-900/30 dark:border-emerald-800 px-4 py-3 text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+        {{ session('success') }}
+    </div>
+    @endif
 
     {{-- Gate: wajib API key Gemini pribadi --}}
     <template x-if="needsApiKeySetup">
@@ -71,63 +88,117 @@
             <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Nalar Guru, generator soal, RPM, ringkasan, dan umpan balik.</p>
         </div>
     </div>
-    {{-- Pintasan Nalar Guru + key --}}
-    @if($launcherAktif ?? true)
-    <div class="card p-4 space-y-4" x-show="launcherAktif && !needsApiKeySetup" x-cloak>
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div class="min-w-0">
-                <h2 class="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-                    <span class="grid place-items-center w-8 h-8 rounded-xl bg-primary/15 text-primary">
-                        <i data-lucide="brain" class="w-4 h-4"></i>
-                    </span>
-                    Nalar Guru
-                </h2>
-                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                    Generate di SIMS memakai API key akun Google Anda.
-                    <span x-show="external.has_gemini_api_key" x-cloak>
-                        Key <span class="font-semibold font-mono" x-text="external.gemini_api_key_masked"></span>
-                    </span>
-                </p>
+    {{-- Folder: Nalar Guru + Generate Kuota --}}
+    <div class="card overflow-hidden" x-show="!needsApiKeySetup" x-cloak
+         x-data="{ nalarFolderOpen: true }">
+        <button type="button" @click="nalarFolderOpen = !nalarFolderOpen"
+                class="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+            <div class="min-w-0 flex items-center gap-3">
+                <span class="grid place-items-center w-9 h-9 rounded-xl bg-primary/15 text-primary shrink-0">
+                    <i data-lucide="folder-open" class="w-4 h-4" x-show="nalarFolderOpen"></i>
+                    <i data-lucide="folder" class="w-4 h-4" x-show="!nalarFolderOpen" x-cloak></i>
+                </span>
+                <div class="min-w-0">
+                    <h2 class="font-semibold text-slate-700 dark:text-slate-200 m-0">Nalar Guru &amp; Kuota</h2>
+                    <p class="m-0 text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                        Chat Nalar, API key, dan sisa generate kuota
+                        <span x-show="quota?.remaining_label" x-cloak> · <span class="font-semibold text-primary" x-text="quota.remaining_label"></span></span>
+                    </p>
+                </div>
             </div>
-            <div class="flex flex-wrap gap-2 flex-shrink-0">
-                <button type="button" @click="selectTab('gemini')"
-                        class="btn-primary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold min-h-[44px]">
-                    <i data-lucide="message-circle" class="w-4 h-4"></i> Buka Nalar Guru
-                </button>
-            </div>
-        </div>
+            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 shrink-0 transition-transform" :class="nalarFolderOpen ? 'rotate-180' : ''"></i>
+        </button>
 
-        <div class="grid gap-3 rounded-xl border border-primary/15 bg-primary/[0.04] dark:bg-slate-900/40 p-3">
-            <div class="flex flex-wrap items-center gap-3">
-                <button type="button" @click="showReplaceKey = !showReplaceKey"
-                        class="inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-200 min-h-[40px] hover:border-primary transition">
-                    <i data-lucide="key-round" class="w-4 h-4"></i> Ganti API key
-                </button>
-                <button type="button" @click="deleteGeminiApiKey" :disabled="apiKeySaving"
-                        class="inline-flex items-center gap-2 rounded-xl border border-rose-200 dark:border-rose-800 px-4 py-2 text-sm font-bold text-rose-600 min-h-[40px] hover:bg-rose-50 dark:hover:bg-rose-900/30 transition disabled:opacity-50">
-                    <i data-lucide="trash-2" class="w-4 h-4"></i> Hapus key
-                </button>
-                <p class="text-[11px] text-primary font-semibold" x-show="externalSaved" x-cloak x-text="externalMessage"></p>
-                <p class="text-[11px] text-rose-500 font-semibold" x-show="apiKeyError && !needsApiKeySetup" x-cloak x-text="apiKeyError"></p>
-            </div>
-            <div x-show="showReplaceKey" x-cloak class="space-y-2 pt-1 border-t border-primary/10">
-                <label class="form-label">API key baru</label>
-                <input type="password" x-model="apiKeyInput" class="form-input font-mono text-sm" placeholder="AIza…" autocomplete="off">
-                <div class="flex flex-wrap gap-2">
-                    <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer"
-                       class="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:underline">
-                        <i data-lucide="external-link" class="w-3.5 h-3.5"></i> AI Studio
-                    </a>
-                    <button type="button" @click="saveGeminiApiKey" :disabled="apiKeySaving || !(apiKeyInput || '').trim()"
-                            class="btn-primary inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold disabled:opacity-40">
-                        Simpan key
+        <div x-show="nalarFolderOpen" x-cloak class="border-t border-slate-100 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
+            {{-- Sub: Nalar Guru --}}
+            @if($launcherAktif ?? true)
+            <div class="p-4 space-y-3" x-show="launcherAktif">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                        <h3 class="text-sm font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2 m-0">
+                            <i data-lucide="brain" class="w-4 h-4 text-primary"></i>
+                            Nalar Guru
+                        </h3>
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400 leading-relaxed m-0">
+                            Generate di SIMS memakai API key akun Google Anda.
+                            <span x-show="external.has_gemini_api_key" x-cloak>
+                                Key <span class="font-semibold font-mono" x-text="external.gemini_api_key_masked"></span>
+                            </span>
+                        </p>
+                    </div>
+                    <button type="button" @click="selectTab('gemini')"
+                            class="btn-primary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold min-h-[44px] shrink-0">
+                        <i data-lucide="message-circle" class="w-4 h-4"></i> Buka Nalar Guru
                     </button>
                 </div>
-                <p class="text-[11px] text-rose-500 font-semibold" x-show="apiKeyError" x-cloak x-text="apiKeyError"></p>
+
+                <div class="grid gap-3 rounded-xl border border-primary/15 bg-primary/[0.04] dark:bg-slate-900/40 p-3">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button type="button" @click="showReplaceKey = !showReplaceKey"
+                                class="inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-2 text-sm font-bold text-slate-700 dark:text-slate-200 min-h-[40px] hover:border-primary transition">
+                            <i data-lucide="key-round" class="w-4 h-4"></i> Ganti API key
+                        </button>
+                        <button type="button" @click="deleteGeminiApiKey" :disabled="apiKeySaving"
+                                class="inline-flex items-center gap-2 rounded-xl border border-rose-200 dark:border-rose-800 px-4 py-2 text-sm font-bold text-rose-600 min-h-[40px] hover:bg-rose-50 dark:hover:bg-rose-900/30 transition disabled:opacity-50">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i> Hapus key
+                        </button>
+                        <p class="text-[11px] text-primary font-semibold" x-show="externalSaved" x-cloak x-text="externalMessage"></p>
+                        <p class="text-[11px] text-rose-500 font-semibold" x-show="apiKeyError && !needsApiKeySetup" x-cloak x-text="apiKeyError"></p>
+                    </div>
+                    <div x-show="showReplaceKey" x-cloak class="space-y-2 pt-1 border-t border-primary/10">
+                        <label class="form-label">API key baru</label>
+                        <input type="password" x-model="apiKeyInput" class="form-input font-mono text-sm" placeholder="AIza…" autocomplete="off">
+                        <div class="flex flex-wrap gap-2">
+                            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer"
+                               class="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:underline">
+                                <i data-lucide="external-link" class="w-3.5 h-3.5"></i> AI Studio
+                            </a>
+                            <button type="button" @click="saveGeminiApiKey" :disabled="apiKeySaving || !(apiKeyInput || '').trim()"
+                                    class="btn-primary inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold disabled:opacity-40">
+                                Simpan key
+                            </button>
+                        </div>
+                        <p class="text-[11px] text-rose-500 font-semibold" x-show="apiKeyError" x-cloak x-text="apiKeyError"></p>
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            {{-- Sub: Generate Kuota --}}
+            <div class="p-4" x-show="quota" x-cloak>
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div class="min-w-0">
+                        <h3 class="text-sm font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2 m-0">
+                            <i data-lucide="gauge" class="w-4 h-4 text-primary"></i>
+                            Generate Kuota
+                            <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                                  :class="quota.live ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'">
+                                <span class="h-1.5 w-1.5 rounded-full" :class="quota.live && quota.key_alive !== false ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'"></span>
+                                <span x-text="quota.live ? 'Live' : 'Estimasi'"></span>
+                            </span>
+                        </h3>
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400" x-show="quota.provider !== 'ninerouter' && quota.status && quota.status !== 'ok'" x-text="quota.message"></p>
+                        <div class="mt-3 flex flex-wrap items-end gap-3">
+                            <div class="text-2xl font-extrabold text-slate-800 dark:text-slate-100" x-text="quota.remaining_label || 'Asisten Guru'"></div>
+                            <div class="pb-1 text-xs font-medium text-slate-400" x-show="quota.provider !== 'ninerouter' && quota.remaining_percent !== null && quota.status === 'ok'" x-text="quota.remaining_percent + '% tersisa'"></div>
+                        </div>
+                        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400">
+                            <span x-show="quota.key_alive === true" class="text-emerald-600 dark:text-emerald-400 font-semibold">Key aktif</span>
+                            <span x-show="quota.key_alive === false" class="text-rose-600 dark:text-rose-400 font-semibold">Key bermasalah</span>
+                            <span x-show="quota.updated_at_human" x-text="'Update ' + quota.updated_at_human"></span>
+                            <button type="button" class="font-semibold text-primary hover:underline" @click="refreshQuota(true)" :disabled="quotaLoading">Segarkan</button>
+                        </div>
+                    </div>
+                    <div class="w-full lg:w-72">
+                        <div class="h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" x-show="quota.remaining_percent !== null && quota.status === 'ok'">
+                            <div class="h-full rounded-full bg-primary transition-all" :style="'width: ' + quota.remaining_percent + '%'"></div>
+                        </div>
+                        <div class="mt-2 h-3 rounded-full bg-slate-100 dark:bg-slate-800" x-show="quota.remaining_percent === null || quota.status !== 'ok'"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-    @endif
 
     {{-- Canva Pendidikan (belajar.id, gratis) --}}
     <div class="card p-4 space-y-3" x-show="!needsApiKeySetup && canva.feature_enabled" x-cloak>
@@ -181,7 +252,7 @@
         </p>
     </div>
 
-    {{-- Alur mengajar: soal → Arena / Presentasi / Canva --}}
+    {{-- Alur mengajar: soal → Arena → Presentasi / Canva --}}
     <div class="card p-4 space-y-3" x-show="!needsApiKeySetup" x-cloak>
         <div>
             <h2 class="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
@@ -191,64 +262,85 @@
                 Alur mengajar
             </h2>
             <p class="mt-1 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                Buat soal di Generator Soal, lalu lanjut ke Arena (kuis/misi), Studio Presentasi, atau Canva.
+                Urutan pakai Asisten Guru → Arena Belajar, lalu Presentasi/Canva bila perlu.
             </p>
         </div>
-        <div class="flex flex-wrap gap-2">
-            <button type="button" @click="tab = 'quiz'"
-                    class="inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-600 px-3 py-2 text-xs font-bold min-h-[40px] hover:border-primary">
-                <i data-lucide="file-question" class="w-3.5 h-3.5"></i> Generator Soal
-            </button>
+
+        <ol class="space-y-2.5 m-0 p-0 list-none">
+            <li class="flex gap-3 items-start">
+                <span class="shrink-0 grid place-items-center w-7 h-7 rounded-full bg-primary text-white text-[11px] font-black">1</span>
+                <div class="min-w-0 flex-1 pt-0.5">
+                    <p class="m-0 text-sm font-bold text-slate-800 dark:text-slate-100">Buat soal</p>
+                    <p class="m-0 text-[11px] text-slate-500 leading-relaxed">Generator Soal / Nalar Guru → susun bank soal.</p>
+                    <button type="button" @click="tab = 'quiz'"
+                            class="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-600 px-2.5 py-1.5 text-[11px] font-bold hover:border-primary min-h-[32px]">
+                        <i data-lucide="file-question" class="w-3.5 h-3.5"></i> Generator Soal
+                    </button>
+                </div>
+            </li>
+
             @if($arenaBelajarAktif ?? false)
-            <a href="{{ route('classroom.index') }}"
-               class="inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-600 px-3 py-2 text-xs font-bold min-h-[40px] hover:border-primary">
-                <i data-lucide="gamepad-2" class="w-3.5 h-3.5"></i> Arena Belajar
-            </a>
+            <li class="flex gap-3 items-start">
+                <span class="shrink-0 grid place-items-center w-7 h-7 rounded-full bg-teal-600 text-white text-[11px] font-black">2</span>
+                <div class="min-w-0 flex-1 pt-0.5">
+                    <p class="m-0 text-sm font-bold text-slate-800 dark:text-slate-100">Kirim ke Arena Belajar</p>
+                    <p class="m-0 text-[11px] text-slate-500 leading-relaxed">Pilih ruang kelas → soal masuk form kuis Arena (atau buka Ruang Kelas).</p>
+                    <div class="mt-1.5 flex flex-wrap gap-1.5">
+                        <button type="button"
+                                @click="tab = 'quiz'; if (result) { openSendToArena(); } else { $nextTick(() => lucide?.createIcons?.()); }"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-200 px-2.5 py-1.5 text-[11px] font-bold min-h-[32px]">
+                            <i data-lucide="send" class="w-3.5 h-3.5"></i> Kirim ke Arena
+                        </button>
+                        <a href="{{ route('classroom.index') }}"
+                           class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-600 px-2.5 py-1.5 text-[11px] font-bold hover:border-primary min-h-[32px]">
+                            <i data-lucide="gamepad-2" class="w-3.5 h-3.5"></i> Buka Arena
+                        </a>
+                    </div>
+                </div>
+            </li>
+            <li class="flex gap-3 items-start">
+                <span class="shrink-0 grid place-items-center w-7 h-7 rounded-full bg-teal-600 text-white text-[11px] font-black">3</span>
+                <div class="min-w-0 flex-1 pt-0.5">
+                    <p class="m-0 text-sm font-bold text-slate-800 dark:text-slate-100">Terbitkan &amp; mainkan</p>
+                    <p class="m-0 text-[11px] text-slate-500 leading-relaxed">
+                        Di Experience kuis: <strong>Terbitkan</strong> → siswa main <strong>solo</strong> (soal acak per siswa) atau host <strong>Live</strong> → cek <strong>Hasil</strong>.
+                    </p>
+                </div>
+            </li>
+            <li class="flex gap-3 items-start">
+                <span class="shrink-0 grid place-items-center w-7 h-7 rounded-full bg-slate-500 text-white text-[11px] font-black">4</span>
+                <div class="min-w-0 flex-1 pt-0.5">
+                    <p class="m-0 text-sm font-bold text-slate-800 dark:text-slate-100">Opsional: Presentasi / Canva</p>
+                    <p class="m-0 text-[11px] text-slate-500 leading-relaxed">Bahan ajar visual setelah atau sebelum sesi Arena.</p>
+                    <div class="mt-1.5 flex flex-wrap gap-1.5">
+                        <a href="{{ route('ai.teacher.presentasi.index') }}"
+                           class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-600 px-2.5 py-1.5 text-[11px] font-bold hover:border-primary min-h-[32px]">
+                            <i data-lucide="presentation" class="w-3.5 h-3.5"></i> Studio Presentasi
+                        </a>
+                        <span x-show="canva.feature_enabled" x-cloak
+                              class="inline-flex items-center gap-1.5 rounded-lg border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 px-2.5 py-1.5 text-[11px] font-bold min-h-[32px]">
+                            <i data-lucide="palette" class="w-3.5 h-3.5"></i> Canva
+                        </span>
+                    </div>
+                </div>
+            </li>
+            @else
+            <li class="flex gap-3 items-start">
+                <span class="shrink-0 grid place-items-center w-7 h-7 rounded-full bg-slate-500 text-white text-[11px] font-black">2</span>
+                <div class="min-w-0 flex-1 pt-0.5">
+                    <p class="m-0 text-sm font-bold text-slate-800 dark:text-slate-100">Presentasi / Canva</p>
+                    <div class="mt-1.5 flex flex-wrap gap-1.5">
+                        <a href="{{ route('ai.teacher.presentasi.index') }}"
+                           class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-600 px-2.5 py-1.5 text-[11px] font-bold hover:border-primary min-h-[32px]">
+                            <i data-lucide="presentation" class="w-3.5 h-3.5"></i> Studio Presentasi
+                        </a>
+                    </div>
+                </div>
+            </li>
             @endif
-            <a href="{{ route('ai.teacher.presentasi.index') }}"
-               class="inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-600 px-3 py-2 text-xs font-bold min-h-[40px] hover:border-primary">
-                <i data-lucide="presentation" class="w-3.5 h-3.5"></i> Studio Presentasi
-            </a>
-            <span x-show="canva.feature_enabled" x-cloak
-                  class="inline-flex items-center gap-2 rounded-xl border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 px-3 py-2 text-xs font-bold min-h-[40px]">
-                <i data-lucide="palette" class="w-3.5 h-3.5"></i> Canva (panel di atas)
-            </span>
-        </div>
+        </ol>
     </div>
 
-    {{-- Generate quota --}}
-    <div class="card p-4" x-show="quota" x-cloak>
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div class="min-w-0">
-                <h2 class="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-                    <i data-lucide="gauge" class="w-4 h-4 text-primary"></i>
-                    Generate Kuota
-                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-                          :class="quota.live ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'">
-                        <span class="h-1.5 w-1.5 rounded-full" :class="quota.live && quota.key_alive !== false ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'"></span>
-                        <span x-text="quota.live ? 'Live' : 'Estimasi'"></span>
-                    </span>
-                </h2>
-                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400" x-show="quota.provider !== 'ninerouter' && quota.status && quota.status !== 'ok'" x-text="quota.message"></p>
-                <div class="mt-3 flex flex-wrap items-end gap-3">
-                    <div class="text-2xl font-extrabold text-slate-800 dark:text-slate-100" x-text="quota.remaining_label || 'Asisten Guru'"></div>
-                    <div class="pb-1 text-xs font-medium text-slate-400" x-show="quota.provider !== 'ninerouter' && quota.remaining_percent !== null && quota.status === 'ok'" x-text="quota.remaining_percent + '% tersisa'"></div>
-                </div>
-                <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400">
-                    <span x-show="quota.key_alive === true" class="text-emerald-600 dark:text-emerald-400 font-semibold">Key aktif</span>
-                    <span x-show="quota.key_alive === false" class="text-rose-600 dark:text-rose-400 font-semibold">Key bermasalah</span>
-                    <span x-show="quota.updated_at_human" x-text="'Update ' + quota.updated_at_human"></span>
-                    <button type="button" class="font-semibold text-primary hover:underline" @click="refreshQuota(true)" :disabled="quotaLoading">Segarkan</button>
-                </div>
-            </div>
-            <div class="w-full lg:w-72">
-                <div class="h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" x-show="quota.remaining_percent !== null && quota.status === 'ok'">
-                    <div class="h-full rounded-full bg-primary transition-all" :style="'width: ' + quota.remaining_percent + '%'"></div>
-                </div>
-                <div class="mt-2 h-3 rounded-full bg-slate-100 dark:bg-slate-800" x-show="quota.remaining_percent === null || quota.status !== 'ok'"></div>
-            </div>
-        </div>
-    </div>
     {{-- Tab --}}
     <div class="flex flex-wrap gap-2">
         <template x-for="t in tabs" :key="t.key">
@@ -297,7 +389,8 @@
                     </div>
                     <p class="text-lg font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">Tanya Nalar Guru</p>
                     <p class="text-sm text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
-                        Minta soal, penjelasan materi, atau rubrik — generate langsung di SIMS dengan API key Anda.
+                        Minta soal, penjelasan materi, atau rubrik — generate langsung di SIMS.
+                        Soal siap dikirim ke Arena Belajar dari balasan chat.
                     </p>
                     <div class="mt-5 grid gap-2 text-left">
                         <template x-for="s in geminiSuggestions" :key="s">
@@ -326,9 +419,24 @@
                         <div x-show="m.role === 'assistant' && m.previewHtml" x-cloak
                              class="min-w-0 max-w-full overflow-x-auto overflow-y-auto overscroll-contain"
                              x-html="m.previewHtml"></div>
-                        <div x-show="m.role === 'assistant' && !m.previewHtml" class="ai-answer break-words whitespace-pre-wrap" x-text="m.text"></div>
+                        <div x-show="m.role === 'assistant' && !m.previewHtml"
+                             class="ai-answer nalar-answer break-words whitespace-pre-wrap font-normal tracking-normal"
+                             x-text="m.text"></div>
                         <div x-show="m.role === 'user'" class="whitespace-pre-wrap" x-text="m.text"></div>
                         <div x-show="m.role === 'assistant'" class="mt-2.5 flex flex-wrap gap-2 border-t border-primary/10 pt-2">
+                            <button type="button" @click="copyGeminiMessage(m)"
+                                    class="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
+                                <i :data-lucide="copiedMessageKey === geminiMessageKey(m) ? 'check' : 'copy'" class="w-3.5 h-3.5"></i>
+                                <span x-text="copiedMessageKey === geminiMessageKey(m) ? 'Tersalin' : 'Salin'"></span>
+                            </button>
+                            <button type="button"
+                                    x-show="arenaBelajarAktif && arenaClassrooms.length && looksLikeQuizDocument(m.text)"
+                                    @click="sendGeminiToArena(m)"
+                                    :disabled="sendingArena"
+                                    class="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-primary hover:bg-primary/10 disabled:opacity-50">
+                                <i :data-lucide="sendingArena ? 'loader-circle' : 'gamepad-2'" class="w-3.5 h-3.5" :class="sendingArena ? 'animate-spin' : ''"></i>
+                                <span x-text="sendingArena ? 'Mengirim…' : 'Kirim ke Arena'"></span>
+                            </button>
                             <button type="button" @click="useGeminiAsQuizResult(m)"
                                     class="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-primary hover:bg-primary/10">
                                 <i data-lucide="file-question" class="w-3.5 h-3.5"></i> Buka di Generator Soal
@@ -738,7 +846,7 @@
                     <i data-lucide="gamepad-2" class="w-5 h-5 text-primary"></i>
                     Kirim ke Arena Belajar
                 </h3>
-                <p class="text-xs text-slate-500 mt-1">Pilih ruang kelas. Soal akan diimpor ke form buat kuis.</p>
+                <p class="text-xs text-slate-500 mt-1">Pilih ruang kelas. Soal dari Nalar Guru / Generator Soal akan diimpor ke form buat kuis Arena.</p>
             </div>
             <div>
                 <label class="form-label">Ruang kelas</label>
@@ -785,6 +893,9 @@
             arenaClassroomId: '',
             showArenaModal: false,
             sendingArena: false,
+            _arenaFromNalar: false,
+            copiedMessageKey: '',
+            copiedMessageTimer: null,
             launcherAktif: @js((bool) ($launcherAktif ?? true)),
             needsApiKeySetup: @js((bool) ($needsApiKeySetup ?? true)),
             external: {
@@ -926,7 +1037,7 @@
                         this.geminiMessages.pop();
                         return;
                     }
-                    const answer = d.answer || '';
+                    const answer = this.tidyNalarAnswer(d.answer || '');
                     const msg = { role: 'assistant', text: answer, previewHtml: '' };
                     this.geminiMessages.push(msg);
                     if (d.history) this.histories.unshift(d.history);
@@ -997,7 +1108,7 @@
                         this.geminiError = this.error;
                         return;
                     }
-                    this.result = d.answer || answer;
+                    this.result = this.tidyNalarAnswer(d.answer || answer);
                     this.externalFlow = false;
                     this.externalPaste = '';
                     this.editing = false;
@@ -1029,7 +1140,7 @@
             async attachQuizPreviewToMessage(msg) {
                 if (!msg?.text || !this.urls.quizPreview) return;
                 // Hanya pratinjau bila teks tampak seperti dokumen soal (kop / SOAL EVALUASI / kunci).
-                if (!/SOAL EVALUASI|Kunci Jawaban|Bagian\s+[A-Z]\s*-/i.test(msg.text)) return;
+                if (!this.looksLikeQuizDocument(msg.text)) return;
                 try {
                     const r = await fetch(this.urls.quizPreview, {
                         method: 'POST',
@@ -1057,6 +1168,51 @@
                 this.error = '';
                 this.refreshPreview();
                 this.$nextTick(() => window.lucide && lucide.createIcons());
+            },
+
+            /** Rapikan jawaban Nalar agar siap disalin (teks polos, spasi konsisten). */
+            tidyNalarAnswer(raw) {
+                let text = String(raw || '').replace(/\r\n?/g, '\n').trim();
+                if (!text) return '';
+
+                // Lepas Markdown ringan yang sering bocor meski sudah diminta teks polos.
+                text = text
+                    .replace(/^#{1,6}\s+/gm, '')
+                    .replace(/\*\*(.*?)\*\*/g, '$1')
+                    .replace(/__(.*?)__/g, '$1')
+                    .replace(/\*([^*\n]+)\*/g, '$1')
+                    // Hanya _italic_ berbatas kata; jangan makan snake_case (nilai_rata_rata).
+                    .replace(/(^|[\s(])_([^_\s][^_\n]*)_(?=[\s).,]|$)/g, '$1$2')
+                    .replace(/`([^`\n]+)`/g, '$1')
+                    .replace(/^>\s?/gm, '')
+                    .replace(/```[\s\S]*?```/g, (block) => block.replace(/```\w*\n?/g, '').trim());
+
+                // Rapikan spasi & baris kosong (maks 1 baris kosong antar blok).
+                text = text
+                    .replace(/[ \t]+\n/g, '\n')
+                    .replace(/\n{3,}/g, '\n\n')
+                    .trim();
+
+                return text;
+            },
+
+            geminiMessageKey(msg) {
+                if (!msg) return '';
+                return String(msg.role || '') + ':' + String(msg.text || '').slice(0, 80);
+            },
+
+            copyGeminiMessage(msg) {
+                const text = this.tidyNalarAnswer(msg?.text || '');
+                if (!text) return;
+                navigator.clipboard.writeText(text).then(() => {
+                    if (this.copiedMessageTimer) clearTimeout(this.copiedMessageTimer);
+                    this.copiedMessageKey = this.geminiMessageKey(msg);
+                    this.$nextTick(() => window.lucide && lucide.createIcons());
+                    this.copiedMessageTimer = setTimeout(() => {
+                        this.copiedMessageKey = '';
+                        this.$nextTick(() => window.lucide && lucide.createIcons());
+                    }, 2000);
+                });
             },
 
             async saveGeminiApiKey() {
@@ -1411,8 +1567,30 @@
                 };
             },
 
-            openSendToArena() {
-                if (!this.result || this.tab !== 'quiz' || !this.arenaClassrooms.length) return;
+            sendGeminiToArena(msg) {
+                if (!msg?.text || !this.arenaBelajarAktif || !this.arenaClassrooms.length || this.sendingArena) return;
+                if (!this.looksLikeQuizDocument(msg.text)) {
+                    this.error = 'Jawaban ini belum berbentuk soal. Minta Nalar membuat soal (SOAL EVALUASI), atau buka di Generator Soal dulu.';
+                    return;
+                }
+                this.result = msg.text;
+                this.openSendToArena({ fromNalar: true });
+            },
+
+            looksLikeQuizDocument(text) {
+                const t = String(text || '').trim();
+                if (!t) return false;
+                if (/SOAL EVALUASI|Kunci Jawaban|Bagian\s+[A-Z]\s*-/i.test(t)) return true;
+                return /^\s*\d+[\.\)]\s+\S/m.test(t) && /^\s*[A-Da-d][\.\)]\s+\S/m.test(t);
+            },
+
+            openSendToArena(opts = {}) {
+                if (!this.result || !this.arenaBelajarAktif || !this.arenaClassrooms.length) return;
+                if (!this.looksLikeQuizDocument(this.result)) {
+                    this.error = 'Teks hasil belum berbentuk soal yang bisa diimpor ke Arena.';
+                    return;
+                }
+                this._arenaFromNalar = !!opts.fromNalar || this.tab === 'gemini';
                 if (this.arenaClassrooms.length === 1) {
                     this.arenaClassroomId = this.arenaClassrooms[0].uuid;
                     this.sendToArena();
@@ -1434,10 +1612,18 @@
                 csrf.name = '_token';
                 csrf.value = document.querySelector('meta[name="csrf-token"]').content;
                 form.appendChild(csrf);
+                const fromNalar = this._arenaFromNalar || this.tab === 'gemini';
+                const defaultTitle = fromNalar
+                    ? 'Kuis dari Nalar Guru'
+                    : 'Kuis dari Asisten Guru';
+                // Jangan pakai quiz.topik Generator Soal saat kirim dari Nalar.
+                const title = (! fromNalar && this.quiz.topik)
+                    ? ('Kuis: ' + this.quiz.topik)
+                    : defaultTitle;
                 const fields = {
                     classroom_id: this.arenaClassroomId,
                     raw_text: this.result,
-                    title: this.quiz.topik ? ('Kuis: ' + this.quiz.topik) : 'Kuis dari Asisten Guru',
+                    title,
                 };
                 Object.entries(fields).forEach(([name, value]) => {
                     const input = document.createElement('input');
@@ -1570,10 +1756,14 @@
                 if (item.type === 'gemini_chat') {
                     this.tab = 'gemini';
                     const prompt = (item.metadata && item.metadata.prompt) || item.title || '';
-                    const answer = item.answer || '';
+                    const answer = this.tidyNalarAnswer(item.answer || '');
                     this.geminiMessages = [];
                     if (prompt) this.geminiMessages.push({ role: 'user', text: prompt });
-                    if (answer) this.geminiMessages.push({ role: 'assistant', text: answer });
+                    if (answer) {
+                        const msg = { role: 'assistant', text: answer, previewHtml: '' };
+                        this.geminiMessages.push(msg);
+                        this.attachQuizPreviewToMessage(msg);
+                    }
                     this.$nextTick(() => {
                         window.lucide && lucide.createIcons();
                         if (this.$refs.geminiScroll) this.$refs.geminiScroll.scrollTop = this.$refs.geminiScroll.scrollHeight;

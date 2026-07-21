@@ -1,13 +1,19 @@
 @extends('layouts.app')
 @section('title', 'Arena Belajar — Misi — ' . $classroom->title)
 
+@push('styles')
+@include('arena-belajar.partials.game-styles')
+@endpush
+
 @section('content')
-<div class="space-y-5 max-w-4xl mx-auto">
+<div class="space-y-5 max-w-4xl mx-auto arena-stage">
     <div class="rounded-2xl p-5 sm:p-7 text-white relative overflow-hidden"
          style="background:radial-gradient(ellipse 70% 50% at 10% 0%,color-mix(in srgb,var(--cp) 50%,transparent),transparent 60%),linear-gradient(155deg,#0c1a24,#152836 55%,#0f2430)">
         <div class="relative z-[1]">
-            <a href="{{ route('classroom.arena.index', $classroom) }}" class="text-xs text-slate-300/90 hover:text-white inline-flex items-center gap-1 mb-3">
-                <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> Arena Belajar
+            <a href="{{ route('classroom.arena.index', ['classroom' => $classroom, 'mode' => 'misi']) }}"
+               class="arena-hud-back !bg-white/15 !border-white/20 !text-white !shadow-none hover:!bg-white/25 mb-3 inline-flex">
+                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                <span>Lobby Arena</span>
             </a>
             <h1 class="text-2xl sm:text-3xl font-black tracking-tight">Misi</h1>
             <p class="text-sm text-slate-300 mt-1.5">Misi edukatif interaktif untuk kelas ini.</p>
@@ -61,7 +67,7 @@
                     <span class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300">
                         {{ $a->isOpen() ? 'Aktif' : 'Tertutup' }}
                     </span>
-                    <span class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500">{{ $mission->mechanic_type }}</span>
+                    <span class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500">{{ $mission->mechanicLabel() }}</span>
                 </div>
                 <h3 class="font-black text-slate-800 dark:text-slate-100 truncate text-base">{{ $mission->title }}</h3>
                 <p class="text-xs text-slate-500 mt-1">
@@ -82,7 +88,7 @@
             <i data-lucide="compass" class="w-10 h-10 mx-auto mb-2 opacity-30"></i>
             <p>Belum ada misi ditugaskan ke kelas ini.</p>
             @if($canManage)
-            <p class="text-sm mt-1">Pilih misi dari katalog di atas atau buat di <a href="{{ route('jagat-misi.builder.index') }}" class="text-primary font-semibold">Builder Misi</a>.</p>
+            <p class="text-sm mt-1">Pilih misi siap main dari katalog, lalu tugaskan ke kelas. <a href="{{ route('jagat-misi.builder.index') }}" class="text-primary font-semibold">Kelola katalog</a>.</p>
             @endif
         </div>
         @endforelse

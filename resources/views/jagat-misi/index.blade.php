@@ -14,27 +14,27 @@
         ['#12345b', '#00a99d'],
         ['#f5a524', '#12345b'],
     ];
-    $mechanicLabels = [
-        'nalar_bundle' => 'Nalar',
-        'recall_quiz_bundle' => 'Kuis recall',
-        'recall_quiz' => 'Kuis recall',
-        'interactive_narrative' => 'Narasi',
-        'strategic_decision' => 'Keputusan',
-        'puzzle_sequencing' => 'Puzzle',
-        'quiz_matching' => 'Menjodohkan',
-    ];
 @endphp
 
 @section('content')
 <div class="space-y-5 arena-stage">
     <div class="arena-hero p-5 sm:p-8 relative">
         <div class="arena-hero-stars" aria-hidden="true"></div>
-        <div class="relative z-[1] arena-intro">
+        <a href="{{ route('dashboard') }}" class="arena-hero-back">
+            <i data-lucide="chevron-left" class="w-4 h-4"></i>
+            <span>Dashboard</span>
+        </a>
+        <div class="relative z-[1] arena-intro arena-intro-katalog">
+            <div class="arena-planet" aria-hidden="true">
+                <div class="arena-orbit arena-orbit-a"><span class="arena-orbit-dot"></span></div>
+                <div class="arena-orbit arena-orbit-b"></div>
+                <div class="arena-planet-core">AB</div>
+            </div>
             <div>
                 <p class="arena-eyebrow">Arena Belajar</p>
                 <h1 class="arena-title">Katalog Misi</h1>
                 <p class="text-sm sm:text-base text-white/75 mt-2.5 max-w-lg leading-relaxed">
-                    Pilih misi nalar, puzzle, atau recall — main solo atau lewat penugasan kelas.
+                    Pilih misi cerita, keputusan, puzzle, atau kuis dalam misi — main solo atau lewat penugasan kelas.
                 </p>
                 <div class="arena-cta-row mt-5">
                     <a href="{{ route('jagat-misi.progress') }}" class="arena-cta arena-cta-amber">
@@ -42,18 +42,13 @@
                     </a>
                     @can('create', \App\Models\Mission::class)
                     <a href="{{ route('jagat-misi.builder.index') }}" class="arena-cta">
-                        <i data-lucide="compass" class="w-4 h-4"></i> Builder Misi
+                        <i data-lucide="folder-cog" class="w-4 h-4"></i> Kelola katalog
                     </a>
                     @endcan
                     @can('viewAnalytics', \App\Models\Mission::class)
                     <a href="{{ route('jagat-misi.analytics') }}" class="arena-cta arena-cta-ghost">Analitik</a>
                     @endcan
                 </div>
-            </div>
-            <div class="arena-planet" aria-hidden="true">
-                <div class="arena-orbit arena-orbit-a"><span class="arena-orbit-dot"></span></div>
-                <div class="arena-orbit arena-orbit-b"></div>
-                <div class="arena-planet-core">AB</div>
             </div>
         </div>
     </div>
@@ -133,7 +128,7 @@
 
     <div>
         <h2 class="text-lg font-black text-slate-800 dark:text-slate-100">Katalog Misi</h2>
-        <p class="text-sm text-slate-500 dark:text-slate-400">Misi nalar, puzzle, atau recall — main solo atau lewat penugasan kelas.</p>
+        <p class="text-sm text-slate-500 dark:text-slate-400">Misi cerita, keputusan, puzzle, atau kuis dalam misi — main solo atau lewat penugasan kelas.</p>
     </div>
     <div class="arena-catalog-grid">
         @forelse($missions as $mission)
@@ -144,7 +139,7 @@
             [$artA, $artB] = $artPairs[$loop->index % count($artPairs)];
             $jenjangKey = $mission->jenjangKey();
             $jenjangLabel = $mission->jenjangLabel();
-            $mechanicLabel = $mechanicLabels[$mission->mechanic_type] ?? str_replace('_', ' ', $mission->mechanic_type);
+            $mechanicLabel = $mission->mechanicLabel();
             $displayTitle = trim(preg_replace('/^\[(?:DEMO|Tren)\]\s*/u', '', $mission->title) ?? $mission->title);
             $displaySummary = trim(preg_replace('/^\[(?:Tren\s*2025[–-]2026\s*·\s*)?(?:SD|SMP|SMA\/?SMK)\]\s*/u', '', (string) $mission->summary));
             $isTren = $mission->isTren();
@@ -182,7 +177,7 @@
         @empty
         <div class="arena-panel text-center py-12 arena-catalog-empty">
             <p class="font-black text-lg text-slate-700 dark:text-slate-200">Belum ada misi terbit</p>
-            <p class="text-sm text-slate-500 mt-1">Jalankan seeder Arena / Jagat Misi untuk mengisi katalog.</p>
+            <p class="text-sm text-slate-500 mt-1">Jalankan seeder misi Arena Belajar untuk mengisi katalog yang siap dimainkan.</p>
         </div>
         @endforelse
     </div>
