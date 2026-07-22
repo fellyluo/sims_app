@@ -189,8 +189,10 @@ class KartuPelajarController extends Controller
     }
 
     /**
-     * Cetak massal kartu pelajar per tingkat: A4 potret, 10 kartu/halaman,
+     * Cetak massal kartu pelajar per tingkat: A4 potret, 8 kartu/halaman (4 baris × 2),
      * ukuran kartu ATM (CR80, 85,6×54 mm). Admin only.
+     * CATATAN: jangan 10/halaman — tinggi 5 baris (±286mm) melebihi area cetak A4 (±281mm),
+     * baris ke-5 meluber sehingga muncul halaman "sisa" berisi 2 kartu + banyak ruang kosong.
      */
     public function cetakTingkat(Request $request)
     {
@@ -209,7 +211,7 @@ class KartuPelajarController extends Controller
         $cards = $siswa->map(fn (Siswa $s) => ['siswa' => $s, 'qrUri' => $this->qrUri($s)]);
 
         return Pdf::loadView('kartu-pelajar.cetak-massal', [
-            'pages'   => $cards->chunk(10)->values(),
+            'pages'   => $cards->chunk(8)->values(),
             'sekolah' => $this->schoolInfo(),
             'logoUri' => $this->fileToDataUri(Setting::get('sekolah_logo')),
             'tingkat' => $tingkat,

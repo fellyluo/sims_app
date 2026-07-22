@@ -54,7 +54,7 @@ class GuruController extends Controller
         // Buat akun login
         $identifier = $data['nik'] ?? $data['nip'] ?? null;
         $username = $identifier ?? (Str::slug($data['nama'], '.') . '.' . Str::random(4));
-        $password = Str::random(8);
+        $password = \App\Support\PasswordSederhana::buat();
 
         $user = User::create([
             'username'   => $username,
@@ -137,7 +137,7 @@ class GuruController extends Controller
     public function reset(string $uuid)
     {
         $guru = Guru::findOrFail($uuid);
-        $password = Str::random(8);
+        $password = \App\Support\PasswordSederhana::buat();
 
         if ($guru->user) {
             $guru->user->update([

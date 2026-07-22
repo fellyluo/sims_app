@@ -134,6 +134,14 @@
                         <i data-lucide="sun" class="w-3.5 h-3.5 flex-shrink-0"></i>
                         <span class="truncate" x-text="autoExposureOn ? 'Pencahayaan rendah — auto exposure & kecerahan aktif' : 'Pencahayaan rendah — kecerahan otomatis aktif'"></span>
                     </div>
+
+                    {{-- Muncul kalau beberapa detik beruntun Human sama sekali tidak menemukan
+                         wajah di frame — biar pengguna tahu harus berbuat apa, bukan cuma diam
+                         menunggu tanpa petunjuk ("susah terdeteksi" tanpa tahu kenapa). --}}
+                    <div x-show="scanning && noFaceHint" x-cloak class="self-start flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500/85 backdrop-blur text-white text-xs font-semibold pointer-events-auto max-w-full">
+                        <i data-lucide="scan-face" class="w-3.5 h-3.5 flex-shrink-0"></i>
+                        <span class="truncate">Wajah tidak terlihat — pastikan wajah masuk kamera & cukup terang</span>
+                    </div>
                 </div>
 
                 {{-- Flash nama besar saat dikenali --}}
@@ -341,7 +349,12 @@ async function loadHuman(){
     human = new HumanLib({
         modelBasePath:'https://vladmandic.github.io/human-models/models/',
         backend: backend, cacheSensitivity: 0, warmup:'none',
-        face:{ enabled:true, detector:{ maxDetected:5, minConfidence:0.45 }, mesh:{enabled:true}, iris:{enabled:false},
+        // minConfidence diturunkan 0.45→0.35: ini ambang DETEKSI kotak wajah (ada wajah atau
+        // tidak), bukan ambang KECOCOKAN identitas — kalau kotaknya sendiri gagal muncul (sudut
+        // agak miring, sebagian tertutup hijab/masker di dagu-dahi, cahaya kurang), tidak ada
+        // proses pencocokan apa pun yang sempat jalan; pengguna cuma melihat kamera diam tanpa
+        // kotak sama sekali, jauh lebih membingungkan drpd kotak muncul tapi belum cocok.
+        face:{ enabled:true, detector:{ maxDetected:5, minConfidence:0.35 }, mesh:{enabled:true}, iris:{enabled:false},
                description:{enabled:true}, emotion:{enabled:false}, antispoof:{enabled:false}, liveness:{enabled:false} },
         body:{enabled:false}, hand:{enabled:false}, object:{enabled:false}, gesture:{enabled:false},
         filter:{enabled:false}, segmentation:{enabled:false},
@@ -373,23 +386,27 @@ function faceScan(data, opts={}){
         attendees: data.map(s=>({ ...s, marked: s.status==='hadir', justMarked:false, pulangMarked: !!s.pulangDone, jam_masuk: s.jam_masuk, jam_pulang: s.jam_pulang })),
         enrolled:[], stream:null, timer:null,
         // ===== Ambang pencocokan =====
-        // DIPERKETAT lagi setelah laporan lapangan: dengan galeri >200 wajah, kalibrasi longgar
-        // (threshold 0.66 + konfirmasi 1 frame + margin 0.05) sempat MENGABSENKAN ORANG LAIN
-        // (salah identitas). Ambang dinaikkan + wajib cocok 2 frame pada ORANG YANG SAMA sebelum
-        // absen tercatat — false positive sekejap 1 frame tidak lagi langsung mengunci nama.
-        threshold:0.70,
-        confidentThreshold:0.85,
+        // Strategi: SKOR longgar + KONSISTENSI ketat. Riwayat kalibrasi:
+        // (1) ambang ketat → "susah terdeteksi"; (2) dilonggarkan + konfirmasi 1 frame →
+        // "mengabsenkan ORANG LAIN"; (3) semua dinaikkan → "susah terdeteksi" lagi.
+        // Pelajaran: pengaman salah-orang paling efektif adalah KONFIRMASI 2 FRAME pada orang
+        // yang sama (match salah tidak stabil antar frame, match benar stabil) + margin ke
+        // kandidat kedua — BUKAN ambang skor tinggi. Maka ambang skor dikembalikan ke level
+        // yang terbukti mudah mendeteksi, sementara confirmFrames:2 dipertahankan.
+        threshold:0.66,
+        confidentThreshold:0.82,
         supportThreshold:0.62,
         minSampleSupport:2,
-        singleSampleTop1:0.78, // 1 sampel cukup bila top1 sangat yakin
-        margin:0.07,           // jarak minimal ke kandidat kedua — nama mirip tidak boleh menang tipis
-        minFaceFrac:0.14,
+        singleSampleTop1:0.72, // 1 sampel cukup bila top1 sangat yakin
+        margin:0.06,           // jarak minimal ke kandidat kedua — nama mirip tidak boleh menang tipis
+        minFaceFrac:0.12,      // wajah boleh sedikit lebih jauh dari kamera (dulu 0.14)
         minFaceScore:0.55,
-        confirmFrames:2,
+        confirmFrames:2,       // JANGAN turunkan ke 1 — ini penahan utama "salah orang"
         _streak:{},
         _faceLocked:{},
         _scanPauseUntil:0,
         recent:[], lastMatch:null, _seq:0, audioCtx:null,
+        _noFaceStreak:0, noFaceHint:false,
         scanMode:'masuk',
         activeTab: 'siswa',
         siswaSearch: '',
@@ -827,6 +844,17 @@ function faceScan(data, opts={}){
 
             const seenThisFrame = new Set();   // uuid yang lolos gate di frame ini (utk konfirmasi lintas-frame)
 
+            // Tidak ada wajah SAMA SEKALI terdeteksi Human (bukan soal cocok/tidak cocok) —
+            // sebelum ini pengguna tidak dapat petunjuk apa pun saat kasus ini terjadi terus-
+            // menerus (kamera gelap/wajah di luar frame/tertutup masker-hijab menutup dagu&dahi).
+            if(!(res.face||[]).length){
+                this._noFaceStreak = (this._noFaceStreak||0) + 1;
+                this.noFaceHint = this._noFaceStreak >= 10; // ~beberapa detik beruntun tanpa wajah
+            } else {
+                this._noFaceStreak = 0;
+                this.noFaceHint = false;
+            }
+
             (res.face||[]).forEach(f=>{
                 if(!f.embedding || !f.box) return;
                 const b=f.box; // [x,y,w,h]
@@ -865,8 +893,17 @@ function faceScan(data, opts={}){
                     else if(!clearGap){ this.recordDiag('small_margin', meta); }
                     else if(!sampleAgreement){ this.recordDiag('low_support', meta); }
 
-                    if((bestMatch?.top1 || bestSim) >= this.supportThreshold && bigEnough){
-                        label='Dekatkan wajah'; color='#f59e0b';
+                    // Label sesuai gate yang SEBENARNYA gagal — sebelumnya kasus paling umum di
+                    // lapangan (wajah masih terlalu kecil/jauh dari kamera, bigEnough=false) malah
+                    // jatuh ke '—' polos tanpa petunjuk apa pun, sementara "Dekatkan wajah" (yang
+                    // seharusnya soal jarak) hanya muncul saat wajah SUDAH cukup besar. Pengguna
+                    // yang berdiri di jarak wajar dari kiosk tidak pernah diberi tahu utk mendekat.
+                    if(!bigEnough){
+                        label='Mendekat ke kamera'; color='#f59e0b';
+                    } else if(faceScore < this.minFaceScore){
+                        label='Tahan diam, perbaiki cahaya'; color='#f59e0b';
+                    } else if((bestMatch?.top1 || bestSim) >= this.supportThreshold){
+                        label='Perjelas wajah'; color='#f59e0b';
                     } else {
                         label='—'; color='#94a3b8';
                     }
@@ -1148,12 +1185,23 @@ function faceScan(data, opts={}){
             this.barcodeError = '';
             if(!barcode){ this.barcodeError = 'Kode kartu kosong.'; this.barcodeBusy = false; return; }
             if(!this.markBarcodeUrl){ this.barcodeError = 'Endpoint kartu pelajar tidak tersedia.'; this.barcodeBusy = false; return; }
-            // Kartu hanya berlaku sekali — kalau siswanya sudah tercatat hadir di daftar,
-            // tolak langsung tanpa ke server (server tetap punya guard yang sama utk kartu
-            // yang tidak ada di daftar, mis. payload NISN).
-            const known = this.attendees.find(x => x.type==='siswa' && (x.uuid === barcode || String(x.nis) === barcode));
-            if(known && known.marked){
-                this.barcodeError = known.nama + ' sudah absen' + (known.jam_masuk ? ' ' + known.jam_masuk : '') + ' — kartu hanya berlaku sekali.';
+            // Kartu hanya berlaku sekali — kalau orangnya sudah tercatat hadir (siswa) atau
+            // sudah absen di mode saat ini (guru: masuk/pulang terpisah) di daftar, tolak
+            // langsung tanpa ke server (server tetap punya guard yang sama utk kartu yang
+            // tidak ada di daftar lokal, mis. payload NISN/NIP yang belum sinkron).
+            const knownSiswa = this.attendees.find(x => x.type==='siswa' && (x.uuid === barcode || String(x.nis) === barcode));
+            if(knownSiswa && knownSiswa.marked){
+                this.barcodeError = knownSiswa.nama + ' sudah absen' + (knownSiswa.jam_masuk ? ' ' + knownSiswa.jam_masuk : '') + ' — kartu hanya berlaku sekali.';
+                this.playError();
+                showToast(this.barcodeError, 'error');
+                this.barcodeBusy = false;
+                if(this.showBarcodeModal && !this.barcodeScanner) this.startBarcodeScan();
+                return;
+            }
+            const knownGuru = this.attendees.find(x => x.type==='guru' && (x.uuid === barcode || String(x.nip||'') === barcode));
+            if(knownGuru && (this.scanMode==='pulang' ? knownGuru.pulangMarked : knownGuru.marked)){
+                const jamSudah = this.scanMode==='pulang' ? knownGuru.jam_pulang : knownGuru.jam_masuk;
+                this.barcodeError = knownGuru.nama + ' sudah absen ' + (this.scanMode==='pulang' ? 'pulang ' : '') + (jamSudah||'') + ' — kartu hanya berlaku sekali.';
                 this.playError();
                 showToast(this.barcodeError, 'error');
                 this.barcodeBusy = false;
@@ -1169,6 +1217,7 @@ function faceScan(data, opts={}){
                         barcode,
                         tanggal: this.tanggal || '{{ $tanggal }}',
                         id_kelas: this.kelasFilter || null,
+                        mode: this.scanMode, // relevan utk kartu ID guru (masuk/pulang)
                         _kiosk: this.kioskToken,
                     }),
                 });
@@ -1177,11 +1226,14 @@ function faceScan(data, opts={}){
                     this.barcodeError = (d && d.message) ? d.message : 'Gagal menandai hadir.';
                     this.playError();
                     showToast(this.barcodeError, 'error');
-                    // Server bilang duplikat → sinkronkan daftar lokal (mis. scan pakai NISN yang
-                    // tidak cocok dgn NIS di daftar) supaya cek lokal ikut menolak scan berikutnya.
+                    // Server bilang duplikat → sinkronkan daftar lokal (mis. scan pakai NISN/NIP yang
+                    // tidak cocok dgn field di daftar) supaya cek lokal ikut menolak scan berikutnya.
                     if(d && d.duplicate && d.uuid){
                         const dup = this.attendees.find(x => x.uuid === d.uuid);
-                        if(dup){ dup.marked = true; if(d.jam) dup.jam_masuk = d.jam; }
+                        if(dup){
+                            if(d.type==='guru' && d.mode==='pulang'){ dup.pulangMarked = true; if(d.jam) dup.jam_pulang = d.jam; }
+                            else { dup.marked = true; if(d.jam) dup.jam_masuk = d.jam; }
+                        }
                     }
                     this.barcodeBusy = false;
                     if(this.showBarcodeModal && !this.barcodeScanner) this.startBarcodeScan();
@@ -1189,14 +1241,27 @@ function faceScan(data, opts={}){
                 }
                 let s = this.attendees.find(x => x.uuid === d.uuid)
                     || this.attendees.find(x => x.type==='siswa' && (String(x.nis)===barcode || x.uuid===barcode));
-                if(!s && d.uuid){
+                if(!s && d.uuid && d.type !== 'guru'){
                     s = {
                         uuid: d.uuid, type: 'siswa', nama: d.nama || barcode, nis: d.nis || barcode,
                         kelas: d.kelas || '-', id_kelas: d.id_kelas, desc: [], marked: false,
                     };
                     this.attendees.push(s);
                 }
-                if(s){
+                if(s && d.type === 'guru'){
+                    // Kartu ID Guru — hormati toggle Masuk/Pulang yang sedang aktif di kiosk.
+                    const jamBaru = d.jam || this.nowHM();
+                    if(d.mode==='pulang'){ s.pulangMarked = true; s.jam_pulang = jamBaru; }
+                    else { s.marked = true; s.jam_masuk = jamBaru; }
+                    s.justMarked = true;
+                    this._faceLocked[d.uuid] = true;
+                    const key=++this._seq;
+                    this.playDing(); this.speak(d.mode==='pulang' ? 'pulang' : 'masuk', s.nama);
+                    this.lastMatch={ key, nama:s.nama, type:'guru', kelas:'Guru', mode:d.mode, jam:jamBaru, terlambat:!!d.terlambat };
+                    this.recent.unshift({ key, nama:s.nama.split(' ')[0], type:'guru', kelas: d.mode==='pulang' ? 'Pulang' : 'Guru', mode:d.mode, jam:jamBaru });
+                    if(this.recent.length>5) this.recent.pop();
+                    setTimeout(()=>{ s.justMarked=false; }, 1600);
+                } else if(s){
                     s.marked = true; s.justMarked = true; s.jam_masuk = d.jam || this.nowHM();
                     this._faceLocked[d.uuid] = true;
                     const key=++this._seq;

@@ -2,7 +2,7 @@
 @section('title', 'Data Siswa')
 
 @section('content')
-<div class="space-y-5" x-data="{ importModal: false, resetModal: false, scope: 'semua', tingkat: '', id_kelas: '', resetSubmitting: false }">
+<div class="space-y-5" x-data="{ importModal: false, resetModal: false, scope: 'semua', tingkat: '', id_kelas: '', target: 'keduanya', resetSubmitting: false }">
 
     @if(session()->has('import_kredensial_siswa'))
     <div class="card p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 flex items-center justify-between gap-3 flex-wrap">
@@ -261,8 +261,21 @@
                 <div class="p-5 space-y-4">
                     <div class="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-700 rounded-xl p-3 text-sm text-rose-800 dark:text-rose-300">
                         <p class="font-semibold mb-1">⚠️ Tindakan ini tidak bisa dibatalkan</p>
-                        <p class="text-xs">Password LAMA akun yang direset langsung tidak berlaku. Akun siswa & orang tuanya sekaligus direset. Segera unduh &amp; bagikan kredensial baru setelah ini.</p>
+                        <p class="text-xs">Password LAMA akun yang direset langsung tidak berlaku. Segera unduh &amp; bagikan kredensial baru setelah ini.</p>
                         <p class="text-xs mt-1">Untuk cakupan besar (semua siswa/tingkat penuh), proses bisa makan waktu beberapa menit — jangan tutup atau refresh halaman sampai selesai.</p>
+                    </div>
+
+                    {{-- Akun yang direset --}}
+                    <div>
+                        <p class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Akun yang direset</p>
+                        <div class="grid grid-cols-3 gap-2">
+                            @foreach(['keduanya' => 'Siswa + Ortu', 'siswa' => 'Siswa saja', 'ortu' => 'Ortu saja'] as $tVal => $tLbl)
+                            <label class="flex items-center justify-center gap-1.5 p-2 rounded-xl border border-slate-200 dark:border-slate-600 cursor-pointer text-center" :class="target==='{{ $tVal }}' && 'border-violet-400 bg-violet-50 dark:bg-violet-900/20'">
+                                <input type="radio" name="target" value="{{ $tVal }}" x-model="target" class="accent-violet-600">
+                                <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">{{ $tLbl }}</span>
+                            </label>
+                            @endforeach
+                        </div>
                     </div>
 
                     <div class="space-y-2">
@@ -323,10 +336,12 @@ function confirmResetBulk(form) {
         const opt = form.id_kelas.options[form.id_kelas.selectedIndex];
         target = opt ? opt.text : 'kelas terpilih';
     }
+    const t = form.querySelector('input[name=target]:checked')?.value || 'keduanya';
+    const akun = t === 'siswa' ? 'akun SISWA' : (t === 'ortu' ? 'akun ORANG TUA' : 'akun siswa & orang tua');
     $.confirm({
         theme: 'material', animation: 'scale', closeIcon: true, backgroundDismiss: true, useBootstrap: false, boxWidth: '420px',
         title: 'Reset password massal?',
-        content: `Password akun siswa & orang tua untuk <b>${target}</b> akan direset semua dan password lama langsung tidak berlaku. Lanjutkan?`,
+        content: `Password ${akun} untuk <b>${target}</b> akan direset semua dan password lama langsung tidak berlaku. Lanjutkan?`,
         type: 'red',
         buttons: {
             ya: { text: 'Ya, Reset Sekarang', btnClass: 'btn-red', action: function(){

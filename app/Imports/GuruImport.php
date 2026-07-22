@@ -54,7 +54,7 @@ class GuruImport implements ToCollection, WithStartRow
             $usernameGuru = $identifier ?? (Str::slug($nama, '.') . '.' . Str::random(4));
             
             // Akun guru
-            $passwordGuru = Str::random(8);
+            $passwordGuru = \App\Support\PasswordSederhana::buat();
             
             $userGuru = User::create([
                 'username'   => $usernameGuru,

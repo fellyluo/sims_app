@@ -317,6 +317,7 @@ class AbsensiController extends Controller
             'barcode'  => 'required|string|max:80',
             'tanggal'  => 'required|date',
             'id_kelas' => 'nullable|exists:kelas,uuid',
+            'mode'     => 'nullable|in:masuk,pulang', // hanya relevan utk kartu ID guru
         ]);
 
         $code = trim($data['barcode']);
@@ -326,6 +327,15 @@ class AbsensiController extends Controller
             return response()->json(['success' => false, 'message' => 'Kode kartu ambigu — hubungi admin untuk verifikasi data siswa.']);
         }
         if (! $siswa) {
+            // Bukan kartu siswa — coba Kartu ID Guru (payload NIP/NIK/UUID, lihat KartuGuruController).
+            $guru = $this->resolveGuruFromBarcode($code);
+            if ($guru === false) {
+                return response()->json(['success' => false, 'message' => 'Kartu ambigu — hubungi admin untuk verifikasi data guru.']);
+            }
+            if ($guru) {
+                return $this->markGuruByBarcode($request, $guru, $data['tanggal'], $data['mode'] ?? 'masuk');
+            }
+
             return response()->json(['success' => false, 'message' => 'Kartu tidak dikenali'.(! empty($data['id_kelas']) ? ' di kelas yang dipilih.' : '.')]);
         }
 
@@ -383,6 +393,73 @@ class AbsensiController extends Controller
         }
 
         return $byNisn->first();
+    }
+
+    /** Cari guru dari payload Kartu ID Guru (lihat KartuGuruController): UUID → NIP → NIK. */
+    private function resolveGuruFromBarcode(string $code): Guru|false|null
+    {
+        if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $code)) {
+            return Guru::where('uuid', $code)->first();
+        }
+
+        $byNip = Guru::where('nip', $code)->get();
+        if ($byNip->count() > 1) {
+            return false;
+        }
+        if ($byNip->count() === 1) {
+            return $byNip->first();
+        }
+
+        $byNik = Guru::where('nik', $code)->get();
+        if ($byNik->count() > 1) {
+            return false;
+        }
+
+        return $byNik->first();
+    }
+
+    /**
+     * Tandai guru hadir/pulang via Kartu ID (barcode/QR) — delegasi langsung ke
+     * PresensiGuruController::mark() (instance $request yang SAMA, jadi konteks
+     * auth/session/kiosk tetap konsisten — kedua route berada dalam middleware
+     * group yang sama), lalu lengkapi respons dgn identitas guru utk ditampilkan client.
+     */
+    private function markGuruByBarcode(Request $request, Guru $guru, string $tanggal, string $mode)
+    {
+        // Kartu hanya berlaku SEKALI per mode (masuk/pulang) per hari — tanpa guard ini,
+        // mark() cuma meng-update baris lama tanpa perubahan tapi tetap membalas sukses
+        // (sama seperti bug kartu siswa yang sudah diperbaiki sebelumnya).
+        $existing = PresensiGuru::where('id_guru', $guru->uuid)->where('tanggal', $tanggal)->first();
+        $sudahAda = $mode === 'pulang' ? ($existing && $existing->jam_pulang) : ($existing && $existing->jam_masuk);
+        if ($sudahAda) {
+            $jam = substr($mode === 'pulang' ? $existing->jam_pulang : $existing->jam_masuk, 0, 5);
+
+            return response()->json([
+                'success'   => false,
+                'duplicate' => true,
+                'type'      => 'guru',
+                'uuid'      => $guru->uuid,
+                'mode'      => $mode,
+                'jam'       => $jam,
+                'message'   => $guru->nama.' sudah absen '.($mode === 'pulang' ? 'pulang ' : '').$jam.' — kartu hanya berlaku sekali.',
+            ]);
+        }
+
+        $request->merge([
+            'id_guru' => $guru->uuid,
+            'tanggal' => $tanggal,
+            'status'  => 'hadir',
+            'mode'    => $mode,
+            '_via'    => 'barcode',
+        ]);
+
+        $response = app(PresensiGuruController::class)->mark($request);
+        $payload  = json_decode($response->getContent(), true) ?? [];
+        $payload['type'] = 'guru';
+        $payload['uuid'] = $guru->uuid;
+        $payload['nama'] = $guru->nama;
+
+        return response()->json($payload, $response->getStatusCode());
     }
 
     /** Tandai 1 siswa hadir (AJAX dari scan wajah atau fallback kartu pelajar). */

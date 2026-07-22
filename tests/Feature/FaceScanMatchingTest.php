@@ -10,19 +10,23 @@ class FaceScanMatchingTest extends TestCase
     {
         $source = file_get_contents(resource_path('views/absensi/scan.blade.php'));
 
-        // Kalibrasi anti-salah-orang (Jul 2026): galeri >200 wajah + threshold 0.66 +
-        // konfirmasi 1 frame sempat mengabsenkan ORANG LAIN — ambang diperketat dan
-        // wajib cocok 2 frame pada orang yang sama sebelum absen dikunci.
-        $this->assertStringContainsString('threshold:0.70', $source);
-        $this->assertStringContainsString('confidentThreshold:0.85', $source);
+        // Kalibrasi (Jul 2026, ronde ke-4): riwayat commit menunjukkan threshold/margin/
+        // confirmFrames sudah bolak-balik dinaikkan-diturunkan berkali-kali (0.5→0.62→0.58→
+        // 0.66→0.58→0.66→0.70→0.66) — pola ping-pong yg tak pernah stabil menandakan angka
+        // BUKAN akar masalah "susah terdeteksi". Skor kecocokan dikembalikan ke titik longgar
+        // yang historis terbukti mudah mendeteksi (0.66), sementara confirmFrames:2 (bukan 1)
+        // dipertahankan sbg penahan utama anti-salah-orang: match yg salah tidak stabil antar
+        // frame, match yg benar stabil — jauh lebih efektif drpd menaikkan ambang skor.
+        $this->assertStringContainsString('threshold:0.66', $source);
+        $this->assertStringContainsString('confidentThreshold:0.82', $source);
         $this->assertStringContainsString('supportThreshold:0.62', $source);
         $this->assertStringContainsString('minSampleSupport:2', $source);
-        $this->assertStringContainsString('margin:0.07', $source);
+        $this->assertStringContainsString('margin:0.06', $source);
         $this->assertStringContainsString('confirmFrames:2', $source);
         $this->assertStringContainsString('_faceLocked', $source);
         $this->assertStringContainsString('isKiosk', $source);
         $this->assertStringContainsString('afterFaceMarkSuccess', $source);
-        $this->assertStringContainsString('singleSampleTop1:0.78', $source);
+        $this->assertStringContainsString('singleSampleTop1:0.72', $source);
         $this->assertStringContainsString('robustPersonSimilarity(faceEmbedding, descriptors)', $source);
         $this->assertStringContainsString('hasEnoughSampleAgreement(match)', $source);
         $this->assertStringContainsString('rebuildEnrolled', $source);
@@ -34,9 +38,28 @@ class FaceScanMatchingTest extends TestCase
         $this->assertStringContainsString('previewBrightness', $source);
         $this->assertStringContainsString('maybeAdjustHardwareExposure', $source);
         $this->assertStringNotContainsString('threshold:0.58', $source);
-        $this->assertStringNotContainsString('threshold:0.66', $source);
+        $this->assertStringNotContainsString('threshold:0.70', $source);
         $this->assertStringNotContainsString('confirmFrames:1,', $source);
         $this->assertStringNotContainsString('confirmFrames:4', $source);
+    }
+
+    public function test_label_petunjuk_akurat_sesuai_gate_yang_gagal(): void
+    {
+        // Regresi konkret: label 'Dekatkan wajah' dulu HANYA muncul saat wajah SUDAH cukup
+        // besar (bigEnough=true) — kasus paling umum di lapangan (wajah masih kecil/jauh dari
+        // kamera) malah jatuh ke '—' polos tanpa petunjuk sama sekali. Pengguna yang berdiri
+        // di jarak wajar dari kiosk tidak pernah diberi tahu utk mendekat — ini kandidat kuat
+        // penyebab "susah terdeteksi" krn gagal SENYAP tanpa ada yg bisa dikoreksi pengguna.
+        $source = file_get_contents(resource_path('views/absensi/scan.blade.php'));
+
+        $this->assertStringContainsString("label='Mendekat ke kamera'", $source);
+        $this->assertStringContainsString("label='Tahan diam, perbaiki cahaya'", $source);
+        $this->assertStringContainsString("label='Perjelas wajah'", $source);
+        // Badge saat Human sama sekali tidak menemukan wajah di frame (bukan soal cocok/tidak)
+        $this->assertStringContainsString('noFaceHint', $source);
+        $this->assertStringContainsString('Wajah tidak terlihat', $source);
+        // minConfidence detektor diturunkan agar sudut/wajah tertutup sebagian tetap terdeteksi
+        $this->assertStringContainsString('minConfidence:0.35', $source);
     }
 
     public function test_kamera_wajah_juga_membaca_qr_kartu(): void

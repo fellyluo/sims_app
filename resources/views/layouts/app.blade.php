@@ -457,6 +457,7 @@
                         if ($modulOn('kartu_pelajar')) {
                             $masterItems[] = ['kartu-pelajar.kelola', ['kartu-pelajar.kelola'], 'id-card', 'Kartu Pelajar'];
                         }
+                        $masterItems[] = ['kartu-guru.kelola', ['kartu-guru.*'], 'contact-round', 'Kartu ID Guru'];
                     }
                     if (!empty($masterItems)) {
                         $groups['master'] = ['Data Master', 'database', $masterItems];
@@ -758,6 +759,12 @@
             <a href="{{ route('kartu-pelajar.self') }}" data-tip="Kartu Pelajar" class="nav-link flex items-center px-3 py-2.5 {{ request()->routeIs('kartu-pelajar.self') ? 'active' : '' }}" :class="mini ? 'justify-center' : 'gap-3'">
                 <i data-lucide="id-card" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
                 <span x-show="!mini" class="text-sm truncate">Kartu Pelajar</span>
+            </a>
+            @endif
+            @if(auth()->user()?->guru)
+            <a href="{{ route('kartu-guru.self') }}" data-tip="Kartu ID Saya" class="nav-link flex items-center px-3 py-2.5 {{ request()->routeIs('kartu-guru.self') ? 'active' : '' }}" :class="mini ? 'justify-center' : 'gap-3'">
+                <i data-lucide="contact-round" class="nav-icon w-[18px] h-[18px] flex-shrink-0"></i>
+                <span x-show="!mini" class="text-sm truncate">Kartu ID Saya</span>
             </a>
             @endif
 

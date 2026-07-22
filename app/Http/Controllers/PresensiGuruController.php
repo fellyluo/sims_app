@@ -99,15 +99,26 @@ class PresensiGuruController extends Controller
             'tanggal' => 'required|date',
             'status'  => 'nullable|in:hadir,izin,sakit,alpa',
             'mode'    => 'nullable|in:masuk,pulang',
+            '_via'    => 'nullable|in:face,barcode',
         ]);
         $mode = $data['mode'] ?? 'masuk';
 
-        // Metode absensi guru aktif harus "Scan Wajah".
-        if (!\App\Support\AbsensiGuru::bolehWajah()) {
+        // Gate metode per-via (pola sama dgn AbsensiController::mark siswa): via wajah butuh
+        // metode wajah aktif sekolah + kamera kiosk tidak disetel QR-saja; via Kartu ID (barcode/
+        // QR) sah selama metode wajah aktif ATAU kamera kiosk membaca QR — supaya Kartu ID Guru
+        // tetap bisa dipakai walau sekolah menyetel "Scan Wajah" sbg metode self-service default.
+        $viaBarcode = ($data['_via'] ?? 'face') === 'barcode';
+        $scanKioskMode = \App\Models\Setting::get('scan_kiosk_mode', 'keduanya');
+        $bolehVia = $viaBarcode
+            ? (\App\Support\AbsensiGuru::bolehWajah() || in_array($scanKioskMode, ['qr', 'keduanya'], true))
+            : (\App\Support\AbsensiGuru::bolehWajah() && $scanKioskMode !== 'qr');
+        if (! $bolehVia) {
             return response()->json([
                 'success' => false,
                 'blocked' => true,
-                'message' => \App\Support\AbsensiGuru::pesanKunci('Scan Wajah'),
+                'message' => $viaBarcode
+                    ? 'Absensi via Kartu ID sedang dikunci. Ubah mode kamera di Pengaturan → Absensi.'
+                    : \App\Support\AbsensiGuru::pesanKunci('Scan Wajah'),
             ]);
         }
 
@@ -147,7 +158,7 @@ class PresensiGuruController extends Controller
         $row->status       = 'hadir';
         $row->dicatat_oleh = auth()->id();
         if (empty($row->keterangan)) {
-            $row->keterangan = 'Scan wajah';
+            $row->keterangan = $viaBarcode ? 'Kartu ID (barcode)' : 'Scan wajah';
         }
 
         if ($mode === 'pulang') {

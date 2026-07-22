@@ -800,7 +800,17 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
             Route::get('/kartu-pelajar/kelola/{siswa}/lihat', [KartuPelajarController::class, 'lihatAdmin'])->name('kartu-pelajar.kelola.lihat');
             Route::delete('/kartu-pelajar/kelola/{siswa}', [KartuPelajarController::class, 'destroy'])->name('kartu-pelajar.destroy');
         });
+
+        // Kartu ID Guru — generate kartu identitas guru otomatis (admin)
+        Route::get('/kartu-guru', [\App\Http\Controllers\KartuGuruController::class, 'kelola'])->name('kartu-guru.kelola');
+        Route::get('/kartu-guru/cetak', [\App\Http\Controllers\KartuGuruController::class, 'cetakSemua'])->name('kartu-guru.cetak');
+        Route::post('/kartu-guru/{guru}/foto', [\App\Http\Controllers\KartuGuruController::class, 'fotoStore'])->name('kartu-guru.foto');
+        Route::delete('/kartu-guru/{guru}/foto', [\App\Http\Controllers\KartuGuruController::class, 'fotoHapus'])->name('kartu-guru.foto.hapus');
+        Route::get('/kartu-guru/{guru}/lihat', [\App\Http\Controllers\KartuGuruController::class, 'lihat'])->name('kartu-guru.lihat');
     });
+
+    // Kartu ID digital milik guru sendiri — akun guru mana pun (bukan hanya manage_users)
+    Route::get('/kartu-saya', [\App\Http\Controllers\KartuGuruController::class, 'self'])->name('kartu-guru.self');
 
     // ─── Cetak Data (admin only) — export Excel siswa/guru/kelas/absensi guru/agenda/nilai ───
     Route::middleware(['role:admin', 'modul:cetak'])->prefix('cetak')->name('cetak.')->controller(CetakController::class)->group(function () {

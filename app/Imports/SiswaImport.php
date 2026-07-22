@@ -48,7 +48,7 @@ class SiswaImport implements ToCollection, WithStartRow
             $nis = $inputNis;
 
             // Akun siswa
-            $passwordSiswa = Str::random(8);
+            $passwordSiswa = \App\Support\PasswordSederhana::buat();
             $usernameSiswa = $nis;
             $userSiswa = User::create([
                 'username'   => $usernameSiswa,
@@ -83,7 +83,7 @@ class SiswaImport implements ToCollection, WithStartRow
             ]);
 
             // Akun orang tua
-            $passwordOrtu = Str::random(8);
+            $passwordOrtu = \App\Support\PasswordSederhana::buat();
             $usernameOrtu = 'P.' . $nis;
             $userOrtu = User::create([
                 'username'   => $usernameOrtu,

@@ -95,7 +95,7 @@ class SiswaController extends Controller
 
         // Akun siswa
         $username = $nis;
-        $password = Str::random(8);
+        $password = \App\Support\PasswordSederhana::buat();
 
         $userSiswa = User::create([
             'username'   => $username,
@@ -113,7 +113,7 @@ class SiswaController extends Controller
 
         // Akun orang tua
         $usernameOrtu = 'P.' . $nis;
-        $passwordOrtu = Str::random(8);
+        $passwordOrtu = \App\Support\PasswordSederhana::buat();
         $userOrtu = User::create([
             'username'   => $usernameOrtu,
             'identifier' => $nis . '-ortu',
@@ -256,7 +256,7 @@ class SiswaController extends Controller
     public function resetSiswa(string $uuid)
     {
         $siswa    = Siswa::findOrFail($uuid);
-        $password = Str::random(8);
+        $password = \App\Support\PasswordSederhana::buat();
         $siswa->user?->update([
             'password' => $password,
             'must_change_password' => true,
@@ -272,7 +272,7 @@ class SiswaController extends Controller
     public function resetOrangtua(string $uuid)
     {
         $siswa    = Siswa::findOrFail($uuid);
-        $password = Str::random(8);
+        $password = \App\Support\PasswordSederhana::buat();
         $siswa->orangtua?->user?->update([
             'password' => $password,
             'must_change_password' => true,
@@ -296,7 +296,10 @@ class SiswaController extends Controller
             'scope'    => 'required|in:semua,tingkat,kelas',
             'tingkat'  => 'required_if:scope,tingkat|nullable|integer',
             'id_kelas' => 'required_if:scope,kelas|nullable|exists:kelas,uuid',
+            'target'   => 'nullable|in:siswa,ortu,keduanya',
         ]);
+        // Akun mana yang direset: siswa saja, orang tua saja, atau keduanya (default).
+        $target = $data['target'] ?? 'keduanya';
 
         $query = Siswa::with(['user', 'orangtua.user'])->where('status', 'aktif');
 
@@ -314,14 +317,14 @@ class SiswaController extends Controller
         $kredensial = [];
         foreach ($siswas as $siswa) {
             $passwordSiswa = null;
-            if ($siswa->user) {
-                $passwordSiswa = Str::random(8);
+            if ($target !== 'ortu' && $siswa->user) {
+                $passwordSiswa = \App\Support\PasswordSederhana::buat();
                 $siswa->user->update(['password' => $passwordSiswa, 'must_change_password' => true]);
             }
 
             $passwordOrtu = null;
-            if ($siswa->orangtua?->user) {
-                $passwordOrtu = Str::random(8);
+            if ($target !== 'siswa' && $siswa->orangtua?->user) {
+                $passwordOrtu = \App\Support\PasswordSederhana::buat();
                 $siswa->orangtua->user->update(['password' => $passwordOrtu, 'must_change_password' => true]);
             }
 
@@ -339,7 +342,13 @@ class SiswaController extends Controller
         // di session supaya bisa diunduh sekali via tombol di halaman berikutnya.
         session(['reset_kredensial_siswa' => $kredensial]);
 
-        return redirect()->route('siswa.index')->with('success', count($kredensial) . ' akun siswa+ortu berhasil direset.');
+        $labelTarget = match ($target) {
+            'siswa' => 'akun siswa',
+            'ortu'  => 'akun orang tua',
+            default => 'akun siswa+ortu',
+        };
+
+        return redirect()->route('siswa.index')->with('success', count($kredensial) . ' ' . $labelTarget . ' berhasil direset.');
     }
 
     /** Unduh sekali kredensial hasil reset massal terakhir, lalu hapus dari session. */
