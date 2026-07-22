@@ -208,17 +208,19 @@ class AbsensiController extends Controller
         return view('absensi.wajah-guru', compact('gurus'));
     }
 
-    /** Halaman scan absensi via kamera — mode kiosk, lintas semua kelas untuk siswa dan guru */
+    /** Halaman scan absensi via kamera — mode kiosk; filter kelas opsional untuk gallery lebih kecil */
     public function scan(Request $request)
     {
         $tanggal = $request->tanggal ?: now()->toDateString();
+        $kelasList = Kelas::orderBy('tingkat')->orderBy('kelas')->get();
+        $selectedKelas = $request->kelas ?: '';
 
-        // Semua siswa yang SUDAH daftar wajah, dari kelas mana pun
+        // Semua siswa yang SUDAH daftar wajah (filter kelas di UI JS untuk scope matching)
         $siswas = Siswa::with('kelas')
             ->whereNotNull('face_descriptor')
             ->orderBy('nama')
             ->get()
-            ->sortBy(fn($s) => sprintf('%s%s %s', $s->kelas?->tingkat, $s->kelas?->kelas, $s->nama))
+            ->sortBy(fn ($s) => sprintf('%s%s %s', $s->kelas?->tingkat, $s->kelas?->kelas, $s->nama))
             ->values();
 
         $existingSiswa = Absensi::whereIn('id_siswa', $siswas->pluck('uuid'))
@@ -234,20 +236,20 @@ class AbsensiController extends Controller
             ->keyBy('id_guru');
 
         // payload untuk JS: siswa + guru + descriptors wajah
-        $payloadSiswa = $siswas->map(fn($s) => [
+        $payloadSiswa = $siswas->map(fn ($s) => [
             'uuid'     => $s->uuid,
             'type'     => 'siswa',
             'nama'     => $s->nama,
             'nis'      => $s->nis,
             'jk'       => $s->jk,
-            'kelas'    => $s->kelas ? $s->kelas->tingkat . $s->kelas->kelas : '-',
+            'kelas'    => $s->kelas ? $s->kelas->tingkat.$s->kelas->kelas : '-',
             'id_kelas' => $s->id_kelas,
-            'desc'     => $s->face_descriptor,           // array of embeddings
+            'desc'     => $s->face_descriptor,
             'status'   => $existingSiswa->get($s->uuid)?->status,
             'jam_masuk'=> substr($existingSiswa->get($s->uuid)?->jam_masuk, 0, 5),
         ]);
 
-        $payloadGuru = $gurus->map(fn($g) => [
+        $payloadGuru = $gurus->map(fn ($g) => [
             'uuid'       => $g->uuid,
             'type'       => 'guru',
             'nama'       => $g->nama,
@@ -255,22 +257,113 @@ class AbsensiController extends Controller
             'desc'       => $g->face_descriptor,
             'nip'        => $g->nip ?: $g->nik,
             'status'     => $existingGuru->get($g->uuid)?->status,
-            'pulangDone' => (bool) ($existingGuru->get($g->uuid)?->jam_pulang),  // sudah scan pulang?
+            'pulangDone' => (bool) ($existingGuru->get($g->uuid)?->jam_pulang),
             'jam_masuk'  => substr($existingGuru->get($g->uuid)?->jam_masuk, 0, 5),
             'jam_pulang' => substr($existingGuru->get($g->uuid)?->jam_pulang, 0, 5),
         ]);
 
         $payload = $payloadSiswa->concat($payloadGuru)->values();
 
-        // Mode kiosk ditentukan per-request dari token di URL (lihat EnsureKioskOrPermission),
-        // BUKAN dari session — supaya tab lain di browser yang sama yg sudah login tak terganggu.
         $isKiosk = \App\Http\Middleware\EnsureKioskOrPermission::hasValidToken($request);
         $kioskToken = $isKiosk ? $request->query('_kiosk') : null;
 
-        return view('absensi.scan', compact('tanggal', 'siswas', 'gurus', 'payload', 'existingSiswa', 'existingGuru', 'isKiosk', 'kioskToken'));
+        $kelasOptions = $kelasList->map(fn ($k) => [
+            'uuid'  => $k->uuid,
+            'label' => $k->tingkat.$k->kelas,
+        ])->values();
+
+        return view('absensi.scan', compact(
+            'tanggal', 'siswas', 'gurus', 'payload', 'existingSiswa', 'existingGuru',
+            'isKiosk', 'kioskToken', 'kelasList', 'selectedKelas', 'kelasOptions'
+        ));
     }
 
-    /** Tandai 1 siswa hadir (AJAX dari scan wajah) */
+    /** Telemetry ringan: alasan gagal match wajah (untuk kalibrasi lapangan). */
+    public function faceTelemetry(Request $request)
+    {
+        $data = $request->validate([
+            'reason'  => 'required|in:low_score,small_margin,low_support,small_face,low_face_score',
+            'top1'    => 'nullable|numeric|min:0|max:1',
+            'gap'     => 'nullable|numeric|min:0|max:1',
+            'support' => 'nullable|integer|min:0|max:10',
+            'kelas'   => 'nullable|string|max:40',
+        ]);
+
+        \Illuminate\Support\Facades\Log::info('face_scan_diag', [
+            'reason'  => $data['reason'],
+            'top1'    => isset($data['top1']) ? round((float) $data['top1'], 3) : null,
+            'gap'     => isset($data['gap']) ? round((float) $data['gap'], 3) : null,
+            'support' => $data['support'] ?? null,
+            'kelas'   => $data['kelas'] ?? null,
+            'user'    => auth()->id(),
+        ]);
+
+        return response()->json(['ok' => true]);
+    }
+
+    /** Fallback absen siswa via barcode/QR kartu pelajar digital (payload = NIS, NISN, atau UUID). */
+    public function markByBarcode(Request $request)
+    {
+        $data = $request->validate([
+            'barcode'  => 'required|string|max:80',
+            'tanggal'  => 'required|date',
+            'id_kelas' => 'nullable|exists:kelas,uuid',
+        ]);
+
+        $code = trim($data['barcode']);
+        $siswa = $this->resolveSiswaFromBarcode($code, $data['id_kelas'] ?? null);
+
+        if ($siswa === false) {
+            return response()->json(['success' => false, 'message' => 'Kode kartu ambigu — hubungi admin untuk verifikasi data siswa.']);
+        }
+        if (! $siswa) {
+            return response()->json(['success' => false, 'message' => 'Kartu tidak dikenali'.(! empty($data['id_kelas']) ? ' di kelas yang dipilih.' : '.')]);
+        }
+
+        $existing = Absensi::where('id_siswa', $siswa->uuid)->where('tanggal', $data['tanggal'])->first();
+        if ($existing && in_array($existing->status, ['izin', 'sakit', 'alpa'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Siswa sudah tercatat '.ucfirst($existing->status).' — ubah dulu di rekap absensi.',
+            ]);
+        }
+
+        $request->merge([
+            'id_siswa' => $siswa->uuid,
+            'id_kelas' => $siswa->id_kelas,
+            'status'   => 'hadir',
+            '_via'     => 'barcode',
+        ]);
+
+        return $this->mark($request);
+    }
+
+    /** Cari siswa dari payload kartu: UUID → NIS → NISN (prioritas ketat, hindari OR ambigu). */
+    private function resolveSiswaFromBarcode(string $code, ?string $idKelas = null): Siswa|false|null
+    {
+        $scoped = fn () => Siswa::query()->when($idKelas, fn ($q) => $q->where('id_kelas', $idKelas));
+
+        if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $code)) {
+            return $scoped()->where('uuid', $code)->first();
+        }
+
+        $byNis = $scoped()->where('nis', $code)->get();
+        if ($byNis->count() > 1) {
+            return false;
+        }
+        if ($byNis->count() === 1) {
+            return $byNis->first();
+        }
+
+        $byNisn = $scoped()->where('nisn', $code)->get();
+        if ($byNisn->count() > 1) {
+            return false;
+        }
+
+        return $byNisn->first();
+    }
+
+    /** Tandai 1 siswa hadir (AJAX dari scan wajah atau fallback kartu pelajar). */
     public function mark(Request $request)
     {
         $data = $request->validate([
@@ -278,31 +371,31 @@ class AbsensiController extends Controller
             'id_kelas' => 'nullable|exists:kelas,uuid',
             'tanggal'  => 'required|date',
             'status'   => 'nullable|in:hadir,izin,sakit,alpa',
+            '_via'     => 'nullable|in:face,barcode',
         ]);
 
-        // Metode absensi aktif harus "Scan Wajah".
-        if (!\App\Support\AbsensiGuru::bolehWajah()) {
+        if (! \App\Support\AbsensiGuru::bolehWajah()) {
             return response()->json([
                 'success' => false,
                 'message' => \App\Support\AbsensiGuru::pesanKunci('Scan Wajah'),
             ]);
         }
 
-        // Hormati kalender: absensi siswa harus dibuka untuk tanggal ini.
-        if (!\App\Support\KalenderAbsensi::absenSiswaDibuka($data['tanggal'])) {
+        if (! \App\Support\KalenderAbsensi::absenSiswaDibuka($data['tanggal'])) {
             return response()->json([
                 'success' => false,
                 'message' => 'Absensi siswa tidak dibuka untuk tanggal ini.',
             ]);
         }
 
-        // Wajib isi kuesioner 7 KAIH hari ini sebelum boleh absen (berlaku juga di kios scan wajah).
-        if (!\App\Support\KaihSiswa::bolehAbsen($data['id_siswa'], $data['tanggal'])) {
+        if (! \App\Support\KaihSiswa::bolehAbsen($data['id_siswa'], $data['tanggal'])) {
             return response()->json([
                 'success' => false,
                 'message' => \App\Support\KaihSiswa::pesanTolak(),
             ]);
         }
+
+        $via = ($data['_via'] ?? 'face') === 'barcode' ? 'Kartu pelajar (barcode)' : 'Scan wajah';
 
         $row = Absensi::firstOrNew([
             'id_siswa' => $data['id_siswa'],
@@ -311,14 +404,15 @@ class AbsensiController extends Controller
         $previousStatus = $row->exists ? $row->status : null;
         $row->id_kelas     = $data['id_kelas'] ?? $row->id_kelas;
         $row->status       = $data['status'] ?? 'hadir';
-        $row->keterangan   = 'Scan wajah';
+        $row->keterangan   = $via;
         $row->dicatat_oleh = auth()->id();
-        // catat jam masuk hanya sekali (scan pertama) agar deteksi terlambat akurat
         $scanPertama = empty($row->jam_masuk);
-        if (!$row->jam_masuk) {
+        if (! $row->jam_masuk) {
             $row->jam_masuk = now()->format('H:i:s');
         }
-        if (!$row->exists) $row->id_semester = \App\Models\Semester::aktif()?->id;
+        if (! $row->exists) {
+            $row->id_semester = \App\Models\Semester::aktif()?->id;
+        }
         $row->save();
 
         $batas = Setting::get('waktu_terlambat', '07:30');
@@ -328,10 +422,18 @@ class AbsensiController extends Controller
         }
         AttendanceParentNotifier::notifyIfStatusChanged($previousStatus, $row);
 
+        $siswa = Siswa::with('kelas')->find($data['id_siswa']);
+
         return response()->json([
             'success'   => true,
             'jam'       => substr($row->jam_masuk, 0, 5),
             'terlambat' => $terlambat,
+            'uuid'      => $data['id_siswa'],
+            'nama'      => $siswa?->nama,
+            'nis'       => $siswa?->nis,
+            'id_kelas'  => $siswa?->id_kelas,
+            'kelas'     => $siswa?->kelas ? $siswa->kelas->tingkat.$siswa->kelas->kelas : null,
+            'via'       => $data['_via'] ?? 'face',
         ]);
     }
 

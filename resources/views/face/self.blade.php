@@ -38,7 +38,7 @@
                     </div>
                     {{-- sample badges --}}
                     <div x-show="streaming" class="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-                        <template x-for="i in 3"><span class="w-3 h-3 rounded-full transition" :class="samples.length>=i ? 'bg-emerald-400' : 'bg-white/40'"></span></template>
+                        <template x-for="i in 5"><span class="w-3 h-3 rounded-full transition" :class="samples.length>=i ? 'bg-emerald-400' : 'bg-white/40'"></span></template>
                     </div>
                     {{-- indikator pencahayaan rendah --}}
                     <div x-show="streaming && lowLight" x-cloak class="absolute top-3 left-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/85 backdrop-blur text-white text-xs font-semibold">
@@ -51,8 +51,8 @@
                     <button x-show="!streaming" @click="openCam()" :disabled="loading" class="btn-primary flex-1 px-4 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50">
                         <i data-lucide="video" class="w-4 h-4"></i> Nyalakan Kamera
                     </button>
-                    <button x-show="streaming" @click="capture()" :disabled="capturing || samples.length>=3" class="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold border border-primary text-primary hover:bg-primary-50 transition flex items-center justify-center gap-1.5 disabled:opacity-40">
-                        <i data-lucide="aperture" class="w-4 h-4"></i> Ambil Sampel (<span x-text="samples.length"></span>/3)
+                    <button x-show="streaming" @click="capture()" :disabled="capturing || samples.length>=5" class="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold border border-primary text-primary hover:bg-primary-50 transition flex items-center justify-center gap-1.5 disabled:opacity-40">
+                        <i data-lucide="aperture" class="w-4 h-4"></i> Ambil Sampel (<span x-text="samples.length"></span>/5)
                         <kbd class="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded bg-primary-50 border border-primary/30">Spasi</kbd>
                     </button>
                 </div>
@@ -244,7 +244,7 @@ function selfEnroll(){
         },
         // Spasi = ambil sampel (saat kamera aktif)
         onSpace(e){
-            if(this.streaming && !this.capturing && !this.saving && this.samples.length < 3){
+            if(this.streaming && !this.capturing && !this.saving && this.samples.length < 5){
                 e.preventDefault();
                 this.capture();
             }
@@ -278,7 +278,7 @@ function selfEnroll(){
                     // simpan snapshot HANYA dari pose paling menghadap depan (yaw terkecil)
                     const yaw = Math.abs(face.rotation?.angle?.yaw ?? 0);
                     if(face.box && yaw < this._bestYaw){ this.photo = this.cropFace(face.box, this._ecv); this._bestYaw = yaw; }
-                    this.msg = 'Sampel ' + this.samples.length + ' tersimpan. ' + (this.samples.length<3 ? 'Ubah posisi sesuai animasi & ambil lagi.' : 'Lengkap! Klik Simpan & Lanjutkan.');
+                    this.msg = 'Sampel ' + this.samples.length + ' tersimpan. ' + (this.samples.length<5 ? 'Ubah posisi/jarak sedikit & ambil lagi (target 5).' : 'Lengkap (5)! Klik Simpan & Lanjutkan.');
                 } else {
                     this.msg=quality.msg || 'Wajah tidak terdeteksi. Perbaiki posisi & pencahayaan.'; this.msgErr=true;
                 }
@@ -286,7 +286,7 @@ function selfEnroll(){
             this.capturing=false;
         },
         async save(){
-            if(this.samples.length < 3){ this.msg='Ambil minimal 3 sampel wajah dulu.'; this.msgErr=true; return; }
+            if(this.samples.length < 3){ this.msg='Ambil minimal 3 sampel wajah dulu (disarankan 5).'; this.msgErr=true; return; }
             this.saving=true;
             try {
                 const res = await fetch('{{ route('face.self.store') }}', {
