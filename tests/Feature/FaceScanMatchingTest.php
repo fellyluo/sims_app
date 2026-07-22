@@ -14,12 +14,21 @@ class FaceScanMatchingTest extends TestCase
         $this->assertStringContainsString('confidentThreshold:0.80', $source);
         $this->assertStringContainsString('supportThreshold:0.62', $source);
         $this->assertStringContainsString('minSampleSupport:2', $source);
-        $this->assertStringContainsString('margin:0.08', $source);
-        $this->assertStringContainsString('confirmFrames:2', $source);
+        $this->assertStringContainsString('margin:0.05', $source);
+        $this->assertStringContainsString('confirmFrames:1', $source);
+        $this->assertStringContainsString('_faceLocked', $source);
+        $this->assertStringContainsString('isKiosk', $source);
+        $this->assertStringContainsString('afterFaceMarkSuccess', $source);
+        $this->assertStringContainsString('singleSampleTop1:0.72', $source);
         $this->assertStringContainsString('robustPersonSimilarity(faceEmbedding, descriptors)', $source);
         $this->assertStringContainsString('hasEnoughSampleAgreement(match)', $source);
-        $this->assertStringContainsString('match.top1 >= this.threshold', $source);
+        $this->assertStringContainsString('rebuildEnrolled', $source);
+        $this->assertStringContainsString('recordDiag', $source);
+        $this->assertStringContainsString('submitBarcode', $source);
+        $this->assertStringContainsString('_scanGen', $source);
         $this->assertStringNotContainsString('threshold:0.58', $source);
+        $this->assertStringNotContainsString('margin:0.08', $source);
+        $this->assertStringNotContainsString('confirmFrames:4', $source);
     }
 
     public function test_skor_kecocokan_pakai_top1_bukan_dirata_rata_dgn_top2(): void

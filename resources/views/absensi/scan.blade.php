@@ -11,26 +11,58 @@
     @keyframes flashName { 0%{opacity:0;transform:scale(.8)} 15%{opacity:1;transform:scale(1)} 80%{opacity:1} 100%{opacity:0;transform:scale(1)} }
     .chip-in { animation: chipIn .3s ease-out; }
     @keyframes chipIn { from{opacity:0;transform:translateY(8px) scale(.9)} to{opacity:1;transform:none} }
+    #barcodeReader { width:100%; border-radius:12px; overflow:hidden; }
+    #barcodeReader video { border-radius:12px; }
 </style>
 @endpush
 
 @section('content')
-<div class="space-y-5" x-data="faceScan(@js($payload))" x-init="init()">
+<div class="space-y-5" x-data="faceScan(@js($payload), @js([
+    'kelasFilter' => $selectedKelas ?: '',
+    'kelasOptions' => $kelasOptions ?? [],
+    'telemetryUrl' => route('absensi.faceTelemetry'),
+    'markBarcodeUrl' => route('absensi.markBarcode'),
+    'tanggal' => $tanggal,
+    'kioskToken' => $kioskToken ?? null,
+    'isKiosk' => $isKiosk ?? false,
+    'hasGuru' => ($gurus ?? collect())->isNotEmpty(),
+]))" x-init="init()">
 
     {{-- Header --}}
     <div class="flex items-center justify-between flex-wrap gap-3">
         <div>
-            <h1 class="page-title">Presensi Scan Wajah (Siswa & Guru)</h1>
-            <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Mode kiosk &mdash; siswa dan guru cukup menghadap kamera. Wajah yang dikenali akan otomatis tercatat <span class="font-semibold text-emerald-600">Hadir</span>.</p>
+            <h1 class="page-title">Absensi Hadir</h1>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Hadap kamera — absen otomatis. Tidak terbaca? pakai kartu pelajar di bawah.</p>
         </div>
         @unless($isKiosk ?? false)
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+            <a href="{{ route('wajah.ganda') }}" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-amber-200 text-amber-700 hover:bg-amber-50 transition">
+                <i data-lucide="shield-alert" class="w-4 h-4"></i> Wajah Ganda
+            </a>
             <a href="{{ route('absensi.wajah') }}" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition">
                 <i data-lucide="user-plus" class="w-4 h-4"></i> Registrasi Wajah Siswa
             </a>
         </div>
         @endunless
     </div>
+
+    <div class="card p-4 flex flex-wrap gap-3 items-center">
+        <div class="min-w-44 flex-1 max-w-xs">
+            <label class="form-label">Kelas</label>
+            <select x-model="kelasFilter" @change="onKelasChange()" class="form-select">
+                <option value="">Semua kelas</option>
+                <template x-for="k in kelasOptions" :key="k.uuid">
+                    <option :value="k.uuid" x-text="k.label"></option>
+                </template>
+            </select>
+        </div>
+        <p class="text-xs text-slate-400 flex-1 min-w-40" x-show="enrolledSiswaCount > 0">
+            <span class="font-semibold text-slate-600 dark:text-slate-300" x-text="enrolledSiswaCount"></span> siswa siap absen
+            <span x-show="enrolledCountGuru > 0"> + <span x-text="enrolledCountGuru"></span> guru</span>
+        </p>
+    </div>
+
+    {{-- Diagnostik hanya ke server (telemetry), tidak ditampilkan ke pengguna --}}
 
     @if($siswas->isEmpty() && $gurus->isEmpty())
     <div class="card p-12 text-center text-slate-400">
@@ -96,9 +128,9 @@
                                 <span x-text="lastMatch.nama"></span>
                             </div>
                             <div class="text-sm font-semibold opacity-90">
-                                <span x-text="lastMatch.type === 'siswa' ? 'Siswa • Kelas ' + lastMatch.kelas : 'Guru'"></span> &bull;
-                                <span x-text="lastMatch.mode==='pulang' ? 'Pulang' : 'Hadir'"></span>
-                                <span class="font-mono" x-text="lastMatch.jam"></span>
+                                <span x-text="lastMatch.type === 'siswa' ? 'Kelas ' + lastMatch.kelas : (lastMatch.mode==='pulang' ? 'Guru · Pulang' : 'Guru')"></span>
+                                <span x-show="lastMatch.terlambat" class="text-amber-200"> · Terlambat</span>
+                                <span class="font-mono" x-text="' ' + lastMatch.jam"></span>
                             </div>
                         </div>
                     </div>
@@ -116,29 +148,38 @@
                 </div>
             </div>
 
-            <div class="flex items-center justify-between gap-3 flex-wrap">
-                <p class="text-sm text-slate-500">
-                    <span class="font-bold text-emerald-600" x-text="totalHadir"></span> hadir /
-                    <span x-text="totalEnrolled"></span> terdaftar wajah &bull;
-                    {{ \Carbon\Carbon::parse($tanggal)->isoFormat('dddd, D MMM Y') }}
-                </p>
-                <div class="flex items-center gap-2 flex-wrap">
-                    {{-- Toggle mode Masuk / Pulang (Pulang dilacak utk guru) --}}
-                    <div class="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800" title="Mode Pulang dicatat untuk guru">
-                        <button @click="scanMode='masuk'" :class="scanMode==='masuk' ? 'bg-white dark:bg-slate-700 text-emerald-600 shadow-sm' : 'text-slate-500'" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
-                            <i data-lucide="log-in" class="w-3.5 h-3.5"></i> Masuk
+            <div class="space-y-2">
+                <div class="flex items-center justify-between gap-3 flex-wrap">
+                    <p class="text-sm text-slate-500">
+                        <span class="font-bold text-emerald-600" x-text="totalHadir"></span>/<span x-text="totalEnrolled"></span> hadir
+                        &bull; {{ \Carbon\Carbon::parse($tanggal)->isoFormat('dddd, D MMM') }}
+                    </p>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <div x-show="hasGuru" class="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800" title="Absen pulang guru — aturan agenda & jam tetap berlaku">
+                            <button @click="scanMode='masuk'" :class="scanMode==='masuk' ? 'bg-white dark:bg-slate-700 text-emerald-600 shadow-sm' : 'text-slate-500'" class="px-3 py-1.5 rounded-lg text-xs font-bold transition">Masuk</button>
+                            <button @click="scanMode='pulang'" :class="scanMode==='pulang' ? 'bg-white dark:bg-slate-700 text-amber-600 shadow-sm' : 'text-slate-500'" class="px-3 py-1.5 rounded-lg text-xs font-bold transition">Pulang</button>
+                        </div>
+                        <button x-show="!camOn" @click="start()" :disabled="loading" class="btn-primary px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 disabled:opacity-50">
+                            <i data-lucide="play" class="w-4 h-4"></i> <span x-text="loading ? 'Menyiapkan…' : 'Buka kamera'"></span>
                         </button>
-                        <button @click="scanMode='pulang'" :class="scanMode==='pulang' ? 'bg-white dark:bg-slate-700 text-amber-600 shadow-sm' : 'text-slate-500'" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
-                            <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Pulang
+                        <button x-show="camOn" @click="stop()" class="px-4 py-2 rounded-xl text-sm font-semibold border border-slate-200 dark:border-slate-600 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2">
+                            <i data-lucide="square" class="w-3.5 h-3.5"></i> Tutup
                         </button>
                     </div>
-                    <button x-show="!camOn" @click="start()" :disabled="loading" class="btn-primary px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 disabled:opacity-50">
-                        <i data-lucide="play" class="w-4 h-4"></i> Mulai Scan (Layar Penuh)
-                    </button>
-                    <button x-show="camOn" @click="stop()" class="px-5 py-2.5 rounded-xl text-sm font-bold border border-rose-200 text-rose-600 hover:bg-rose-50 transition flex items-center gap-2">
-                        <i data-lucide="square" class="w-4 h-4"></i> Hentikan
+                </div>
+                {{-- Kartu pelajar: scanner USB langsung, tanpa modal --}}
+                <div class="flex gap-2 items-center">
+                    <div class="relative flex-1">
+                        <i data-lucide="credit-card" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none"></i>
+                        <input type="text" x-model="barcodeInput" @keydown.enter.prevent="submitBarcode(barcodeInput)"
+                            class="form-input w-full pl-9 py-2 text-sm" placeholder="Kartu tidak terbaca? tempelkan di scanner…" autocomplete="off"
+                            :disabled="barcodeBusy">
+                    </div>
+                    <button type="button" @click="openBarcodeModal()" title="Scan QR kartu" class="px-3 py-2 rounded-xl text-sm font-semibold border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-1.5 shrink-0">
+                        <i data-lucide="qr-code" class="w-4 h-4"></i> QR
                     </button>
                 </div>
+                <p class="text-xs text-rose-500" x-show="barcodeError" x-text="barcodeError"></p>
             </div>
         </div>
 
@@ -239,10 +280,30 @@
         </div>
     </div>
     @endif
+
+    {{-- Modal QR kartu (hanya bila tidak punya scanner USB) --}}
+    <div x-show="showBarcodeModal" x-cloak class="modal-backdrop" style="display:none" @keydown.escape.window="closeBarcodeModal()">
+        <div class="modal-box max-w-sm w-full" @click.stop>
+            <div class="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                <h3 class="font-bold text-slate-800 dark:text-slate-200">Scan QR kartu</h3>
+                <button type="button" @click="closeBarcodeModal()" class="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <div class="p-4 space-y-3">
+                <div x-show="barcodeScanning" class="rounded-xl overflow-hidden bg-slate-900">
+                    <div id="barcodeReader"></div>
+                </div>
+                <div x-show="!barcodeScanning && !barcodeBusy" class="text-center py-8 text-slate-400 text-sm">
+                    <i data-lucide="loader-2" class="w-7 h-7 mx-auto animate-spin mb-2"></i> Membuka kamera…
+                </div>
+                <p class="text-xs text-rose-500 text-center" x-show="barcodeError" x-text="barcodeError"></p>
+            </div>
+        </div>
+    </div>
 </div>
 
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/human/dist/human.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
 // ===== Human (WebGPU) — pengenalan wajah modern, asinkron, UI tak freeze =====
 let human=null, humanReady=false, humanBackend='';
@@ -276,37 +337,62 @@ function normalizeFaceDescriptors(desc){
     return desc.filter(v => Array.isArray(v) && v.length >= 64).map(v => v.map(Number));
 }
 
-function faceScan(data){
+function faceScan(data, opts={}){
     return {
         loading:false, camOn:false, scanning:false, busy:false, fs:false, lowLight:false,
-        status:'Klik "Mulai Scan" untuk mengaktifkan kamera',
+        status:'Menyiapkan kamera…',
         attendees: data.map(s=>({ ...s, marked: s.status==='hadir', justMarked:false, pulangMarked: !!s.pulangDone, jam_masuk: s.jam_masuk, jam_pulang: s.jam_pulang })),
         enrolled:[], stream:null, timer:null,
-        // ===== Ambang pencocokan wajah: ketat untuk absensi produksi (hindari false positive) =====
-        threshold:0.66,        // skor robust minimum; jangan turunkan tanpa uji lapangan
+        // ===== Ambang pencocokan: longgar sedikit vs anti-FP lama (gallery besar) =====
+        threshold:0.66,
         confidentThreshold:0.80,
-        supportThreshold:0.62, // minimal 2 sampel orang yang sama harus cukup mirip
+        supportThreshold:0.62,
         minSampleSupport:2,
-        margin:0.08,           // kandidat terbaik harus unggul jelas dari kandidat kedua
-        minFaceFrac:0.14,      // wajah harus cukup besar di frame agar embedding stabil
-        minFaceScore:0.55,     // buang deteksi ragu/blur/pencahayaan buruk
-        confirmFrames:2,       // wajib stabil beberapa frame beruntun sebelum absen ditandai
-        _streak:{},            // penghitung frame beruntun per uuid
+        singleSampleTop1:0.72, // 1 sampel cukup bila top1 sangat yakin
+        margin:0.05,
+        minFaceFrac:0.14,
+        minFaceScore:0.55,
+        confirmFrames:1,
+        _streak:{},
+        _faceLocked:{},
+        _scanPauseUntil:0,
         recent:[], lastMatch:null, _seq:0, audioCtx:null,
         scanMode:'masuk',
         activeTab: 'siswa',
         siswaSearch: '',
         guruSearch: '',
+        kelasFilter: opts.kelasFilter || '',
+        kelasOptions: opts.kelasOptions || [],
+        telemetryUrl: opts.telemetryUrl || '',
+        markBarcodeUrl: opts.markBarcodeUrl || '',
+        tanggal: opts.tanggal || '',
+        kioskToken: opts.kioskToken || null,
+        isKiosk: !!opts.isKiosk,
+        hasGuru: !!opts.hasGuru,
+        showBarcodeModal:false, barcodeInput:'', barcodeError:'', barcodeBusy:false,
+        barcodeScanning:false, barcodeScanner:null, _faceWasOn:false, _scanGen:0,
+        failStreak:0,
+        diag:{ low_score:0, small_margin:0, low_support:0, small_face:0, low_face_score:0 },
+        _lastDiagAt:0,
 
-        get hadirCountSiswa(){ return this.attendees.filter(s=>s.type==='siswa' && s.marked).length; },
-        get enrolledCountSiswa(){ return this.attendees.filter(s=>s.type==='siswa' && s.desc && s.desc.length).length; },
+        get diagTotal(){ return Object.values(this.diag).reduce((a,b)=>a+b,0); },
+        get enrolledSiswaCount(){ return this.enrolled.filter(s=>s.type==='siswa').length; },
+        get hadirCountSiswa(){ return this.attendees.filter(s=>s.type==='siswa' && s.marked && this.inKelasScope(s)).length; },
+        get enrolledCountSiswa(){ return this.attendees.filter(s=>s.type==='siswa' && s.desc && s.desc.length && this.inKelasScope(s)).length; },
         get hadirCountGuru(){ return this.attendees.filter(s=>s.type==='guru' && s.marked).length; },
         get enrolledCountGuru(){ return this.attendees.filter(s=>s.type==='guru' && s.desc && s.desc.length).length; },
-        get totalHadir(){ return this.attendees.filter(s=>s.marked).length; },
-        get totalEnrolled(){ return this.attendees.filter(s=>s.desc && s.desc.length).length; },
+        get totalHadir(){ return this.attendees.filter(s=>s.marked && (s.type==='guru' || this.inKelasScope(s))).length; },
+        get totalEnrolled(){ return this.enrolled.length; },
+
+        inKelasScope(s){
+            if(s.type==='guru') return true;
+            if(!this.kelasFilter) return true;
+            return s.id_kelas === this.kelasFilter;
+        },
 
         get filteredSiswa(){
-            return this.attendees.filter(s=>s.type==='siswa' && s.nama.toLowerCase().includes(this.siswaSearch.toLowerCase()));
+            const q = this.siswaSearch.toLowerCase();
+            return this.attendees.filter(s=>s.type==='siswa' && this.inKelasScope(s) && s.nama.toLowerCase().includes(q));
         },
         get filteredGuru(){
             return this.attendees.filter(s=>s.type==='guru' && s.nama.toLowerCase().includes(this.guruSearch.toLowerCase()));
@@ -314,10 +400,38 @@ function faceScan(data){
 
         init(){
             this.attendees = this.attendees.map(s => ({ ...s, desc: normalizeFaceDescriptors(s.desc) }));
+            this.rebuildEnrolled();
             document.addEventListener('fullscreenchange', ()=>{
                 this.fs = !!document.fullscreenElement;
                 setTimeout(()=> window.lucide && lucide.createIcons(), 60);
             });
+            // Buka kamera otomatis — pengguna tidak perlu klik tombol dulu
+            if(this.enrolled.length > 0){
+                this.$nextTick(()=> setTimeout(()=> this.start(), this.isKiosk ? 150 : 500));
+            } else {
+                this.status = 'Belum ada wajah terdaftar.';
+            }
+        },
+
+        rebuildEnrolled(){
+            this.enrolled = this.attendees.filter(s=>s.desc && s.desc.length && this.inKelasScope(s));
+            this._streak = {};
+        },
+        isFaceLocked(uuid){
+            const s = this.attendees.find(x=>x.uuid===uuid);
+            return !!(this._faceLocked[uuid] || s?.marked || s?.pulangMarked);
+        },
+        afterFaceMarkSuccess(){
+            this._scanPauseUntil = Date.now() + 900;
+            this._streak = {};
+        },
+        onKelasChange(){
+            this.rebuildEnrolled();
+            const url = new URL(window.location.href);
+            if(this.kelasFilter) url.searchParams.set('kelas', this.kelasFilter);
+            else url.searchParams.delete('kelas');
+            history.replaceState({}, '', url);
+            setTimeout(()=> window.lucide && lucide.createIcons(), 40);
         },
 
         enterFs(){
@@ -350,7 +464,30 @@ function faceScan(data){
         hasEnoughSampleAgreement(match){
             if(!match) return false;
             if((match.sampleCount || 0) <= 1) return match.top1 >= this.threshold;
+            if(match.top1 >= this.singleSampleTop1) return true;
             return match.support >= this.minSampleSupport || match.top1 >= this.confidentThreshold;
+        },
+
+        recordDiag(reason, meta={}){
+            if(this.diag[reason] !== undefined) this.diag[reason]++;
+            const now = Date.now();
+            if(!this.telemetryUrl || now - this._lastDiagAt < 3000) return;
+            this._lastDiagAt = now;
+            try {
+                fetch(this.telemetryUrl, {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json','X-CSRF-TOKEN':$('meta[name=csrf-token]').attr('content'),Accept:'application/json'},
+                    body: JSON.stringify({
+                        reason,
+                        top1: meta.top1 ?? null,
+                        gap: meta.gap ?? null,
+                        support: meta.support ?? null,
+                        kelas: this.kelasFilter || null,
+                        _kiosk: this.kioskToken,
+                    }),
+                    keepalive:true,
+                });
+            } catch(e){}
         },
 
         // bunyi "ting" sukses absen (Web Audio, tanpa file)
@@ -417,8 +554,9 @@ function faceScan(data){
             this.enterFs(); // panggil dalam gesture klik (sebelum await) agar fullscreen diizinkan
             try { this.audioCtx = this.audioCtx || new (window.AudioContext||window.webkitAudioContext)(); } catch(e){}
             try { if('speechSynthesis' in window){ speechSynthesis.getVoices(); speechSynthesis.speak(new SpeechSynthesisUtterance(' ')); } } catch(e){} // buka izin suara (gesture)
-            this.enrolled = this.attendees.filter(s=>s.desc && s.desc.length);
-            if(this.enrolled.length===0){ this.status='Belum ada wajah terdaftar.'; showToast('Daftarkan wajah siswa/guru dulu','error'); return; }
+            this.rebuildEnrolled();
+            if(this.enrolled.length===0){ this.status='Belum ada wajah terdaftar.'; return; }
+            if(this.camOn || this.loading) return;
             this.loading=true; this.status='Mengaktifkan kamera...';
             try {
                 this.stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'user', width:{ideal:1280}, height:{ideal:720} } });
@@ -429,7 +567,7 @@ function faceScan(data){
                 this.status='Memuat model AI (pertama kali agak lama, lalu tersimpan)...';
                 await loadHuman();
                 this.loading=false; this.scanning=true;
-                this.status='Memindai ('+humanBackend+')...';
+                this.status='Hadap kamera';
                 this.tick();
             } catch(e){
                 this.loading=false; this.camOn=false;
@@ -488,20 +626,27 @@ function faceScan(data){
 
         async tick(){
             if(!this.scanning) return;
-            if(this.busy){ this.timer=setTimeout(()=>this.tick(), 120); return; }
+            if(Date.now() < this._scanPauseUntil){
+                if(this.scanning) this.timer=setTimeout(()=>this.tick(), 180);
+                return;
+            }
+            const gen = this._scanGen;
+            if(this.busy){ if(this.scanning && gen === this._scanGen) this.timer=setTimeout(()=>this.tick(), 120); return; }
             const v=this.$refs.video;
-            if(!v.videoWidth){ this.timer=setTimeout(()=>this.tick(), 300); return; }
+            if(!v || !v.videoWidth){ if(this.scanning && gen === this._scanGen) this.timer=setTimeout(()=>this.tick(), 300); return; }
             this.busy=true;
             const t0=performance.now();
             try {
-                const frame = this.enhanceFrame(v);   // pencerahan otomatis sebelum deteksi (aman di tempat gelap)
-                const res = await human.detect(frame);   // WebGPU asinkron → UI tetap responsif
+                const frame = this.enhanceFrame(v);
+                const res = await human.detect(frame);
+                if(gen !== this._scanGen || !this.scanning) return;
                 this.render(res);
             } catch(e){ /* skip frame */ }
-            this.busy=false;
+            finally {
+                if(gen === this._scanGen) this.busy = false;
+            }
+            if(gen !== this._scanGen || !this.scanning) return;
             const dt = performance.now()-t0;
-
-            // jeda kecil adaptif; selalu memindai (kiosk) selama masih ada yang belum hadir
             const allDone = this.enrolled.every(s=>s.marked);
             const delay = allDone ? 1500 : Math.min(1200, Math.max(200, Math.round(dt*0.7)));
             this.timer=setTimeout(()=>this.tick(), delay);
@@ -522,6 +667,7 @@ function faceScan(data){
                 // Satu sampel buruk tidak boleh membuat satu nama terus menang sebagai false positive.
                 let bestUuid=null, bestSim=0, secondSim=0, bestMatch=null;
                 for(const s of this.enrolled){
+                    if(this.isFaceLocked(s.uuid)) continue;
                     const match = this.robustPersonSimilarity(f.embedding, s.desc);
                     match.sampleCount = (s.desc || []).length;
                     if(match.score>bestSim){ secondSim=bestSim; bestSim=match.score; bestUuid=s.uuid; bestMatch=match; }
@@ -531,20 +677,31 @@ function faceScan(data){
                 // ===== Gate berlapis (harus lolos SEMUA baru dianggap cocok) =====
                 const faceScore = (f.faceScore ?? f.score ?? f.boxScore ?? 1);
                 const bigEnough = Math.min(b[2], b[3]) >= (c.height * this.minFaceFrac);
-                const clearGap  = (bestSim - secondSim) >= this.margin || bestSim >= this.confidentThreshold;
+                const gap = bestSim - secondSim;
+                const clearGap  = gap >= this.margin || bestSim >= this.confidentThreshold;
                 const sampleAgreement = this.hasEnoughSampleAgreement(bestMatch);
                 const strongMatch = bestSim >= this.threshold && clearGap && sampleAgreement && bigEnough && faceScore >= this.minFaceScore;
 
                 let label, color;
                 if(strongMatch){
                     const s=this.attendees.find(z=>z.uuid===bestUuid);
-                    label=(s?s.nama.split(' ')[0]:'?'); color='#10b981';   // hijau: dikenal & yakin
+                    label=(s?s.nama.split(' ')[0]:'?'); color='#10b981';
                     seenThisFrame.add(bestUuid);
-                } else if((bestMatch?.top1 || bestSim) >= this.supportThreshold && bigEnough){
-                    // Mirip tapi belum yakin (gap tipis / hanya 1 sampel cocok / skor rendah) -> jangan tandai.
-                    label='Perjelas wajah'; color='#f59e0b';
+                    this.failStreak = 0;
                 } else {
-                    label='Tidak dikenal'; color='#ef4444';
+                    this.failStreak++;
+                    const meta = { top1: bestMatch?.top1 ?? bestSim, gap, support: bestMatch?.support ?? 0 };
+                    if(!bigEnough){ this.recordDiag('small_face', meta); }
+                    else if(faceScore < this.minFaceScore){ this.recordDiag('low_face_score', meta); }
+                    else if(bestSim < this.threshold){ this.recordDiag('low_score', meta); }
+                    else if(!clearGap){ this.recordDiag('small_margin', meta); }
+                    else if(!sampleAgreement){ this.recordDiag('low_support', meta); }
+
+                    if((bestMatch?.top1 || bestSim) >= this.supportThreshold && bigEnough){
+                        label='Dekatkan wajah'; color='#f59e0b';
+                    } else {
+                        label='—'; color='#94a3b8';
+                    }
                 }
 
                 ctx.strokeStyle=color; ctx.lineWidth=3; ctx.strokeRect(b[0], b[1], b[2], b[3]);
@@ -553,10 +710,14 @@ function faceScan(data){
                 ctx.fillStyle='#fff'; ctx.fillText(label, b[0]+7, b[1]-10);
             });
 
-            // ===== Konfirmasi lintas-frame: hanya tandai hadir bila wajah stabil beberapa frame beruntun =====
+            // ===== Hijau = langsung kunci & absen (1 frame), tanpa scan berulang =====
             seenThisFrame.forEach(uuid=>{
+                if(this.isFaceLocked(uuid)) return;
                 this._streak[uuid] = (this._streak[uuid]||0) + 1;
-                if(this._streak[uuid] >= this.confirmFrames) this.onMatch(uuid);
+                if(this._streak[uuid] >= this.confirmFrames){
+                    this._faceLocked[uuid] = true;
+                    this.onMatch(uuid);
+                }
             });
             // Luruh (bukan reset total) untuk yang tidak lolos gate frame ini — satu frame buram/silau
             // tak boleh menghapus progres streak yang sudah bagus (itu yang bikin "kedetect lalu
@@ -567,12 +728,14 @@ function faceScan(data){
         onMatch(uuid){
             const s=this.attendees.find(x=>x.uuid===uuid);
             if(!s) return;
+            if(this.isFaceLocked(uuid) && (s.marked || s.pulangMarked || s._masukBusy || s._pulangBusy)) return;
+            this._faceLocked[uuid] = true;
 
             // ===== Mode PULANG (khusus guru) =====
             if(this.scanMode==='pulang'){
-                if(s.type!=='guru') return;          // pulang hanya dilacak untuk guru
+                if(s.type!=='guru'){ delete this._faceLocked[uuid]; return; }
                 if(s.pulangMarked) return;
-                if(s._pulangBusy) return;            // cegah fetch ganda saat wajah masih di kamera
+                if(s._pulangBusy) return;
                 if(s._pulangBlockedAt && (Date.now()-s._pulangBlockedAt) < 8000) return; // jeda setelah ditolak
                 s._pulangBusy=true;
                 // Cek server DULU (agenda wajib lengkap) — baru tampilkan konfirmasi bila lolos.
@@ -583,6 +746,7 @@ function faceScan(data){
                     s._pulangBusy=false;
                     if(!d || d.success===false){
                         s._pulangBlockedAt = Date.now();
+                        delete this._faceLocked[uuid];
                         this.rejectFeedback(s.nama, (d&&d.message) ? d.message : 'Tidak bisa absen pulang.');
                         return;
                     }
@@ -593,14 +757,15 @@ function faceScan(data){
                     s.jam_pulang = jamK;
                     this.playDing();
                     this.speak('pulang', s.nama);
-                    this.lastMatch={ key:k, nama:s.nama, type:s.type, kelas:'Guru', mode:'pulang', jam:jamK };
+                    this.afterFaceMarkSuccess();
+                    this.lastMatch={ key, nama:s.nama, type:s.type, kelas:'Guru', mode:'pulang', jam:jamK, terlambat:false };
                     this.recent.unshift({ key:k, nama:s.nama.split(' ')[0], type:s.type, kelas:'Pulang', mode:'pulang', jam:jamK });
                     if(this.recent.length>5) this.recent.pop();
                     setTimeout(()=> window.lucide && lucide.createIcons(), 40);
                     setTimeout(()=>{ if(this.lastMatch && this.lastMatch.key===k) this.lastMatch=null; }, 1700);
                     setTimeout(()=>{ s.justMarked=false; }, 1600);
                     setTimeout(()=>{ this.recent = this.recent.filter(x=>x.key!==k); }, 6000); // auto-hilang
-                }).catch(()=>{ s._pulangBusy=false; });
+                }).catch(()=>{ s._pulangBusy=false; delete this._faceLocked[uuid]; });
                 return;
             }
 
@@ -619,6 +784,7 @@ function faceScan(data){
                     s._masukBusy=false;
                     if(!d || d.success===false){
                         s._masukBlockedAt = Date.now();
+                        delete this._faceLocked[uuid];
                         this.rejectFeedback(s.nama, (d&&d.message) || 'Tidak bisa absen');
                         return;
                     }
@@ -626,15 +792,15 @@ function faceScan(data){
                     const key=++this._seq; const jam=d.jam || this.nowHM();
                     s.jam_masuk = jam;
                     this.playDing(); this.speak('masuk', s.nama);
-                    this.lastMatch={ key, nama:s.nama, type:'guru', kelas:'Guru', mode:'masuk', jam };
+                    this.afterFaceMarkSuccess();
+                    this.lastMatch={ key, nama:s.nama, type:'guru', kelas:'Guru', mode:'masuk', jam, terlambat:!!d.terlambat };
                     this.recent.unshift({ key, nama:s.nama.split(' ')[0], type:'guru', kelas:'Guru', mode:'masuk', jam });
                     if(this.recent.length>5) this.recent.pop();
                     setTimeout(()=> window.lucide && lucide.createIcons(), 40);
                     setTimeout(()=>{ if(this.lastMatch && this.lastMatch.key===key) this.lastMatch=null; }, 1700);
                     setTimeout(()=>{ s.justMarked=false; }, 1600);
                     setTimeout(()=>{ this.recent = this.recent.filter(x=>x.key!==key); }, 6000);
-                    if(d.terlambat){ showToast(s.nama+' Terlambat (' + jam + ')', 'info'); }
-                }).catch(()=>{ s._masukBusy=false; });
+                }).catch(()=>{ s._masukBusy=false; delete this._faceLocked[uuid]; });
                 return;
             }
 
@@ -648,8 +814,8 @@ function faceScan(data){
             }).then(r=>r.json()).then(d=>{
                 s._masukBusy=false;
                 if(!d || d.success===false){
-                    // ditolak (mis. metode dikunci / tanggal absensi tidak dibuka)
                     s._masukBlockedAt = Date.now();
+                    delete this._faceLocked[uuid];
                     this.rejectFeedback(s.nama, (d&&d.message) || 'Absensi tidak dibuka');
                     return;
                 }
@@ -657,15 +823,15 @@ function faceScan(data){
                 const key=++this._seq; const jam=d.jam || this.nowHM();
                 s.jam_masuk = jam;
                 this.playDing(); this.speak('masuk', s.nama);
-                this.lastMatch={ key, nama:s.nama, type:'siswa', kelas:s.kelas, mode:'masuk', jam };
+                this.afterFaceMarkSuccess();
+                this.lastMatch={ key, nama:s.nama, type:'siswa', kelas:s.kelas, mode:'masuk', jam, terlambat:!!d.terlambat };
                 this.recent.unshift({ key, nama:s.nama.split(' ')[0], type:'siswa', kelas:s.kelas, mode:'masuk', jam });
                 if(this.recent.length>5) this.recent.pop();
                 setTimeout(()=> window.lucide && lucide.createIcons(), 40);
                 setTimeout(()=>{ if(this.lastMatch && this.lastMatch.key===key) this.lastMatch=null; }, 1700);
                 setTimeout(()=>{ s.justMarked=false; }, 1600);
-                setTimeout(()=>{ this.recent = this.recent.filter(x=>x.key!==key); }, 6000); // auto-hilang
-                if(d.terlambat){ showToast(s.nama+' Terlambat (' + jam + ')', 'info'); }
-            }).catch(()=>{ s._masukBusy=false; });
+                setTimeout(()=>{ this.recent = this.recent.filter(x=>x.key!==key); }, 6000);
+            }).catch(()=>{ s._masukBusy=false; delete this._faceLocked[uuid]; });
         },
 
         stop(){
@@ -699,6 +865,7 @@ function faceScan(data){
                             }).then(r=>r.json()).then(d=>{
                                 s._masukBusy=false;
                                 if(d && d.success) {
+                                    delete this._faceLocked[s.uuid];
                                     if (mode === 'masuk') {
                                         s.marked = false;
                                         s.jam_masuk = null;
@@ -722,6 +889,149 @@ function faceScan(data){
                     }
                 }
             });
+        },
+
+        pauseFaceForBarcode(){
+            this._scanGen++;
+            if(this.timer){ clearTimeout(this.timer); this.timer=null; }
+            this.scanning = false;
+            this.busy = false;
+            this._faceWasOn = this.camOn || this.loading || !!this.stream;
+            this.failStreak = 0;
+            if(this.stream){
+                this.stream.getTracks().forEach(t => t.stop());
+                this.stream = null;
+                this.camOn = false;
+            }
+        },
+
+        async resumeFaceAfterBarcode(){
+            if(!this._faceWasOn) return;
+            this._faceWasOn = false;
+            if(this.loading && !this.camOn){
+                await this.start();
+                return;
+            }
+            try {
+                this.stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'user', width:{ideal:1280}, height:{ideal:720} } });
+                const v=this.$refs.video; v.srcObject=this.stream;
+                await new Promise(r=> v.onloadedmetadata = r); v.play();
+                this.camOn = true;
+                this.applyAutoExposure();
+                this.scanning = true;
+                this.tick();
+            } catch(e){
+                this.status = 'Gagal memulihkan kamera wajah: ' + e.message;
+            }
+        },
+
+        async openBarcodeModal(){
+            this.barcodeError = '';
+            this.showBarcodeModal = true;
+            this.pauseFaceForBarcode();
+            this.$nextTick(()=>{
+                this.startBarcodeScan();
+                setTimeout(()=> window.lucide && lucide.createIcons(), 40);
+            });
+        },
+
+        async closeBarcodeModal(){
+            await this.stopBarcodeScan();
+            this.showBarcodeModal = false;
+            await this.resumeFaceAfterBarcode();
+        },
+
+        startBarcodeScan(){
+            if(typeof Html5Qrcode === 'undefined'){ this.barcodeError = 'Pemindai QR belum dimuat.'; return; }
+            const el = document.getElementById('barcodeReader');
+            if(!el) return;
+            if(this.barcodeScanner) return;
+            this.barcodeScanning = true;
+            this.barcodeScanner = new Html5Qrcode('barcodeReader');
+            this.barcodeScanner.start(
+                { facingMode:'environment' },
+                { fps:12, qrbox:{ width:240, height:240 }, aspectRatio:1.0 },
+                (text)=> this.onBarcodeScanned(text),
+                ()=>{}
+            ).catch(()=>{
+                this.barcodeScanning = false;
+                this.barcodeError = 'Tidak bisa membuka kamera kartu — gunakan scanner USB di bawah.';
+            });
+        },
+
+        stopBarcodeScan(){
+            if(!this.barcodeScanner) return Promise.resolve();
+            const s = this.barcodeScanner;
+            this.barcodeScanner = null;
+            this.barcodeScanning = false;
+            return s.stop().then(()=>{ try{ s.clear(); }catch(e){} }).catch(()=>{});
+        },
+
+        onBarcodeScanned(raw){
+            const code = String(raw || '').trim();
+            if(!code || this.barcodeBusy) return;
+            this.barcodeBusy = true;
+            this.stopBarcodeScan().then(()=> this.submitBarcode(code));
+        },
+
+        async submitBarcode(code){
+            const barcode = String(code || this.barcodeInput || '').trim();
+            this.barcodeError = '';
+            if(!barcode){ this.barcodeError = 'Kode kartu kosong.'; this.barcodeBusy = false; return; }
+            if(!this.markBarcodeUrl){ this.barcodeError = 'Endpoint kartu pelajar tidak tersedia.'; this.barcodeBusy = false; return; }
+            if(!this.barcodeBusy) this.barcodeBusy = true;
+            try {
+                const res = await fetch(this.markBarcodeUrl, {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json','X-CSRF-TOKEN':$('meta[name=csrf-token]').attr('content'),Accept:'application/json'},
+                    body: JSON.stringify({
+                        barcode,
+                        tanggal: this.tanggal || '{{ $tanggal }}',
+                        id_kelas: this.kelasFilter || null,
+                        _kiosk: this.kioskToken,
+                    }),
+                });
+                const d = await res.json();
+                if(!d || d.success===false){
+                    this.barcodeError = (d && d.message) ? d.message : 'Gagal menandai hadir.';
+                    this.barcodeBusy = false;
+                    if(this.showBarcodeModal && !this.barcodeScanner) this.startBarcodeScan();
+                    return;
+                }
+                let s = this.attendees.find(x => x.uuid === d.uuid)
+                    || this.attendees.find(x => x.type==='siswa' && (String(x.nis)===barcode || x.uuid===barcode));
+                if(!s && d.uuid){
+                    s = {
+                        uuid: d.uuid, type: 'siswa', nama: d.nama || barcode, nis: d.nis || barcode,
+                        kelas: d.kelas || '-', id_kelas: d.id_kelas, desc: [], marked: false,
+                    };
+                    this.attendees.push(s);
+                }
+                if(s){
+                    s.marked = true; s.justMarked = true; s.jam_masuk = d.jam || this.nowHM();
+                    this._faceLocked[d.uuid] = true;
+                    const key=++this._seq;
+                    this.playDing(); this.speak('masuk', s.nama);
+                    this.lastMatch={ key, nama:s.nama, type:'siswa', kelas:s.kelas, mode:'masuk', jam:s.jam_masuk, terlambat:!!d.terlambat };
+                    this.recent.unshift({ key, nama:s.nama.split(' ')[0], type:'siswa', kelas:s.kelas, mode:'masuk', jam:s.jam_masuk });
+                    if(this.recent.length>5) this.recent.pop();
+                    setTimeout(()=>{ s.justMarked=false; }, 1600);
+                }
+                this.barcodeInput = '';
+                this.failStreak = 0;
+                this.afterFaceMarkSuccess();
+                const wasModal = this.showBarcodeModal;
+                if(wasModal){
+                    this.showBarcodeModal = false;
+                    await this.stopBarcodeScan();
+                    await this.resumeFaceAfterBarcode();
+                }
+            } catch(e){
+                this.barcodeError = 'Jaringan gagal. Coba lagi.';
+                if(this.showBarcodeModal && !this.barcodeScanner) this.startBarcodeScan();
+            }
+            this.barcodeBusy = false;
+            setTimeout(()=> window.lucide && lucide.createIcons(), 40);
         }
     }
 }

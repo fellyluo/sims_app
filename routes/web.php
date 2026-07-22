@@ -100,10 +100,12 @@ WebAuthnRoutes::register('webauthn');
 Route::get('/kiosk-absensi/{token}', [AbsensiController::class, 'kioskEnter'])->name('absensi.kioskEnter');
 
 Route::middleware([EnsureKioskOrPermission::class, 'modul:absensi'])->group(function () {
-    Route::get('/absensi/scan', [AbsensiController::class, 'scan'])->name('absensi.scan');
-    Route::post('/absensi/mark', [AbsensiController::class, 'mark'])->name('absensi.mark');
-    Route::post('/absensi/cancel', [AbsensiController::class, 'cancel'])->name('absensi.cancel');
-    Route::get('/presensi-guru/scan', [AbsensiController::class, 'scan'])->name('presensi-guru.scan');
+        Route::get('/absensi/scan', [AbsensiController::class, 'scan'])->name('absensi.scan');
+        Route::post('/absensi/mark', [AbsensiController::class, 'mark'])->name('absensi.mark');
+        Route::post('/absensi/mark-barcode', [AbsensiController::class, 'markByBarcode'])->middleware('throttle:60,1')->name('absensi.markBarcode');
+        Route::post('/absensi/face-telemetry', [AbsensiController::class, 'faceTelemetry'])->middleware('throttle:30,1')->name('absensi.faceTelemetry');
+        Route::post('/absensi/cancel', [AbsensiController::class, 'cancel'])->name('absensi.cancel');
+        Route::get('/presensi-guru/scan', [AbsensiController::class, 'scan'])->name('presensi-guru.scan');
     Route::post('/presensi-guru/mark', [PresensiGuruController::class, 'mark'])->name('presensi-guru.mark');
     Route::post('/presensi-guru/cancel', [PresensiGuruController::class, 'cancel'])->name('presensi-guru.cancel');
     Route::get('/qr-absensi', [QrAbsensiController::class, 'show'])->name('qr.absensi');

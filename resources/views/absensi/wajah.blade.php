@@ -12,6 +12,9 @@
         </div>
         <div class="flex items-center gap-2 flex-wrap">
             @if(auth()->user()->canAccess('manage_absensi'))
+            <a href="{{ route('wajah.ganda') }}" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition">
+                <i data-lucide="shield-alert" class="w-4 h-4"></i> Cek Wajah Ganda
+            </a>
             <a href="{{ route('absensi.wajah-guru') }}" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition">
                 <i data-lucide="user-cog" class="w-4 h-4"></i> Registrasi Wajah Guru
             </a>
@@ -111,7 +114,7 @@
                     </div>
                     {{-- sample badges --}}
                     <div x-show="streaming" class="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-                        <template x-for="i in 3"><span class="w-3 h-3 rounded-full transition" :class="samples.length>=i ? 'bg-emerald-400' : 'bg-white/40'"></span></template>
+                        <template x-for="i in 5"><span class="w-3 h-3 rounded-full transition" :class="samples.length>=i ? 'bg-emerald-400' : 'bg-white/40'"></span></template>
                     </div>
                     {{-- indikator pencahayaan rendah --}}
                     <div x-show="streaming && lowLight" x-cloak class="absolute top-3 left-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/85 backdrop-blur text-white text-xs font-semibold">
@@ -122,8 +125,8 @@
             </div>
             <div class="p-5 border-t border-slate-100 dark:border-slate-700 flex flex-wrap sm:flex-nowrap gap-2 justify-end">
                 <button @click="close()" class="flex-1 sm:flex-none justify-center px-4 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700">Batal</button>
-                <button @click="capture()" :disabled="!streaming || capturing || samples.length>=3" class="w-full sm:w-auto order-first sm:order-none justify-center px-4 py-2 rounded-xl text-sm font-semibold border border-primary text-primary hover:bg-primary-50 transition flex items-center gap-1.5 disabled:opacity-40">
-                    <i data-lucide="aperture" class="w-4 h-4"></i> Ambil Sampel (<span x-text="samples.length"></span>/3)
+                <button @click="capture()" :disabled="!streaming || capturing || samples.length>=5" class="w-full sm:w-auto order-first sm:order-none justify-center px-4 py-2 rounded-xl text-sm font-semibold border border-primary text-primary hover:bg-primary-50 transition flex items-center gap-1.5 disabled:opacity-40">
+                    <i data-lucide="aperture" class="w-4 h-4"></i> Ambil Sampel (<span x-text="samples.length"></span>/5)
                     <kbd class="text-[10px] px-1.5 py-0.5 rounded bg-primary-50 border border-primary/30">Spasi</kbd>
                 </button>
                 <button @click="save()" :disabled="samples.length<3 || saving" class="flex-1 sm:flex-none justify-center btn-primary px-5 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 disabled:opacity-40">
@@ -302,7 +305,7 @@ function faceEnroll(){
         },
         // Spasi = ambil sampel (saat modal kamera terbuka)
         onSpace(e){
-            if(this.modal && this.streaming && !this.capturing && !this.saving && this.samples.length < 3){
+            if(this.modal && this.streaming && !this.capturing && !this.saving && this.samples.length < 5){
                 e.preventDefault();
                 this.capture();
             }
@@ -334,7 +337,7 @@ function faceEnroll(){
                     // foto profil = pose paling menghadap depan (yaw terkecil)
                     const yaw = Math.abs(face.rotation?.angle?.yaw ?? 0);
                     if(face.box && yaw < this._bestYaw){ this.photo = this.cropFace(face.box, this._ecv); this._bestYaw = yaw; }
-                    this.msg = 'Sampel ' + this.samples.length + ' tersimpan. ' + (this.samples.length<3 ? 'Ambil lagi dari sudut sedikit berbeda.' : 'Cukup, klik Simpan.');
+                    this.msg = 'Sampel ' + this.samples.length + ' tersimpan. ' + (this.samples.length<5 ? 'Ubah sudut/jarak sedikit lalu ambil lagi (target 5).' : 'Lengkap (5). Klik Simpan.');
                     this.msgErr=false;
                 } else {
                     this.msg=quality.msg || 'Wajah tidak terdeteksi. Pastikan pencahayaan cukup & wajah menghadap kamera.';
@@ -344,7 +347,7 @@ function faceEnroll(){
             this.capturing=false;
         },
         async save(){
-            if(this.samples.length < 3){ this.msg='Ambil minimal 3 sampel wajah dulu.'; this.msgErr=true; return; }
+            if(this.samples.length < 3){ this.msg='Ambil minimal 3 sampel wajah dulu (disarankan 5).'; this.msgErr=true; return; }
             this.saving=true;
             try {
                 const res = await fetch(`/siswa/${this.uuid}/wajah`, {
