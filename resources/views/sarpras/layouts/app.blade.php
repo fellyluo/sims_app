@@ -132,17 +132,40 @@
 .sarpras-scope .dataTables_scrollBody {
     overflow-x:auto;
 }
-.sarpras-scope table:not(.ttd) { max-width:100%; }
-.sarpras-scope table:not(.ttd) th,
-.sarpras-scope table:not(.ttd) td,
-.sarpras-scope table.dataTable.nowrap th,
-.sarpras-scope table.dataTable.nowrap td,
+/* Tabel BUKAN DataTables: batasi max-width spy tak keluar kartu (word-break di th+td-nya). */
+.sarpras-scope table:not(.ttd):not(.dataTable) { max-width:100%; }
+.sarpras-scope table:not(.ttd):not(.dataTable) th,
+.sarpras-scope table:not(.ttd):not(.dataTable) td,
 .sarpras-scope .data-table th,
 .sarpras-scope .data-table td {
     white-space:normal !important;
     overflow-wrap:anywhere;
     word-break:break-word;
     vertical-align:top;
+}
+/* Tabel DataTables (scrollX): JANGAN di-max-width:100% — itu memaksa tabel internal DataTables
+   muat di lebar kontainer sempit (mis. layar HP), sehingga kolom terpaksa dipepetkan sampai
+   teks header pecah di tengah kata ("Peminjam" -> "Pemi"/"njam"). scrollX sudah punya scroll
+   horizontal sendiri (.dataTables_scrollBody { overflow-x:auto } di atas) — biarkan tabelnya
+   melebar natural & discroll, bukan dipaksa muat. Header (th) sengaja TIDAK di-word-break biar
+   label kolom tetap 1 baris; body (td) tetap boleh wrap utk teks panjang di kolom yg sudah lega. */
+.sarpras-scope table.dataTable td {
+    white-space:normal !important;
+    overflow-wrap:anywhere;
+    word-break:break-word;
+    vertical-align:top;
+}
+/* overflow-wrap:anywhere di .sarpras-scope (baris atas) ke-inherit turun ke SEMUA elemen di
+   bawahnya termasuk th DataTables, walau th tak disebut di rule manapun di atas — inherited
+   value tetap "anywhere" kalau tak di-reset eksplisit. Itu bikin browser hitung intrinsic width
+   header jadi nyaris nol (krn "anywhere" boleh potong di mana saja, bukan cuma di whitespace),
+   sehingga scrollX DataTables salah kira tabel muat di kontainer sempit & label kolom terpepet
+   sampai pecah di tengah kata. Reset eksplisit ke "normal" di sini spy th kembali dihitung
+   berdasar lebar kata utuh & scrollX bisa melebarkan tabel + scroll horizontal spt seharusnya. */
+.sarpras-scope table.dataTable thead th {
+    overflow-wrap:normal;
+    word-break:normal;
+    white-space:nowrap;
 }
 .sarpras-scope td .badge,
 .sarpras-scope th .badge,
@@ -385,11 +408,11 @@
     border-color:#1a73e8 !important;
     box-shadow:0 0 0 3px rgba(26,115,232,.14);
 }
-.sarpras-google-shell [class*="bg-slate-900"],
-.sarpras-google-shell [class*="hover:bg-slate-800"]:hover {
+.sarpras-google-shell [class~="bg-slate-900"],
+.sarpras-google-shell [class~="hover:bg-slate-800"]:hover {
     background-color:#1a73e8 !important;
 }
-.sarpras-google-shell [class*="bg-primary"] {
+.sarpras-google-shell [class~="bg-primary"] {
     background-color:#1a73e8 !important;
 }
 .sarpras-google-shell .text-primary,
@@ -441,14 +464,6 @@
                 </div>
             </div>
             <div class="flex items-center gap-2 flex-wrap justify-end">
-                @can('sarpras.denah.kelola')
-                    @if (request()->routeIs('sarpras.dashboard') || request()->routeIs('sarpras.denah.index') || request()->routeIs('sarpras.denah.show'))
-                        <button type="button" id="btn-toggle-tata-letak" onclick="toggleTataLetakMode()"
-                           class="sarpras-google-btn inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition">
-                            <i data-lucide="layout-dashboard" class="w-4 h-4"></i> <span>Tata Letak</span>
-                        </button>
-                    @endif
-                @endcan
                 @hasSection('sarpras_actions')
                     @yield('sarpras_actions')
                 @endif
@@ -456,48 +471,6 @@
         </div>
     </div>
 
-    {{-- Navigasi struktur modul Sarpras: operator vs staf (guru) --}}
-    @php
-        $bolehKelolaSarpras = auth()->user()?->isAdmin() || auth()->user()?->canAccess('manage_sarpras');
-        if ($bolehKelolaSarpras) {
-            $sarprasNav = [
-                ['label' => 'Dashboard', 'icon' => 'layout-dashboard', 'route' => 'sarpras.dashboard', 'active' => ['sarpras.dashboard'], 'can' => 'sarpras.dashboard.lihat'],
-                ['label' => 'Kerusakan', 'icon' => 'triangle-alert', 'route' => 'sarpras.kerusakan.index', 'active' => ['sarpras.kerusakan.*'], 'can' => 'sarpras.kerusakan.lihat'],
-                ['label' => 'Inventaris', 'icon' => 'package', 'route' => 'sarpras.aset.index', 'active' => ['sarpras.aset.*'], 'can' => 'sarpras.aset.lihat'],
-                ['label' => 'Denah Sekolah', 'icon' => 'map', 'route' => 'sarpras.denah.index', 'active' => ['sarpras.denah.*', 'sarpras.ruangan.*'], 'can' => 'sarpras.denah.lihat'],
-                ['label' => 'Booking', 'icon' => 'calendar-check', 'route' => 'sarpras.booking.index', 'active' => ['sarpras.booking.*'], 'can' => 'sarpras.peminjaman.lihat'],
-                ['label' => 'Peminjaman', 'icon' => 'hand-helping', 'route' => 'sarpras.peminjaman.index', 'active' => ['sarpras.peminjaman.*'], 'can' => 'sarpras.peminjaman.lihat'],
-                ['label' => 'Pengadaan', 'icon' => 'shopping-cart', 'route' => 'sarpras.pengadaan.index', 'active' => ['sarpras.pengadaan.*'], 'can' => 'sarpras.pengadaan.lihat'],
-                ['label' => 'Perawatan', 'icon' => 'wrench', 'route' => 'sarpras.perbaikan.index', 'active' => ['sarpras.perbaikan.*', 'sarpras.teknisi.*', 'sarpras.jadwal.*'], 'can' => 'sarpras.perbaikan.lihat'],
-                ['label' => 'Mutasi/Hapus', 'icon' => 'replace', 'route' => 'sarpras.mutasi.index', 'active' => ['sarpras.mutasi.*', 'sarpras.penghapusan.*'], 'can' => 'sarpras.mutasi.kelola'],
-                ['label' => 'Laporan', 'icon' => 'file-bar-chart', 'route' => 'sarpras.laporan.index', 'active' => ['sarpras.laporan.*'], 'can' => 'sarpras.laporan.lihat'],
-                ['label' => 'Master Data', 'icon' => 'settings-2', 'route' => 'sarpras.kategori.index', 'active' => ['sarpras.kategori.*', 'sarpras.supplier.*'], 'can' => 'sarpras.pengaturan.kelola'],
-            ];
-        } else {
-            // Staf/guru: aksi harian saja.
-            $sarprasNav = [
-                ['label' => 'Pinjam Barang', 'icon' => 'hand-helping', 'route' => 'sarpras.peminjaman.index', 'active' => ['sarpras.peminjaman.*'], 'can' => 'sarpras.peminjaman.lihat'],
-                ['label' => 'Booking Ruangan', 'icon' => 'calendar-check', 'route' => 'sarpras.booking.index', 'active' => ['sarpras.booking.*'], 'can' => 'sarpras.peminjaman.lihat'],
-                ['label' => 'Lapor Kerusakan', 'icon' => 'triangle-alert', 'route' => 'sarpras.kerusakan.index', 'active' => ['sarpras.kerusakan.*'], 'can' => 'sarpras.kerusakan.lihat'],
-                ['label' => 'Denah Sekolah', 'icon' => 'map', 'route' => 'sarpras.denah.index', 'active' => ['sarpras.denah.*', 'sarpras.ruangan.*'], 'can' => 'sarpras.denah.lihat'],
-            ];
-        }
-    @endphp
-    <div class="card sarpras-google-tabs !rounded-2xl p-2 overflow-x-auto sarpras-tabs">
-        <div class="flex items-center gap-1 min-w-max">
-            @foreach($sarprasNav as $item)
-                @can($item['can'])
-                    @php $active = request()->routeIs($item['active']); @endphp
-                    <a href="{{ route($item['route']) }}"
-                       class="sarpras-tab-link inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition {{ $active ? 'is-active' : '' }}">
-                        <i data-lucide="{{ $item['icon'] }}" class="w-4 h-4"></i>
-                        <span>{{ $item['label'] }}</span>
-                    </a>
-                @endcan
-            @endforeach
-        </div>
-    </div>
-    {{-- Konten halaman modul --}}
     @yield('sarpras_body')
 </div>
 
@@ -531,143 +504,4 @@ window.confirmDelete = function (form) {
 };
 </script>
 @endpush
-
-<script>
-// === DRAG & DROP LAYOUT ARRANGEMENT (LocalStorage-backed) ===
-let isLayoutEditMode = false;
-
-function applySavedLayouts() {
-    document.querySelectorAll('[data-drag-container]').forEach(container => {
-        const key = 'sarpras_layout_' + container.getAttribute('data-drag-container');
-        const savedOrder = localStorage.getItem(key);
-        if (savedOrder) {
-            const orderIds = JSON.parse(savedOrder);
-            const elements = Array.from(container.children);
-            
-            // Map elements by a unique identifier (data-drag-id)
-            const elementsMap = {};
-            elements.forEach(el => {
-                const id = el.getAttribute('data-drag-id') || el.innerText.trim();
-                elementsMap[id] = el;
-            });
-            
-            // Re-append elements in the saved order
-            orderIds.forEach(id => {
-                if (elementsMap[id]) {
-                    container.appendChild(elementsMap[id]);
-                    delete elementsMap[id];
-                }
-            });
-            
-            // Append any remaining elements that weren't in the saved order
-            Object.values(elementsMap).forEach(el => {
-                container.appendChild(el);
-            });
-        }
-    });
-}
-
-function toggleTataLetakMode() {
-    isLayoutEditMode = !isLayoutEditMode;
-    const btn = document.getElementById('btn-toggle-tata-letak');
-    const containers = document.querySelectorAll('[data-drag-container]');
-    
-    if (isLayoutEditMode) {
-        if (btn) {
-            btn.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i> <span>Selesai</span>';
-            btn.className = "sarpras-google-btn inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition";
-            if (window.lucide) window.lucide.createIcons();
-        }
-        
-        containers.forEach(container => {
-            container.classList.add('ring-4', 'ring-emerald-300/40', 'p-2', 'rounded-xl', 'bg-emerald-50/10', 'transition-all');
-            Array.from(container.children).forEach(child => {
-                child.setAttribute('draggable', 'true');
-                child.classList.add('cursor-move', 'opacity-90', 'hover:border-emerald-400');
-                
-                // Add drag events
-                child.addEventListener('dragstart', handleDragStart);
-                child.addEventListener('dragover', handleDragOver);
-                child.addEventListener('drop', handleDrop);
-                child.addEventListener('dragend', handleDragEnd);
-            });
-        });
-    } else {
-        if (btn) {
-            btn.innerHTML = '<i data-lucide="layout-dashboard" class="w-4 h-4"></i> <span>Tata Letak</span>';
-            btn.className = "sarpras-google-btn inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition";
-            if (window.lucide) window.lucide.createIcons();
-        }
-        
-        containers.forEach(container => {
-            container.classList.remove('ring-4', 'ring-emerald-300/40', 'p-2', 'rounded-xl', 'bg-emerald-50/10');
-            
-            // Save new order to localStorage
-            const key = 'sarpras_layout_' + container.getAttribute('data-drag-container');
-            const orderIds = Array.from(container.children).map(child => {
-                return child.getAttribute('data-drag-id') || child.innerText.trim();
-            });
-            localStorage.setItem(key, JSON.stringify(orderIds));
-            
-            Array.from(container.children).forEach(child => {
-                child.removeAttribute('draggable');
-                child.classList.remove('cursor-move', 'opacity-90', 'hover:border-emerald-400');
-                
-                // Remove drag events
-                child.removeEventListener('dragstart', handleDragStart);
-                child.removeEventListener('dragover', handleDragOver);
-                child.removeEventListener('drop', handleDrop);
-                child.removeEventListener('dragend', handleDragEnd);
-            });
-        });
-    }
-}
-
-let dragSrcEl = null;
-
-function handleDragStart(e) {
-    this.style.opacity = '0.4';
-    dragSrcEl = this;
-    e.dataTransfer.effectAllowed = 'move';
-}
-
-function handleDragOver(e) {
-    if (e.preventDefault) {
-        e.preventDefault();
-    }
-    e.dataTransfer.dropEffect = 'move';
-    return false;
-}
-
-function handleDrop(e) {
-    if (e.stopPropagation) {
-        e.stopPropagation();
-    }
-    
-    if (dragSrcEl !== this) {
-        const container = this.parentNode;
-        const children = Array.from(container.children);
-        const fromIndex = children.indexOf(dragSrcEl);
-        const toIndex = children.indexOf(this);
-        
-        if (fromIndex < toIndex) {
-            container.insertBefore(dragSrcEl, this.nextSibling);
-        } else {
-            container.insertBefore(dragSrcEl, this);
-        }
-    }
-    return false;
-}
-
-function handleDragEnd(e) {
-    this.style.opacity = '1';
-}
-
-// Run applySavedLayouts on DOMContentLoaded or immediately if DOM is loaded
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', applySavedLayouts);
-} else {
-    applySavedLayouts();
-}
-</script>
 @endsection

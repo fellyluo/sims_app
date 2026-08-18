@@ -101,6 +101,13 @@ Route::post('/login/pin', [LoginController::class, 'loginPin'])->middleware('thr
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 Route::post('/password/request', [LoginController::class, 'requestResetPassword'])->middleware('throttle:6,1')->name('password.request');
 
+// ─── Unduh Aplikasi dari halaman login — SEBELUM login, jadi tanpa 'auth'. Controller
+//     yang sama dgn menu sidebar (app.download.*) — download()/page() di sana murni baca
+//     Setting/Storage, tak pernah menyentuh auth()->user(), aman diekspos publik juga. ───
+Route::controller(AppDownloadController::class)->group(function () {
+    Route::get('/unduh-aplikasi-tamu/{platform}', 'download')->name('guest.app.download.file');
+});
+
 // WebAuthn (Fingerprint / Face ID)
 WebAuthnRoutes::register('webauthn');
 
@@ -655,6 +662,12 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
         Route::get('/{tugasKelas}/unduh', 'download')->name('.unduh');
         Route::delete('/{tugasKelas}', 'destroy')->name('.destroy');
     });
+    // Fase 5 dihapus dari navigasi (keputusan FL) — redirect bookmark lama ke dashboard utama
+    Route::middleware('modul:piket')->group(function () {
+        Route::redirect('/piket/dashboard', '/dashboard')->name('piket.dashboard');
+        Route::redirect('/piket/rekap', '/dashboard')->name('piket.rekap');
+        Route::redirect('/piket/rekap/export', '/dashboard')->name('piket.rekap.export');
+    });
 
     // ─── Agenda Rapat / Notulen Rapat — admin/kurikulum/kepala atau guru sekretaris ───
     Route::middleware('modul:agenda')->prefix('rapat')->name('rapat.')->controller(RapatController::class)->group(function () {
@@ -951,6 +964,7 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
             Route::post('/semester', 'updateSemester')->name('setting.semester');
             Route::post('/semester/store', 'storeSemester')->name('setting.semester.store');
             Route::post('/identitas', 'setIdentitasSekolah')->name('setting.identitas');
+            Route::post('/login-background', 'setLoginBackground')->name('setting.loginBackground');
             Route::post('/jenjang-sekolah', 'setJenjangSekolah')->name('setting.jenjangSekolah');
             Route::post('/media-sosial', 'setMediaSosial')->name('setting.mediaSosial');
             Route::post('/poin-terlambat', 'setPoinTerlambat')->name('setting.poinTerlambat');
@@ -1043,11 +1057,13 @@ Route::middleware(['auth', EnsureFaceRegistered::class])->group(function () {
 
         Route::get('/{ujian}', [UjianController::class, 'show'])->name('show');
         Route::get('/{ujian}/edit', [UjianController::class, 'edit'])->name('edit');
+        Route::get('/{ujian}/pengaturan', [UjianController::class, 'editPengaturan'])->name('pengaturan.edit');
         Route::post('/{ujian}/update', [UjianController::class, 'update'])->name('update');
         Route::post('/{ujian}/kelas', [UjianController::class, 'syncKelas'])->name('kelas.sync');
         Route::post('/{ujian}/terbit', [UjianController::class, 'publish'])->name('publish');
         Route::post('/{ujian}/tutup', [UjianController::class, 'close'])->name('close');
         Route::post('/{ujian}/kelas/{ujianKelas}/token-baru', [UjianController::class, 'regenerateToken'])->name('kelas.token');
+        Route::post('/{ujian}/token-baru', [UjianController::class, 'regenerateSemuaToken'])->name('token.reset');
         Route::delete('/{ujian}', [UjianController::class, 'destroy'])->name('destroy');
 
         Route::post('/unggah-gambar', [UjianSoalController::class, 'uploadGambar'])->middleware('throttle:30,1')->name('soal.unggah-gambar');
